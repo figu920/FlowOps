@@ -1,0 +1,333 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from './api';
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ['currentUser'],
+    queryFn: api.auth.me,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUsers() {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: api.users.getAll,
+  });
+}
+
+export function usePendingUsers() {
+  return useQuery({
+    queryKey: ['users', 'pending'],
+    queryFn: api.users.getPending,
+  });
+}
+
+export function useApproveUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: string }) => 
+      api.users.approve(id, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users', 'pending'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useRejectUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.users.reject(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users', 'pending'] });
+    },
+  });
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
+      api.users.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useRemoveUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.users.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useInventory() {
+  return useQuery({
+    queryKey: ['inventory'],
+    queryFn: api.inventory.getAll,
+  });
+}
+
+export function useCreateInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.inventory.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useUpdateInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
+      api.inventory.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useDeleteInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.inventory.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    },
+  });
+}
+
+export function useEquipment() {
+  return useQuery({
+    queryKey: ['equipment'],
+    queryFn: api.equipment.getAll,
+  });
+}
+
+export function useCreateEquipment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.equipment.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useUpdateEquipment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
+      api.equipment.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useDeleteEquipment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.equipment.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    },
+  });
+}
+
+export function useChecklists(listType?: string) {
+  return useQuery({
+    queryKey: ['checklists', listType],
+    queryFn: () => api.checklists.getByType(listType),
+  });
+}
+
+export function useCreateChecklist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.checklists.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useUpdateChecklist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
+      api.checklists.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useDeleteChecklist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.checklists.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+  });
+}
+
+export function useTasks() {
+  return useQuery({
+    queryKey: ['tasks'],
+    queryFn: api.tasks.getAll,
+  });
+}
+
+export function useCreateTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.tasks.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useUpdateTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
+      api.tasks.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.tasks.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useCompleteTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, photo }: { id: string; photo: string }) => 
+      api.tasks.complete(id, photo),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useTaskCompletions(id: string) {
+  return useQuery({
+    queryKey: ['tasks', id, 'completions'],
+    queryFn: () => api.tasks.getCompletions(id),
+    enabled: !!id,
+  });
+}
+
+export function useChat() {
+  return useQuery({
+    queryKey: ['chat'],
+    queryFn: api.chat.getAll,
+  });
+}
+
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.chat.send,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat'] });
+    },
+  });
+}
+
+export function useTimeline() {
+  return useQuery({
+    queryKey: ['timeline'],
+    queryFn: api.timeline.getAll,
+  });
+}
+
+export function useCreateTimelineEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.timeline.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useMenu() {
+  return useQuery({
+    queryKey: ['menu'],
+    queryFn: api.menu.getAll,
+  });
+}
+
+export function useCreateMenuItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.menu.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useDeleteMenuItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.menu.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+    },
+  });
+}
+
+export function useMenuIngredients(id: string) {
+  return useQuery({
+    queryKey: ['menu', id, 'ingredients'],
+    queryFn: () => api.menu.getIngredients(id),
+    enabled: !!id,
+  });
+}
+
+export function useAddIngredient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      api.menu.addIngredient(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+      queryClient.invalidateQueries({ queryKey: ['menu', variables.id, 'ingredients'] });
+    },
+  });
+}

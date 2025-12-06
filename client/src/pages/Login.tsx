@@ -7,13 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from 'framer-motion';
 import { Lock, Mail, AlertCircle, User, Building2, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 
 export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [emailOrUser, setEmailOrUser] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login, register } = useStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const { setCurrentUser } = useStore();
   const [_, setLocation] = useLocation();
 
   // Registration State
@@ -26,17 +28,23 @@ export default function Login() {
   const [regPhone, setRegPhone] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = login(emailOrUser, password);
-    if (result.success) {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const user = await api.auth.login(emailOrUser, password);
+      setCurrentUser(user);
       setLocation('/');
-    } else {
-      setError(result.message || "Invalid credentials.");
+    } catch (err: any) {
+      setError(err.message || "Invalid credentials.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
@@ -56,22 +64,29 @@ export default function Login() {
       return;
     }
 
-    register({
-      name: regName,
-      email: regEmail,
-      username: regUser,
-      password: regPass,
-      establishment: regEstablishment,
-      phoneNumber: regPhone
-    });
+    setIsLoading(true);
 
-    setSuccessMsg("Registration successful! Please wait for Manager approval.");
-    setTimeout(() => {
-      setIsRegistering(false);
-      setSuccessMsg("");
-      // Reset form
-      setRegName(""); setRegEmail(""); setRegUser(""); setRegPass(""); setRegConfirmPass("");
-    }, 3000);
+    try {
+      await api.auth.register({
+        name: regName,
+        email: regEmail,
+        username: regUser,
+        password: regPass,
+        establishment: regEstablishment,
+        phoneNumber: regPhone
+      });
+
+      setSuccessMsg("Registration successful! Please wait for Manager approval.");
+      setTimeout(() => {
+        setIsRegistering(false);
+        setSuccessMsg("");
+        setRegName(""); setRegEmail(""); setRegUser(""); setRegPass(""); setRegConfirmPass("");
+      }, 3000);
+    } catch (err: any) {
+      setError(err.message || "Registration failed.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -144,8 +159,13 @@ export default function Login() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-12 bg-flow-green text-black font-bold text-base hover:bg-flow-green/90 rounded-xl mt-4 shadow-[0_0_20px_rgba(50,215,75,0.2)]">
-                Sign In
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full h-12 bg-flow-green text-black font-bold text-base hover:bg-flow-green/90 rounded-xl mt-4 shadow-[0_0_20px_rgba(50,215,75,0.2)] disabled:opacity-50"
+                data-testid="button-login"
+              >
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
           ) : (
@@ -191,8 +211,13 @@ export default function Login() {
                     </div>
                   )}
 
-                  <Button type="submit" className="w-full h-11 bg-white text-black font-bold hover:bg-white/90 rounded-xl mt-2">
-                    Create Account
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full h-11 bg-white text-black font-bold hover:bg-white/90 rounded-xl mt-2 disabled:opacity-50"
+                    data-testid="button-register"
+                  >
+                    {isLoading ? 'Creating Account...' : 'Create Account'}
                   </Button>
                 </>
               )}
