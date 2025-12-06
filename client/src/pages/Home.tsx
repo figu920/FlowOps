@@ -4,41 +4,107 @@ import { motion } from 'framer-motion';
 import { 
   Package, 
   Wrench, 
-  ClipboardCheck, 
-  CalendarCheck, 
-  MessageSquare, 
-  Clock 
+  ClipboardList, 
+  CalendarDays, 
+  MessageCircle, 
+  Activity 
 } from 'lucide-react';
-
-const menuItems = [
-  { title: 'Inventory', icon: Package, path: '/inventory', color: 'text-flow-green' },
-  { title: 'Equipment', icon: Wrench, path: '/equipment', color: 'text-flow-yellow' },
-  { title: 'Checklists', icon: ClipboardCheck, path: '/checklists', color: 'text-blue-400' },
-  { title: 'Weekly Tasks', icon: CalendarCheck, path: '/tasks', color: 'text-purple-400' },
-  { title: 'Chat', icon: MessageSquare, path: '/chat', color: 'text-white' },
-  { title: 'Timeline', icon: Clock, path: '/timeline', color: 'text-orange-400' },
-];
+import { useStore } from '@/lib/store';
 
 export default function Home() {
+  const { inventory, equipment } = useStore();
+  
+  // Dynamic status counts
+  const lowStockCount = inventory.filter(i => i.status !== 'OK').length;
+  const brokenCount = equipment.filter(e => e.status === 'Broken').length;
+
+  const menuItems = [
+    { 
+      title: 'Inventory', 
+      icon: Package, 
+      path: '/inventory', 
+      color: 'bg-flow-green', 
+      textColor: 'text-flow-green',
+      count: lowStockCount > 0 ? `${lowStockCount} Alert` : undefined,
+      countColor: 'text-flow-yellow'
+    },
+    { 
+      title: 'Equipment', 
+      icon: Wrench, 
+      path: '/equipment', 
+      color: 'bg-flow-yellow', 
+      textColor: 'text-flow-yellow',
+      count: brokenCount > 0 ? `${brokenCount} Issue` : undefined,
+      countColor: 'text-flow-red'
+    },
+    { 
+      title: 'Checklists', 
+      icon: ClipboardList, 
+      path: '/checklists', 
+      color: 'bg-blue-500',
+      textColor: 'text-blue-400'
+    },
+    { 
+      title: 'Tasks', 
+      icon: CalendarDays, 
+      path: '/tasks', 
+      color: 'bg-purple-500',
+      textColor: 'text-purple-400'
+    },
+    { 
+      title: 'Chat', 
+      icon: MessageCircle, 
+      path: '/chat', 
+      color: 'bg-white',
+      textColor: 'text-white'
+    },
+    { 
+      title: 'Timeline', 
+      icon: Activity, 
+      path: '/timeline', 
+      color: 'bg-orange-500',
+      textColor: 'text-orange-400'
+    },
+  ];
+
   return (
-    <Layout title="Dashboard" showBack={false}>
-      <div className="grid grid-cols-2 gap-4 mt-2">
+    <Layout title="FlowOps" showBack={false}>
+      <div className="grid grid-cols-2 gap-4">
         {menuItems.map((item, index) => (
           <Link key={item.title} href={item.path}>
             <motion.div
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.96 }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="aspect-square bg-card rounded-2xl p-5 flex flex-col justify-between shadow-sm border border-white/5 active:bg-white/5 transition-colors cursor-pointer"
+              transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 20 }}
+              className="aspect-[1/1.1] bg-card rounded-[24px] p-5 flex flex-col justify-between relative overflow-hidden group border border-white/[0.03]"
             >
-              <div className={`p-3 bg-white/5 w-fit rounded-xl ${item.color}`}>
-                <item.icon className="w-8 h-8" strokeWidth={1.5} />
+              {/* Ambient Glow */}
+              <div className={`absolute -right-10 -top-10 w-32 h-32 ${item.color} opacity-[0.07] blur-3xl group-hover:opacity-[0.15] transition-opacity duration-500`} />
+
+              <div className="flex justify-between items-start">
+                <div className={`w-12 h-12 rounded-full ${item.color} bg-opacity-15 flex items-center justify-center`}>
+                  <item.icon className={`w-6 h-6 ${item.textColor}`} strokeWidth={2.5} />
+                </div>
+                {item.count && (
+                  <div className="bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-full">
+                    <span className={`text-[10px] font-bold uppercase ${item.countColor}`}>{item.count}</span>
+                  </div>
+                )}
               </div>
-              <span className="font-semibold text-lg tracking-tight">{item.title}</span>
+
+              <div>
+                <h3 className="font-semibold text-[19px] tracking-tight text-white/90">{item.title}</h3>
+                <p className="text-white/40 text-xs mt-1 font-medium">Tap to view</p>
+              </div>
             </motion.div>
           </Link>
         ))}
+      </div>
+      
+      <div className="mt-8 text-center">
+        <p className="text-white/20 text-xs font-medium uppercase tracking-widest">University Dining • v1.0</p>
       </div>
     </Layout>
   );

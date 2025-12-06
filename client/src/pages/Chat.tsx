@@ -2,15 +2,17 @@ import { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import { Send } from 'lucide-react';
+import { Send, Plus } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { motion, AnimatePresence } from 'framer-motion';
 
 const QUICK_ACTIONS = [
-  "Inventory arrived",
-  "Need help front",
-  "Backup grill",
-  "Rush incoming"
+  "Inventory arrived 📦",
+  "Need help front 🆘",
+  "Backup grill 🔥",
+  "Rush incoming 🏃",
+  "Break time ☕"
 ];
 
 export default function Chat() {
@@ -32,66 +34,91 @@ export default function Chat() {
   };
 
   return (
-    <Layout title="Chat" className="flex flex-col p-0 pb-0 h-[calc(100vh-60px)]">
+    <Layout title="Team Chat" className="flex flex-col p-0 h-screen overflow-hidden">
       {/* Messages Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto px-4 pt-24 pb-4 space-y-6"
       >
-        {chat.map((msg) => (
-          <div 
-            key={msg.id} 
-            className={cn(
-              "flex flex-col max-w-[80%]",
-              msg.isMe ? "ml-auto items-end" : "mr-auto items-start"
-            )}
-          >
-            {!msg.isMe && <span className="text-xs text-muted-foreground mb-1 ml-1">{msg.sender}</span>}
-            
-            <div className={cn(
-              "px-4 py-2.5 rounded-2xl text-sm shadow-sm",
-              msg.isMe 
-                ? "bg-flow-green text-black rounded-tr-sm" 
-                : "bg-card border border-white/10 text-foreground rounded-tl-sm",
-              msg.type === 'action' && "font-bold"
-            )}>
-              {msg.text}
-            </div>
-            
-            <span className="text-[10px] text-muted-foreground/50 mt-1 mx-1">
-              {msg.timestamp}
-            </span>
-          </div>
-        ))}
+        {chat.map((msg, i) => {
+          const isSequence = i > 0 && chat[i-1].sender === msg.sender;
+          
+          return (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              key={msg.id} 
+              className={cn(
+                "flex flex-col max-w-[85%]",
+                msg.isMe ? "ml-auto items-end" : "mr-auto items-start"
+              )}
+            >
+              {!msg.isMe && !isSequence && (
+                <span className="text-[11px] text-muted-foreground mb-1 ml-3 font-medium">{msg.sender}</span>
+              )}
+              
+              <div className={cn(
+                "px-5 py-3 text-[15px] shadow-sm backdrop-blur-sm",
+                msg.isMe 
+                  ? "bg-blue-600 text-white rounded-[20px] rounded-tr-sm" 
+                  : "bg-[#2C2C2E] text-white rounded-[20px] rounded-tl-sm border border-white/5",
+                msg.type === 'action' && "font-bold bg-flow-green text-black border-none"
+              )}>
+                {msg.text}
+              </div>
+              
+              <span className={cn(
+                "text-[10px] text-white/20 mt-1 mx-2",
+                msg.isMe ? "text-right" : "text-left"
+              )}>
+                {msg.timestamp}
+              </span>
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-card border-t border-white/5 pb-8 safe-area-bottom">
+      <div className="bg-[#161618] border-t border-white/10 pb-8 pt-3 px-4 safe-area-bottom w-full z-20">
         {/* Quick Actions */}
-        <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar mb-2">
-          {QUICK_ACTIONS.map(action => (
-            <button
+        <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar mask-fade-right">
+          {QUICK_ACTIONS.map((action, idx) => (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: idx * 0.05 }}
               key={action}
               onClick={() => sendMessage(action, true)}
-              className="whitespace-nowrap px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs font-medium border border-white/5 transition-colors"
+              className="whitespace-nowrap px-4 py-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] active:scale-95 rounded-full text-xs font-semibold border border-white/5 transition-all text-white"
             >
               {action}
-            </button>
+            </motion.button>
           ))}
         </div>
 
-        <div className="flex gap-2">
-          <Input 
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Message..."
-            className="rounded-full bg-background border-white/10 h-11 px-4 focus-visible:ring-flow-green"
-          />
+        <div className="flex gap-3 items-end">
+          <Button size="icon" variant="ghost" className="rounded-full text-muted-foreground hover:text-white shrink-0 h-11 w-11 bg-[#2C2C2E]">
+            <Plus className="w-6 h-6" />
+          </Button>
+          
+          <div className="flex-1 relative">
+            <Input 
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Message team..."
+              className="rounded-full bg-[#1C1C1E] border-white/10 h-11 px-5 text-base focus:border-blue-500/50 focus:ring-0 placeholder:text-muted-foreground/50"
+            />
+          </div>
+          
           <Button 
             onClick={handleSend}
             size="icon" 
-            className="rounded-full w-11 h-11 bg-flow-green text-black hover:bg-flow-green/90"
+            disabled={!inputText.trim()}
+            className={cn(
+              "rounded-full w-11 h-11 transition-all duration-200 shrink-0",
+              inputText.trim() ? "bg-blue-600 hover:bg-blue-500 text-white" : "bg-[#2C2C2E] text-muted-foreground"
+            )}
           >
             <Send className="w-5 h-5 ml-0.5" />
           </Button>
