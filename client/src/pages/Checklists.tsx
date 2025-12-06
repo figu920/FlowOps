@@ -4,7 +4,7 @@ import { useStore, type ChecklistItem } from '@/lib/store';
 import { useChecklists, useUpdateChecklist, useCreateChecklist, useDeleteChecklist, useUsers } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Calendar, Plus, Trash2, UserCircle } from 'lucide-react';
+import { Check, Calendar, Plus, Trash2, UserCircle, Edit2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,12 @@ export default function Checklists() {
   const [assignedTo, setAssignedTo] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Edit Item State
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editTaskName, setEditTaskName] = useState("");
+  const [editAssignedTo, setEditAssignedTo] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
   const isAdmin = currentUser?.isSystemAdmin === true;
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
   const canDelete = currentUser?.role === 'manager' || isAdmin;
@@ -47,6 +53,27 @@ export default function Checklists() {
     }
   };
 
+  const openEditItem = (task: any) => {
+    setEditingItem(task.id);
+    setEditTaskName(task.text);
+    setEditAssignedTo(task.assignedTo || "");
+    setEditNotes(task.notes || "");
+  };
+
+  const handleEditItem = () => {
+    if (editingItem && editTaskName && editAssignedTo) {
+      updateMutation.mutate({
+        id: editingItem,
+        updates: {
+          text: editTaskName,
+          assignedTo: editAssignedTo,
+          notes: editNotes || undefined
+        }
+      });
+      setEditingItem(null);
+    }
+  };
+
   const tabs = [
     { id: "opening", label: "Opening", color: "text-flow-green", border: "data-[state=active]:border-flow-green" },
     { id: "shift", label: "Shift", color: "text-flow-yellow", border: "data-[state=active]:border-flow-yellow" },
@@ -59,33 +86,25 @@ export default function Checklists() {
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       className={cn(
-        "relative w-full text-left p-5 rounded-2xl border mb-3 transition-all duration-300 group overflow-hidden",
+        "relative w-full text-left p-5 rounded-2xl border mb-3 transition-all duration-300 overflow-hidden",
         task.completed 
           ? "bg-white/[0.02] border-transparent opacity-60" 
-          : "bg-card border-white/[0.04] shadow-sm hover:bg-white/[0.06]"
+          : "bg-card border-white/[0.04] shadow-sm"
       )}
     >
-      {canDelete && (
-        <button 
-          onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(task.id); }}
-          className="absolute top-2 right-2 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-20"
-          data-testid={`button-delete-${task.id}`}
+      <div className="flex items-center gap-4">
+        <div 
+          className="cursor-pointer"
+          onClick={() => updateMutation.mutate({ id: task.id, updates: { completed: !task.completed } })}
         >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      )}
-
-      <div 
-        className="flex items-center gap-4 cursor-pointer"
-        onClick={() => updateMutation.mutate({ id: task.id, updates: { completed: !task.completed } })}
-      >
-        <div className={cn(
-          "w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0",
-          task.completed 
-            ? "bg-flow-green border-flow-green scale-110" 
-            : "border-white/20 group-hover:border-white/40"
-        )}>
-          {task.completed && <Check className="w-4 h-4 text-black stroke-[3]" />}
+          <div className={cn(
+            "w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0",
+            task.completed 
+              ? "bg-flow-green border-flow-green scale-110" 
+              : "border-white/20 hover:border-white/40"
+          )}>
+            {task.completed && <Check className="w-4 h-4 text-black stroke-[3]" />}
+          </div>
         </div>
         
         <div className="flex-1 min-w-0">
@@ -122,6 +141,27 @@ export default function Checklists() {
             )}
           </AnimatePresence>
         </div>
+
+        {canEdit && (
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={(e) => { e.stopPropagation(); openEditItem(task); }}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+              data-testid={`button-edit-${task.id}`}
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+            {canDelete && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(task.id); }}
+                className="p-2 rounded-lg bg-white/5 hover:bg-flow-red/20 text-muted-foreground hover:text-flow-red transition-colors"
+                data-testid={`button-delete-${task.id}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -231,6 +271,68 @@ export default function Checklists() {
           </div>
           <DialogFooter>
             <Button onClick={handleAddItem} className="w-full bg-blue-500 text-white font-bold hover:bg-blue-600">Save Item</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Checklist Item Dialog */}
+      <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Task Name</label>
+              <Input 
+                value={editTaskName}
+                onChange={(e) => setEditTaskName(e.target.value)}
+                placeholder="e.g. Clean espresso machine"
+                className="bg-black/20 border-white/10"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assign To</label>
+              <Select value={editAssignedTo} onValueChange={setEditAssignedTo}>
+                <SelectTrigger className="bg-black/20 border-white/10">
+                  <SelectValue placeholder="Select employee..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
+                  {users.map(user => (
+                    <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes (Optional)</label>
+              <Textarea 
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Instructions..."
+                className="bg-black/20 border-white/10 resize-none h-20"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            {canDelete && (
+              <Button 
+                variant="ghost"
+                onClick={() => {
+                  if (editingItem) {
+                    deleteMutation.mutate(editingItem);
+                    setEditingItem(null);
+                  }
+                }}
+                className="text-flow-red hover:text-flow-red/80 hover:bg-flow-red/10"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            )}
+            <Button onClick={handleEditItem} className="w-full bg-blue-500 text-white font-bold hover:bg-blue-600">Update Task</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

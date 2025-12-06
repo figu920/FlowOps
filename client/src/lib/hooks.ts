@@ -333,6 +333,27 @@ export function useAddIngredient() {
   });
 }
 
+export function useUpdateIngredient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      api.menu.updateIngredient(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+    },
+  });
+}
+
+export function useDeleteIngredient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.menu.deleteIngredient(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+    },
+  });
+}
+
 export function useNotifications() {
   return useQuery({
     queryKey: ['notifications'],

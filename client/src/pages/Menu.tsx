@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore, type MenuItem, type MeasurementUnit } from '@/lib/store';
-import { useMenu, useCreateMenuItem, useDeleteMenuItem, useAddIngredient } from '@/lib/hooks';
+import { useMenu, useCreateMenuItem, useDeleteMenuItem, useAddIngredient, useUpdateIngredient, useDeleteIngredient } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, ChevronDown, Utensils, Edit2 } from 'lucide-react';
@@ -17,6 +17,8 @@ export default function Menu() {
   const createMenuItemMutation = useCreateMenuItem();
   const deleteMenuItemMutation = useDeleteMenuItem();
   const addIngredientMutation = useAddIngredient();
+  const updateIngredientMutation = useUpdateIngredient();
+  const deleteIngredientMutation = useDeleteIngredient();
   
   // State for Add/Edit
   const [isAddingDish, setIsAddingDish] = useState(false);
@@ -75,8 +77,15 @@ export default function Menu() {
     if (!ingName || isNaN(quantity)) return;
 
     if (editingIngredient) {
-      // For editing, we'd need an updateIngredient mutation (not implemented in hooks yet)
-      // For now, just close the dialog
+      updateIngredientMutation.mutate({
+        id: editingIngredient.ingId,
+        data: {
+          name: ingName,
+          quantity,
+          unit: ingUnit,
+          notes: ingNotes || undefined
+        }
+      });
       setEditingIngredient(null);
     } else if (addingIngredientTo) {
       addIngredientMutation.mutate({
@@ -89,6 +98,13 @@ export default function Menu() {
         }
       });
       setAddingIngredientTo(null);
+    }
+  };
+
+  const handleDeleteIngredient = () => {
+    if (editingIngredient) {
+      deleteIngredientMutation.mutate(editingIngredient.ingId);
+      setEditingIngredient(null);
     }
   };
 
@@ -160,24 +176,30 @@ export default function Menu() {
                     {dish.ingredients.map((ing) => (
                       <div 
                         key={ing.id} 
-                        onClick={() => canManageMenu && openEditIngredient(dish.id, ing)}
-                        className={cn(
-                          "flex items-start justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02]",
-                          canManageMenu && "cursor-pointer hover:border-white/10 hover:bg-white/5 transition-all"
-                        )}
+                        className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02]"
                       >
-                         <div>
+                         <div className="flex-1">
                            <div className="flex items-center gap-2">
                              <span className="font-semibold text-white">{ing.name}</span>
-                             {canManageMenu && <Edit2 className="w-3 h-3 text-muted-foreground opacity-50" />}
                            </div>
                            {ing.notes && (
                              <p className="text-xs text-muted-foreground italic mt-0.5">"{ing.notes}"</p>
                            )}
                          </div>
-                         <div className="text-right">
-                           <span className="text-lg font-bold text-flow-green">{ing.quantity}</span>
-                           <span className="text-xs text-muted-foreground uppercase ml-1 font-medium">{ing.unit}</span>
+                         <div className="flex items-center gap-3">
+                           <div className="text-right">
+                             <span className="text-lg font-bold text-flow-green">{ing.quantity}</span>
+                             <span className="text-xs text-muted-foreground uppercase ml-1 font-medium">{ing.unit}</span>
+                           </div>
+                           {canManageMenu && (
+                             <button
+                               onClick={() => openEditIngredient(dish.id, ing)}
+                               className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+                               data-testid={`button-edit-ingredient-${ing.id}`}
+                             >
+                               <Edit2 className="w-4 h-4" />
+                             </button>
+                           )}
                          </div>
                       </div>
                     ))}
@@ -294,12 +316,11 @@ export default function Menu() {
              {editingIngredient && (
                 <Button 
                   variant="ghost"
-                  onClick={() => {
-                    // deleteIngredient not implemented yet in hooks
-                    setEditingIngredient(null);
-                  }}
+                  onClick={handleDeleteIngredient}
                   className="text-flow-red hover:text-flow-red/80 hover:bg-flow-red/10"
+                  data-testid="button-delete-ingredient"
                 >
+                  <Trash2 className="w-4 h-4 mr-2" />
                   Delete
                 </Button>
              )}
