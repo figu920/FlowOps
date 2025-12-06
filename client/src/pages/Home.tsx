@@ -12,20 +12,27 @@ import {
   Utensils
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { useInventory, useEquipment } from '@/lib/hooks';
+import { useInventory, useEquipment, usePendingUsers, useNotificationCount } from '@/lib/hooks';
 
 export default function Home() {
   const { currentUser } = useStore();
   const { data: inventory = [] } = useInventory();
   const { data: equipment = [] } = useEquipment();
   
+  // Only fetch pending users for managers or system admins
+  const canManageUsers = currentUser?.role === 'manager' || currentUser?.isSystemAdmin;
+  const { data: pendingUsers = [] } = usePendingUsers(canManageUsers);
+  const { data: notificationData } = useNotificationCount();
+  
   if (!currentUser) return null;
 
   // Dynamic status counts
   const lowStockCount = inventory.filter(i => i.status !== 'OK').length;
   const brokenCount = equipment.filter(e => e.status === 'Broken').length;
+  const pendingCount = canManageUsers ? pendingUsers.length : 0;
+  const unreadNotifications = notificationData?.count || 0;
 
-  const canManageEmployees = currentUser.role === 'manager' || currentUser.role === 'lead';
+  const canManageEmployees = currentUser.role === 'manager' || currentUser.role === 'lead' || currentUser.isSystemAdmin;
 
   const menuItems = [
     { 
@@ -86,7 +93,9 @@ export default function Home() {
       icon: Users, 
       path: '/employees', 
       color: 'bg-pink-500',
-      textColor: 'text-pink-400'
+      textColor: 'text-pink-400',
+      count: pendingCount > 0 ? `${pendingCount} Pending` : undefined,
+      countColor: 'text-flow-yellow'
     }] : [])
   ];
 

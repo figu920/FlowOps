@@ -17,10 +17,11 @@ export function useUsers() {
   });
 }
 
-export function usePendingUsers() {
+export function usePendingUsers(enabled: boolean = true) {
   return useQuery({
     queryKey: ['users', 'pending'],
     queryFn: api.users.getPending,
+    enabled,
   });
 }
 
@@ -328,6 +329,54 @@ export function useAddIngredient() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['menu'] });
       queryClient.invalidateQueries({ queryKey: ['menu', variables.id, 'ingredients'] });
+    },
+  });
+}
+
+export function useNotifications() {
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: api.notifications.getAll,
+  });
+}
+
+export function useNotificationCount() {
+  return useQuery({
+    queryKey: ['notifications', 'count'],
+    queryFn: api.notifications.getCount,
+    refetchInterval: 30000,
+  });
+}
+
+export function useMarkNotificationAsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.notifications.markAsRead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'count'] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsAsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.notifications.markAllAsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'count'] });
+    },
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.admin.createUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
     },
   });
 }

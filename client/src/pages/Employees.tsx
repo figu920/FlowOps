@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore, type UserRole, type User } from '@/lib/store';
-import { useUsers, usePendingUsers, useApproveUser, useRejectUser, useUpdateUser, useRemoveUser } from '@/lib/hooks';
+import { useUsers, usePendingUsers, useApproveUser, useRejectUser, useUpdateUser, useRemoveUser, useCreateUser } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit2, Shield, User as UserIcon, ShieldCheck, Check, X, Clock } from 'lucide-react';
+import { Plus, Trash2, Edit2, Shield, User as UserIcon, ShieldCheck, Check, X, Clock, UserPlus, Building } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ export default function Employees() {
   const rejectMutation = useRejectUser();
   const updateMutation = useUpdateUser();
   const removeMutation = useRemoveUser();
+  const createUserMutation = useCreateUser();
   const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
   
   // Edit State
@@ -30,12 +31,23 @@ export default function Employees() {
   const [approvingUser, setApprovingUser] = useState<User | null>(null);
   const [approvalRole, setApprovalRole] = useState<UserRole>("employee");
 
-  const canManage = currentUser?.role === 'manager';
+  // Create User State (Admin only)
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserUsername, setNewUserUsername] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<UserRole>("employee");
+  const [newUserEstablishment, setNewUserEstablishment] = useState("");
+
+  const isAdmin = currentUser?.isSystemAdmin === true;
+  const canManage = currentUser?.role === 'manager' || isAdmin;
   
-  // Filter users by establishment and status
-  const myUsers = allUsers.filter(u => u.establishment === currentUser?.establishment);
-  const activeUsers = myUsers.filter(u => u.status === 'active');
-  const pendingUsers = pendingUsersData.filter(u => u.establishment === currentUser?.establishment);
+  // For Admin: show all users across all establishments
+  // For Manager/Lead: show only users from their establishment
+  const filteredUsers = isAdmin ? allUsers : allUsers.filter(u => u.establishment === currentUser?.establishment);
+  const activeUsers = filteredUsers.filter(u => u.status === 'active');
+  const pendingUsers = isAdmin ? pendingUsersData : pendingUsersData.filter(u => u.establishment === currentUser?.establishment);
 
   const startEdit = (user: User) => {
     setEditName(user.name);
@@ -62,6 +74,29 @@ export default function Employees() {
     if (approvingUser) {
       approveMutation.mutate({ id: approvingUser.id, role: approvalRole });
       setApprovingUser(null);
+    }
+  };
+
+  const handleCreateUser = () => {
+    if (newUserName && newUserUsername && newUserEmail && newUserPassword && newUserRole && newUserEstablishment) {
+      createUserMutation.mutate({
+        name: newUserName,
+        username: newUserUsername,
+        email: newUserEmail,
+        password: newUserPassword,
+        role: newUserRole,
+        establishment: newUserEstablishment
+      }, {
+        onSuccess: () => {
+          setShowCreateUser(false);
+          setNewUserName("");
+          setNewUserUsername("");
+          setNewUserEmail("");
+          setNewUserPassword("");
+          setNewUserRole("employee");
+          setNewUserEstablishment("");
+        }
+      });
     }
   };
 
@@ -127,7 +162,7 @@ export default function Employees() {
 
               <div className="flex-1">
                 <h3 className="font-bold text-white text-[17px]">{user.name}</h3>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className={cn(
                     "text-[10px] uppercase font-bold px-1.5 py-0.5 rounded flex items-center gap-1",
                     user.role === 'manager' ? "bg-purple-500/10 text-purple-400" :
@@ -140,6 +175,12 @@ export default function Employees() {
                     {user.role}
                   </span>
                   <span className="text-xs text-muted-foreground">{user.username}</span>
+                  {isAdmin && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 flex items-center gap-1">
+                      <Building className="w-3 h-3" />
+                      {user.establishment}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -264,6 +305,113 @@ export default function Employees() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create User Dialog (Admin Only) */}
+      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New User</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Full Name</label>
+              <Input 
+                value={newUserName} 
+                onChange={(e) => setNewUserName(e.target.value)} 
+                className="bg-black/20 border-white/10" 
+                placeholder="John Doe"
+                data-testid="input-new-user-name"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Username</label>
+              <Input 
+                value={newUserUsername} 
+                onChange={(e) => setNewUserUsername(e.target.value)} 
+                className="bg-black/20 border-white/10" 
+                placeholder="johndoe"
+                data-testid="input-new-user-username"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Email</label>
+              <Input 
+                value={newUserEmail} 
+                onChange={(e) => setNewUserEmail(e.target.value)} 
+                className="bg-black/20 border-white/10" 
+                placeholder="john@example.com"
+                data-testid="input-new-user-email"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Password</label>
+              <Input 
+                type="password"
+                value={newUserPassword} 
+                onChange={(e) => setNewUserPassword(e.target.value)} 
+                className="bg-black/20 border-white/10" 
+                placeholder="••••••••"
+                data-testid="input-new-user-password"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Role</label>
+              <Select value={newUserRole} onValueChange={(val: UserRole) => setNewUserRole(val)}>
+                <SelectTrigger className="bg-black/20 border-white/10" data-testid="select-new-user-role">
+                  <SelectValue placeholder="Select role..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="lead">Lead</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Establishment</label>
+              <Select value={newUserEstablishment} onValueChange={setNewUserEstablishment}>
+                <SelectTrigger className="bg-black/20 border-white/10" data-testid="select-new-user-establishment">
+                  <SelectValue placeholder="Select establishment..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
+                  <SelectItem value="Bison Den">Bison Den</SelectItem>
+                  <SelectItem value="Trailblazer Café">Trailblazer Café</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={handleCreateUser} 
+              disabled={!newUserName || !newUserUsername || !newUserEmail || !newUserPassword || !newUserRole || !newUserEstablishment || createUserMutation.isPending}
+              className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90 h-12 rounded-xl disabled:opacity-50"
+              data-testid="button-create-user-submit"
+            >
+              {createUserMutation.isPending ? "Creating..." : "Create User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Floating Create User Button (Admin Only) */}
+      {isAdmin && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowCreateUser(true)}
+          className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-flow-green flex items-center justify-center shadow-lg shadow-flow-green/30"
+          data-testid="button-create-user"
+        >
+          <UserPlus className="w-6 h-6 text-black" />
+        </motion.button>
+      )}
     </Layout>
   );
 }

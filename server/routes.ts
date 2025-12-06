@@ -78,6 +78,24 @@ export async function registerRoutes(
         role: 'employee'
       });
       
+      // Notify all system admins about the new registration
+      try {
+        const systemAdmins = await storage.getSystemAdmins();
+        for (const admin of systemAdmins) {
+          await storage.createNotification({
+            recipientId: admin.id,
+            type: 'user_registration',
+            title: 'New User Registration',
+            message: `${user.name} (${user.username}) has requested access to ${user.establishment}`,
+            relatedUserId: user.id,
+            isRead: false
+          });
+        }
+      } catch (notifError) {
+        console.error("Failed to create notifications:", notifError);
+        // Don't fail registration if notification fails
+      }
+      
       // Don't send password back
       const { password, ...userWithoutPassword } = user;
       
@@ -872,6 +890,95 @@ export async function registerRoutes(
     }
     await storage.deleteIngredient(req.params.id);
     res.json({ message: "Ingredient deleted" });
+  });
+  
+  // ==================== NOTIFICATIONS ====================
+  
+  // Get current user's notifications
+  app.get("/api/notifications", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    const notifications = await storage.getNotificationsByRecipient(req.session.user.id);
+    res.json(notifications);
+  });
+  
+  // Get unread notification count
+  app.get("/api/notifications/count", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    const count = await storage.getUnreadNotificationCount(req.session.user.id);
+    res.json({ count });
+  });
+  
+  // Mark a notification as read
+  app.post("/api/notifications/:id/read", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    const notification = await storage.markNotificationAsRead(req.params.id);
+    if (!notification) return res.status(404).json({ message: "Notification not found" });
+    res.json(notification);
+  });
+  
+  // Mark all notifications as read
+  app.post("/api/notifications/read-all", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    await storage.markAllNotificationsAsRead(req.session.user.id);
+    res.json({ message: "All notifications marked as read" });
+  });
+  
+  // ==================== ADMIN USER CREATION ====================
+  
+  // Create user directly (Admin only) - bypasses approval process
+  app.post("/api/users/create", async (req: Request, res: Response) => {
+    if (!req.session.user || !isSystemAdminUser(req.session.user)) {
+      return res.status(403).json({ message: "Only system admin can create users directly" });
+    }
+    
+    try {
+      const { username, email, name, password, role, establishment } = req.body;
+      
+      if (!username || !email || !name || !password || !role || !establishment) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+      
+      // Check if username or email already exists
+      const existingUser = await storage.getUserByUsername(username);
+      const existingEmail = await storage.getUserByEmail(email);
+      
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+      
+      // Create user with active status (no approval needed)
+      const user = await storage.createUser({
+        username,
+        email,
+        name,
+        password: hashedPassword,
+        role,
+        establishment,
+        status: 'active',
+        isSystemAdmin: false
+      });
+      
+      // Log to timeline
+      await storage.createTimelineEvent({
+        text: `User created by Admin: ${user.name} as ${role}`,
+        establishment: user.establishment,
+        author: req.session.user.name,
+        authorRole: 'admin',
+        type: 'success'
+      });
+      
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("User creation error:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
   });
 
   return httpServer;

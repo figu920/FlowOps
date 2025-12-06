@@ -162,4 +162,21 @@ export const api = {
         body: JSON.stringify(data),
       }),
   },
+
+  notifications: {
+    getAll: () => fetchAPI('/notifications'),
+    getCount: () => fetchAPI('/notifications/count'),
+    markAsRead: (id: string) =>
+      fetchAPI(`/notifications/${id}/read`, { method: 'POST' }),
+    markAllAsRead: () =>
+      fetchAPI('/notifications/read-all', { method: 'POST' }),
+  },
+
+  admin: {
+    createUser: (data: any) =>
+      fetchAPI('/users/create', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
 };

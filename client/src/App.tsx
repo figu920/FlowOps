@@ -65,7 +65,7 @@ function Router() {
          {() => <PrivateRoute component={Timeline} />}
       </Route>
       <Route path="/employees">
-         {() => currentUser?.role === 'manager' || currentUser?.role === 'lead' 
+         {() => currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin
             ? <PrivateRoute component={Employees} /> 
             : <NotFound />
          }
