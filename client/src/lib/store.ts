@@ -37,13 +37,17 @@ export interface ChecklistItem {
   completed: boolean;
   completedAt?: string;
   completedBy?: string;
+  assignedTo?: string; // User ID or Name
+  notes?: string;
 }
 
 export interface TaskItem {
   id: string;
   text: string;
-  assignedTo: string;
+  assignedTo: string; // User Name
   completed: boolean;
+  notes?: string;
+  completedAt?: string;
 }
 
 export interface ChatMessage {
@@ -93,9 +97,17 @@ interface FlowState {
   addEquipmentItem: (name: string, category?: string) => void;
   deleteEquipmentItem: (id: string) => void;
 
-  // Other Actions
+  // Checklist Actions
   toggleChecklist: (listType: 'opening' | 'shift' | 'closing', taskId: string) => void;
+  addChecklistItem: (listType: 'opening' | 'shift' | 'closing', text: string, assignedTo: string, notes?: string) => void;
+  deleteChecklistItem: (listType: 'opening' | 'shift' | 'closing', taskId: string) => void;
+
+  // Task Actions
   toggleTask: (taskId: string) => void;
+  addWeeklyTask: (text: string, assignedTo: string, notes?: string) => void;
+  deleteWeeklyTask: (taskId: string) => void;
+
+  // Other Actions
   sendMessage: (text: string, isAction?: boolean) => void;
   addTimelineEntry: (text: string, type: TimelineEvent['type'], comment?: string) => void;
 }
@@ -104,6 +116,7 @@ const INITIAL_USERS: User[] = [
   { id: 'u1', name: 'Angel (Manager)', role: 'manager' },
   { id: 'u2', name: 'Hunter (Lead)', role: 'lead' },
   { id: 'u3', name: 'Bella (Employee)', role: 'employee' },
+  { id: 'u4', name: 'Sam (Employee)', role: 'employee' },
 ];
 
 const INITIAL_INVENTORY: InventoryItem[] = [
@@ -125,27 +138,27 @@ const INITIAL_EQUIPMENT: EquipmentItem[] = [
 
 const INITIAL_CHECKLISTS = {
   opening: [
-    { id: 'o1', text: 'Turn on grill', completed: false },
-    { id: 'o2', text: 'Prep lettuce & tomato', completed: true, completedAt: new Date().toISOString(), completedBy: 'Bella' },
-    { id: 'o3', text: 'Refill sauces', completed: false },
-    { id: 'o4', text: 'Unlock fridge', completed: false },
+    { id: 'o1', text: 'Turn on grill', completed: false, assignedTo: 'Hunter (Lead)' },
+    { id: 'o2', text: 'Prep lettuce & tomato', completed: true, completedAt: new Date().toISOString(), completedBy: 'Bella', assignedTo: 'Bella (Employee)' },
+    { id: 'o3', text: 'Refill sauces', completed: false, assignedTo: 'Sam (Employee)' },
+    { id: 'o4', text: 'Unlock fridge', completed: false, assignedTo: 'Angel (Manager)' },
   ],
   shift: [
-    { id: 's1', text: 'Wipe tables', completed: false },
-    { id: 's2', text: 'Check trash bins', completed: false },
-    { id: 's3', text: 'Restock napkins', completed: false },
+    { id: 's1', text: 'Wipe tables', completed: false, assignedTo: 'Bella (Employee)' },
+    { id: 's2', text: 'Check trash bins', completed: false, assignedTo: 'Sam (Employee)' },
+    { id: 's3', text: 'Restock napkins', completed: false, assignedTo: 'Hunter (Lead)' },
   ],
   closing: [
-    { id: 'c1', text: 'Clean fryer knob', completed: false },
-    { id: 'c2', text: 'Sweep floors', completed: false },
-    { id: 'c3', text: 'Lock fridge', completed: false },
+    { id: 'c1', text: 'Clean fryer knob', completed: false, assignedTo: 'Angel (Manager)' },
+    { id: 'c2', text: 'Sweep floors', completed: false, assignedTo: 'Sam (Employee)' },
+    { id: 'c3', text: 'Lock fridge', completed: false, assignedTo: 'Hunter (Lead)' },
   ],
 };
 
 const INITIAL_TASKS: TaskItem[] = [
-  { id: 't1', text: 'Deep clean fridge', assignedTo: 'Angel', completed: false },
-  { id: 't2', text: 'Clean vents', assignedTo: 'Hunter', completed: false },
-  { id: 't3', text: 'Wipe counters', assignedTo: 'Bella', completed: true },
+  { id: 't1', text: 'Deep clean fridge', assignedTo: 'Angel (Manager)', completed: false, notes: 'Use the heavy duty cleaner' },
+  { id: 't2', text: 'Clean vents', assignedTo: 'Hunter (Lead)', completed: false },
+  { id: 't3', text: 'Wipe counters', assignedTo: 'Bella (Employee)', completed: true, completedAt: new Date().toISOString() },
 ];
 
 const INITIAL_CHAT: ChatMessage[] = [
@@ -270,6 +283,7 @@ export const useStore = create<FlowState>((set, get) => ({
     }
   },
 
+  // CHECKLIST ACTIONS
   toggleChecklist: (listType, taskId) => {
     const { currentUser } = get();
     set((state) => ({
@@ -290,22 +304,81 @@ export const useStore = create<FlowState>((set, get) => ({
     
     const task = get().checklists[listType].find(t => t.id === taskId);
     if (task && !task.completed) {
-       get().addTimelineEntry(`Completed task: ${task.text}`, 'success');
+       get().addTimelineEntry(`${listType} Checklist: ${task.text} completed`, 'success');
     }
   },
 
+  addChecklistItem: (listType, text, assignedTo, notes) => {
+    const newItem: ChecklistItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      text,
+      completed: false,
+      assignedTo,
+      notes
+    };
+    
+    set(state => ({
+      checklists: {
+        ...state.checklists,
+        [listType]: [...state.checklists[listType], newItem]
+      }
+    }));
+    
+    get().addTimelineEntry(`New ${listType} item: ${text} (Assigned to ${assignedTo})`, 'info');
+  },
+
+  deleteChecklistItem: (listType, taskId) => {
+    const task = get().checklists[listType].find(t => t.id === taskId);
+    if (task) {
+      set(state => ({
+        checklists: {
+          ...state.checklists,
+          [listType]: state.checklists[listType].filter(t => t.id !== taskId)
+        }
+      }));
+      get().addTimelineEntry(`Deleted ${listType} item: ${task.text}`, 'warning');
+    }
+  },
+
+  // TASK ACTIONS
   toggleTask: (taskId) => {
+    const { currentUser } = get();
     set((state) => ({
       weeklyTasks: state.weeklyTasks.map((task) =>
         task.id === taskId
-          ? { ...task, completed: !task.completed }
+          ? { 
+              ...task, 
+              completed: !task.completed,
+              completedAt: !task.completed ? new Date().toISOString() : undefined
+            }
           : task
       ),
     }));
     
     const task = get().weeklyTasks.find(t => t.id === taskId);
     if (task && !task.completed) {
-       get().addTimelineEntry(`Weekly task done: ${task.text}`, 'success');
+       get().addTimelineEntry(`Weekly task completed: ${task.text} by ${currentUser.name}`, 'success');
+    }
+  },
+
+  addWeeklyTask: (text, assignedTo, notes) => {
+    const newTask: TaskItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      text,
+      assignedTo,
+      completed: false,
+      notes
+    };
+    
+    set(state => ({ weeklyTasks: [...state.weeklyTasks, newTask] }));
+    get().addTimelineEntry(`New Weekly Task: ${text} (Assigned to ${assignedTo})`, 'info');
+  },
+
+  deleteWeeklyTask: (taskId) => {
+    const task = get().weeklyTasks.find(t => t.id === taskId);
+    if (task) {
+      set(state => ({ weeklyTasks: state.weeklyTasks.filter(t => t.id !== taskId) }));
+      get().addTimelineEntry(`Deleted Weekly Task: ${task.text}`, 'warning');
     }
   },
 

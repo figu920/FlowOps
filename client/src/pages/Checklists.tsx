@@ -3,11 +3,35 @@ import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { Check, Plus, Trash2, UserCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Checklists() {
-  const { checklists, toggleChecklist } = useStore();
+  const { checklists, toggleChecklist, currentUser, users, addChecklistItem, deleteChecklistItem } = useStore();
   const [activeTab, setActiveTab] = useState<"opening" | "shift" | "closing">("opening");
+  
+  // Add Item State
+  const [isAdding, setIsAdding] = useState(false);
+  const [taskName, setTaskName] = useState("");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const canEdit = currentUser.role === 'manager' || currentUser.role === 'lead';
+  const canDelete = currentUser.role === 'manager';
+
+  const handleAddItem = () => {
+    if (taskName && assignedTo) {
+      addChecklistItem(activeTab, taskName, assignedTo, notes);
+      setIsAdding(false);
+      setTaskName("");
+      setAssignedTo("");
+      setNotes("");
+    }
+  };
 
   const tabs = [
     { id: "opening", label: "Opening", color: "text-flow-green", border: "data-[state=active]:border-flow-green" },
@@ -16,52 +40,92 @@ export default function Checklists() {
   ] as const;
 
   const TaskRow = ({ task, type }: { task: any, type: 'opening' | 'shift' | 'closing' }) => (
-    <motion.button
+    <motion.div
       layout
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => toggleChecklist(type, task.id)}
       className={cn(
-        "w-full text-left flex items-center gap-4 p-5 rounded-2xl border mb-3 transition-all duration-300 group",
+        "relative w-full text-left p-5 rounded-2xl border mb-3 transition-all duration-300 group overflow-hidden",
         task.completed 
           ? "bg-white/[0.02] border-transparent opacity-60" 
           : "bg-card border-white/[0.04] shadow-sm hover:bg-white/[0.06]"
       )}
     >
-      <div className={cn(
-        "w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300",
-        task.completed 
-          ? "bg-flow-green border-flow-green scale-110" 
-          : "border-white/20 group-hover:border-white/40"
-      )}>
-        {task.completed && <Check className="w-4 h-4 text-black stroke-[3]" />}
-      </div>
-      
-      <div className="flex-1">
-        <span className={cn(
-          "text-[17px] font-medium transition-all block",
-          task.completed ? "text-muted-foreground line-through decoration-white/20" : "text-white"
+      {canDelete && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); deleteChecklistItem(type, task.id); }}
+          className="absolute top-2 right-2 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-20"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+
+      <div 
+        className="flex items-center gap-4 cursor-pointer"
+        onClick={() => toggleChecklist(type, task.id)}
+      >
+        <div className={cn(
+          "w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0",
+          task.completed 
+            ? "bg-flow-green border-flow-green scale-110" 
+            : "border-white/20 group-hover:border-white/40"
         )}>
-          {task.text}
-        </span>
+          {task.completed && <Check className="w-4 h-4 text-black stroke-[3]" />}
+        </div>
         
-        <AnimatePresence>
-          {task.completed && task.completedBy && (
-            <motion.span 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="text-xs text-flow-green font-medium mt-1 block"
-            >
-              Done by {task.completedBy}
-            </motion.span>
-          )}
-        </AnimatePresence>
+        <div className="flex-1 min-w-0">
+          <span className={cn(
+            "text-[17px] font-medium transition-all block",
+            task.completed ? "text-muted-foreground line-through decoration-white/20" : "text-white"
+          )}>
+            {task.text}
+          </span>
+          
+          <div className="flex flex-wrap gap-2 mt-1.5 items-center">
+             {task.assignedTo && (
+               <span className="text-[10px] font-medium text-white/50 bg-white/5 px-2 py-0.5 rounded flex items-center gap-1">
+                 <UserCircle className="w-3 h-3" />
+                 {task.assignedTo}
+               </span>
+             )}
+             
+             {task.notes && (
+                <span className="text-[10px] text-muted-foreground/70 italic truncate max-w-[150px]">
+                  {task.notes}
+                </span>
+             )}
+          </div>
+
+          <AnimatePresence>
+            {task.completed && task.completedBy && (
+              <motion.span 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-xs text-flow-green font-medium mt-1 block"
+              >
+                Done by {task.completedBy}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
-    </motion.button>
+    </motion.div>
   );
 
   return (
-    <Layout title="Checklists">
+    <Layout 
+      title="Checklists"
+      action={
+        canEdit && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setIsAdding(true)}
+            className="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20"
+          >
+            <Plus className="w-5 h-5" strokeWidth={3} />
+          </motion.button>
+        )
+      }
+    >
       {/* Custom Tab Bar */}
       <div className="flex p-1 bg-white/5 rounded-xl mb-6 relative">
         {tabs.map((tab) => {
@@ -69,7 +133,7 @@ export default function Checklists() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setActiveTab(tab.id as any)}
               className={cn(
                 "flex-1 py-2.5 text-sm font-bold rounded-lg transition-all z-10 relative",
                 isActive ? "text-white" : "text-muted-foreground hover:text-white/70"
@@ -108,6 +172,53 @@ export default function Checklists() {
            </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Add Checklist Item Dialog */}
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle>Add to {tabs.find(t => t.id === activeTab)?.label} List</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Task Name</label>
+              <Input 
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                placeholder="e.g. Clean espresso machine"
+                className="bg-black/20 border-white/10"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assign To</label>
+              <Select value={assignedTo} onValueChange={setAssignedTo}>
+                <SelectTrigger className="bg-black/20 border-white/10">
+                  <SelectValue placeholder="Select employee..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
+                  {users.map(user => (
+                    <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes (Optional)</label>
+              <Textarea 
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Instructions..."
+                className="bg-black/20 border-white/10 resize-none h-20"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleAddItem} className="w-full bg-blue-500 text-white font-bold hover:bg-blue-600">Save Item</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

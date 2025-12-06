@@ -1,0 +1,146 @@
+Update the FlowOps app to allow Managers and Employee Leads to create new Weekly Tasks and new Checklist items, and assign each task to a specific user. Employees should NOT be able to create or assign tasks. Only Managers and Leads can add, edit, or assign tasks.
+
+👤 ROLE PERMISSIONS (NEW)
+Employees
+
+Can ONLY view weekly tasks
+
+Can ONLY view checklists
+
+Can mark tasks as completed
+
+Cannot create tasks
+
+Cannot edit or assign tasks
+
+Employee Leads
+
+Can create new Weekly Tasks
+
+Can create new checklist items (Opening, During Shift, Closing)
+
+Can assign each task to a specific employee
+
+Can edit task names
+
+Cannot delete tasks permanently (only managers can)
+
+Managers
+
+All Lead permissions
+
+Can delete tasks
+
+Can reassign tasks
+
+Can create recurring weekly tasks
+
+📅 1. WEEKLY TASKS — NEW FEATURES
+
+Add a “+” button on the Weekly Tasks screen for Leads and Managers only.
+
+When pressed, show:
+
+ADD WEEKLY TASK FORM
+
+Task Name (text input)
+
+Assign To: dropdown list of all employees and leads
+
+Optional Notes: text box
+
+Save
+
+After saving:
+
+✔ Task appears immediately in the Weekly Tasks list
+✔ Shows assigned user
+✔ Shows checkbox for completion
+✔ Shows timestamp when completed
+✔ Logs event to Timeline
+
+Employees should only see tasks and mark them as completed.
+
+📝 2. CHECKLIST EDITOR — NEW FEATURES
+
+Managers and Leads should now have the ability to add new checklist items inside:
+
+Opening Checklist
+
+During Shift Checklist
+
+Closing Checklist
+
+Add a “+” button at the top right of each checklist screen.
+
+When tapped:
+
+ADD CHECKLIST ITEM FORM
+
+Task Name
+
+Checklist Category (Opening / During Shift / Closing)
+
+Assign To (employee or lead)
+
+Optional notes
+
+Save
+
+Once added:
+
+✔ The task appears in the correct checklist
+✔ Assigned person is displayed under the task
+✔ Employees can check tasks but cannot create them
+✔ Leads and Managers can edit names and reassignment
+✔ Only Managers can delete items
+
+All completed checklist items must log into the Timeline with:
+
+User
+
+Role
+
+Timestamp
+
+Task name
+
+Checklist category
+
+⚙️ 3. ASSIGNMENT RULES
+
+Assignment dropdown should include:
+
+All employees
+
+All leads
+
+Managers (optional)
+
+If the assignee changes, log it in timeline.
+
+🕒 4. TIMELINE INTEGRATION
+
+Whenever a Weekly Task or Checklist item is:
+
+Created
+
+Edited
+
+Assigned
+
+Completed
+
+Reassigned
+
+Deleted (manager only)
+
+Log it into timeline like:
+
+“7:45 PM — New Weekly Task added: Deep clean freezer (Assigned to Hunter). Created by Lead: Angel.”
+
+or
+
+“8:12 PM — Opening Checklist: Prep lettuce completed by Bella.”
+
+✔️ END OF PROMPT
