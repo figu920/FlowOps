@@ -73,6 +73,24 @@ export interface TimelineEvent {
   comment?: string;
 }
 
+// NEW INTERFACES FOR MENU
+export type MeasurementUnit = 'grams' | 'oz' | 'cups' | 'bowls' | 'tablespoons' | 'pieces';
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: MeasurementUnit;
+  notes?: string;
+}
+
+export interface MenuItem {
+  id: string;
+  name: string;
+  category: string;
+  ingredients: Ingredient[];
+}
+
 interface FlowState {
   currentUser: User | null;
   users: User[];
@@ -86,6 +104,7 @@ interface FlowState {
   weeklyTasks: TaskItem[];
   chat: ChatMessage[];
   timeline: TimelineEvent[];
+  menu: MenuItem[]; // NEW
 
   // Auth Actions
   login: (email: string, password: string) => boolean;
@@ -115,6 +134,13 @@ interface FlowState {
   toggleTask: (taskId: string) => void;
   addWeeklyTask: (text: string, assignedTo: string, notes?: string) => void;
   deleteWeeklyTask: (taskId: string) => void;
+
+  // Menu Actions
+  addMenuItem: (name: string, category: string) => void;
+  deleteMenuItem: (id: string) => void;
+  addIngredient: (menuItemId: string, name: string, quantity: number, unit: MeasurementUnit, notes?: string) => void;
+  updateIngredient: (menuItemId: string, ingredientId: string, updates: Partial<Ingredient>) => void;
+  deleteIngredient: (menuItemId: string, ingredientId: string) => void;
 
   // Other Actions
   sendMessage: (text: string, isAction?: boolean) => void;
@@ -182,6 +208,39 @@ const INITIAL_TIMELINE: TimelineEvent[] = [
   { id: 'e4', text: 'Opening checklist completed', author: 'Bella', role: 'employee', timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), type: 'success' },
 ];
 
+const INITIAL_MENU: MenuItem[] = [
+  {
+    id: 'm1',
+    name: 'Honkytonk Burger',
+    category: 'Burgers',
+    ingredients: [
+      { id: 'i1', name: 'Beef Patty', quantity: 120, unit: 'grams' },
+      { id: 'i2', name: 'Bun', quantity: 1, unit: 'pieces' },
+      { id: 'i3', name: 'Lettuce', quantity: 15, unit: 'grams' },
+      { id: 'i4', name: 'Tomato', quantity: 10, unit: 'grams' },
+      { id: 'i5', name: 'Sauce', quantity: 1, unit: 'tablespoons' },
+    ]
+  },
+  {
+    id: 'm2',
+    name: 'Bites on Bites',
+    category: 'Appetizers',
+    ingredients: [
+      { id: 'i6', name: 'Bites', quantity: 1, unit: 'bowls', notes: 'Fill to the top' },
+      { id: 'i7', name: 'Sauce', quantity: 0.5, unit: 'cups' },
+    ]
+  },
+  {
+    id: 'm3',
+    name: 'Wings',
+    category: 'Appetizers',
+    ingredients: [
+      { id: 'i8', name: 'Wings', quantity: 6, unit: 'pieces', notes: 'Standard portion' },
+      { id: 'i9', name: 'Sauce', quantity: 2, unit: 'oz' },
+    ]
+  }
+];
+
 export const useStore = create<FlowState>()(
   persist(
     (set, get) => ({
@@ -193,6 +252,7 @@ export const useStore = create<FlowState>()(
       weeklyTasks: INITIAL_TASKS,
       chat: INITIAL_CHAT,
       timeline: INITIAL_TIMELINE,
+      menu: INITIAL_MENU,
 
       login: (email, password) => {
         const user = get().users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
@@ -451,6 +511,95 @@ export const useStore = create<FlowState>()(
         }
       },
 
+      // MENU ACTIONS
+      addMenuItem: (name, category) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+
+        const newItem: MenuItem = {
+          id: Math.random().toString(36).substr(2, 9),
+          name,
+          category,
+          ingredients: []
+        };
+        set(state => ({ menu: [...state.menu, newItem] }));
+        get().addTimelineEntry(`Menu Item Added: ${name}`, 'info');
+      },
+
+      deleteMenuItem: (id) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+        
+        const item = get().menu.find(i => i.id === id);
+        if (item) {
+          set(state => ({ menu: state.menu.filter(i => i.id !== id) }));
+          get().addTimelineEntry(`Menu Item Deleted: ${item.name}`, 'warning');
+        }
+      },
+
+      addIngredient: (menuItemId, name, quantity, unit, notes) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+
+        const newIngredient: Ingredient = {
+          id: Math.random().toString(36).substr(2, 9),
+          name,
+          quantity,
+          unit,
+          notes
+        };
+
+        set(state => ({
+          menu: state.menu.map(item => 
+            item.id === menuItemId 
+              ? { ...item, ingredients: [...item.ingredients, newIngredient] }
+              : item
+          )
+        }));
+      },
+
+      updateIngredient: (menuItemId, ingredientId, updates) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+        
+        const menuItem = get().menu.find(m => m.id === menuItemId);
+        const ingredient = menuItem?.ingredients.find(i => i.id === ingredientId);
+
+        if (menuItem && ingredient) {
+          set(state => ({
+            menu: state.menu.map(item => 
+              item.id === menuItemId
+                ? {
+                    ...item,
+                    ingredients: item.ingredients.map(ing => 
+                      ing.id === ingredientId ? { ...ing, ...updates } : ing
+                    )
+                  }
+                : item
+            )
+          }));
+
+          // Log change if quantity or unit changed
+          if (updates.quantity !== undefined || updates.unit !== undefined) {
+             const changeText = `${ingredient.name} (${ingredient.quantity}${ingredient.unit} → ${updates.quantity ?? ingredient.quantity}${updates.unit ?? ingredient.unit})`;
+             get().addTimelineEntry(`Portion size updated: ${menuItem.name}`, 'info', changeText);
+          }
+        }
+      },
+
+      deleteIngredient: (menuItemId, ingredientId) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+
+        set(state => ({
+          menu: state.menu.map(item => 
+            item.id === menuItemId
+              ? { ...item, ingredients: item.ingredients.filter(ing => ing.id !== ingredientId) }
+              : item
+          )
+        }));
+      },
+
       sendMessage: (text, isAction = false) => {
         const { currentUser } = get();
         if (!currentUser) return;
@@ -476,7 +625,8 @@ export const useStore = create<FlowState>()(
         weeklyTasks: state.weeklyTasks,
         chat: state.chat,
         timeline: state.timeline,
-        users: state.users, // Persist users so new ones are saved
+        users: state.users, 
+        menu: state.menu, // Persist menu
         // Don't persist currentUser to force login
       }),
     }

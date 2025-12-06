@@ -8,7 +8,8 @@ import {
   CalendarDays, 
   MessageCircle, 
   Activity,
-  Users
+  Users,
+  Utensils
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
@@ -55,6 +56,13 @@ export default function Home() {
       path: '/tasks', 
       color: 'bg-purple-500',
       textColor: 'text-purple-400'
+    },
+    {
+      title: 'Menu & Sizes',
+      icon: Utensils,
+      path: '/menu',
+      color: 'bg-teal-500',
+      textColor: 'text-teal-400'
     },
     { 
       title: 'Chat', 

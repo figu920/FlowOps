@@ -1,0 +1,197 @@
+Update the FlowOps app by adding a new tab called “Menu & Portion Sizes.”
+This feature is designed to eliminate inconsistency in serving sizes and prevent major food loss.
+Managers must be able to define, update, and edit the exact portion sizes for every menu item.
+Employees must ONLY be able to view these portions, never edit them.
+
+📌 1. NEW TAB: “Menu & Portion Sizes”
+
+Add a brand-new section in the main navigation:
+
+Menu & Sizes
+
+This tab must contain:
+
+Full list of menu items
+
+For each item: recommended portion quantities
+
+Clear portion instructions (ex: “1 bowl filled to top”)
+
+Expandable sections showing the ingredients for each dish and the required amounts
+
+👤 2. ROLE PERMISSIONS (VERY IMPORTANT)
+Employees
+
+Can ONLY view recommended portion sizes
+
+Cannot edit or add menu items
+
+Cannot change quantities
+
+Cannot delete menu items
+
+Cannot add ingredients
+
+Employee Leads
+
+Same permissions as Employees
+
+Leads should NOT edit portions
+
+Leads should NOT create menu items
+
+Leads can ONLY view
+
+Managers
+
+Managers get FULL control:
+
+Add new dishes (menu items)
+
+Edit dish names
+
+Delete dishes
+
+Add ingredients to each dish
+
+Edit ingredient portion sizes
+
+Change portion measurement units
+
+Reorder ingredients
+
+Save updates instantly
+
+No other user can modify anything inside Menu & Sizes.
+
+🍔 3. MENU ITEM STRUCTURE
+
+Each menu item must display:
+
+Dish Name (example: Honkytonk Burger)
+
+Tap to expand and display:
+
+Ingredients list with portion sizes:
+
+Example:
+
+Beef Patty → 120 grams
+
+Bun → 1 piece
+
+Lettuce → 15 grams
+
+Tomato → 10 grams
+
+Sauce → 1 tablespoon
+
+For "Bites on Bites":
+
+Bites → 1 full bowl
+
+Sauce → ½ cup
+
+For Wings:
+
+Wings → 6 pieces (standard portion)
+
+Sauce → 2 ounces
+
+Employees should see all this information in a clean, simple layout.
+
+🧪 4. SUPPORTED MEASUREMENT UNITS
+
+Managers must be able to assign portion sizes using the following units:
+
+Grams (g)
+
+Ounces (oz)
+
+Cups
+
+Bowls
+
+Tablespoons
+
+Pieces
+
+Make sure the portion editor includes a dropdown for unit type.
+
+➕ 5. ADDING MENU ITEMS (MANAGER ONLY)
+
+In the “Menu & Sizes” tab, Managers must see a “+” button in the top-right corner.
+
+Pressing it opens:
+
+ADD DISH FORM
+
+Dish Name
+
+Category (optional: burgers, wings, desserts, drinks, etc.)
+
+Add Ingredients section (empty until manager adds items)
+
+Save
+
+After saving, the dish appears instantly in the menu list.
+
+🥗 6. ADDING INGREDIENTS TO EACH DISH (MANAGER ONLY)
+
+Inside each dish, Managers must have a “+ Add Ingredient” button.
+
+Tap opens:
+
+ADD INGREDIENT FORM
+
+Ingredient Name
+
+Portion Size (number input)
+
+Measurement Unit (dropdown: grams, ounces, cups, bowls, pieces, tablespoons)
+
+Optional notes (ex: “Bowl must be filled to the top for standard portion”)
+
+Save
+
+Employees see ingredients but cannot modify them.
+
+🔧 7. EDITING PORTION SIZES (MANAGER ONLY)
+
+Managers must be able to:
+
+Tap an ingredient
+
+Edit quantity
+
+Edit unit
+
+Edit notes
+
+Delete ingredient
+
+Reorder ingredients
+
+Changes update instantly.
+
+📥 8. EMPLOYEE VIEW (READ-ONLY)
+
+Employees should see:
+
+List of dishes
+
+Portion instructions
+
+Ingredient quantities
+
+Notes
+
+The UI must be simple, clean, and extremely clear.
+
+📊 9. TIMELINE INTEGRATION (OPTIONAL)
+
+When a Manager updates portion sizes, log to Timeline:
+
+“6:42 PM — Portion size updated: Honkytonk Burger (Beef Patty from 140g → 120g). Updated by Manager: Angel.”
+
+✔️ END OF PROMPT

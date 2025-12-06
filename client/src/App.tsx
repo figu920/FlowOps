@@ -14,6 +14,7 @@ import Chat from "@/pages/Chat";
 import Timeline from "@/pages/Timeline";
 import Login from "@/pages/Login";
 import Employees from "@/pages/Employees";
+import Menu from "@/pages/Menu";
 import NotFound from "@/pages/not-found";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -53,6 +54,9 @@ function Router() {
       </Route>
       <Route path="/tasks">
          {() => <PrivateRoute component={Tasks} />}
+      </Route>
+      <Route path="/menu">
+         {() => <PrivateRoute component={Menu} />}
       </Route>
       <Route path="/chat">
          {() => <PrivateRoute component={Chat} />}
