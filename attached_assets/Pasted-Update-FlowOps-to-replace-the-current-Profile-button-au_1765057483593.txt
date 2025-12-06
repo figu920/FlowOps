@@ -1,0 +1,133 @@
+Update FlowOps to replace the current “Profile button automatically signs out” behavior with a complete and professional Profile system.
+Users must be able to view and edit their personal information without being logged out automatically.
+Sign Out must only happen when the user intentionally taps the “Sign Out” button inside the Profile screen.
+
+👤 1. CREATE A FULL “PROFILE” SCREEN
+
+When the user taps the Profile icon, DO NOT sign out.
+Instead open a new screen called:
+
+My Profile
+
+This screen must display:
+
+Profile Picture (circular, editable)
+
+Full Name
+
+Username
+
+Email
+
+Role (Employee / Lead / Manager — read only)
+
+Establishment (read only for employees; editable by Manager)
+
+Under that, show a set of editable fields:
+
+Editable Fields:
+
+Change Profile Photo
+
+Change Username
+
+Change Email
+
+Change Password
+
+(Optional) Change Establishment (Manager approval only)
+
+Managers may also have:
+
+Manage Team shortcut
+
+Approvals shortcut (optional)
+
+🖼 2. PROFILE PHOTO FEATURE
+
+Users must be able to:
+
+Upload a photo
+
+Use the camera to take a new photo
+
+Replace or delete their current photo
+
+The photo should be stored in their account and appear in chats, timeline logs, and employee lists.
+
+✏️ 3. EDIT ACCOUNT INFORMATION
+
+Inside the Profile screen, users must be able to:
+
+Update their email
+
+Update their username
+
+Update their password
+
+When editing password, require:
+
+Old Password
+
+New Password
+
+Confirm Password
+
+The app must save changes securely and update instantly.
+
+🔒 4. ROLE PERMISSIONS FOR PROFILE
+All Users (Employee, Lead, Manager)
+
+Can edit profile photo
+
+Can edit username
+
+Can edit password
+
+Can edit email
+
+Employees & Leads
+
+Cannot change their assigned role
+
+Cannot change establishment
+
+Cannot approve or manage other users
+
+Managers
+
+Can change establishment (if needed)
+
+Can access “Employees” tab from profile
+
+Cannot change their own role (for security)
+
+🚪 5. ADD A PROPER “SIGN OUT” BUTTON
+
+At the BOTTOM of the Profile screen, add:
+
+Sign Out
+
+(Styled as a separate button in red or neutral color)
+
+Users must only sign out when they tap this button.
+
+IMPORTANT:
+
+Tapping profile must NEVER auto-sign out
+
+Sign out must ONLY occur from the explicit button
+
+🛠 6. REQUIRED UI BEHAVIOR
+
+Profile screen opens normally (no logout)
+
+Photo + fields appear in a clean, modern layout
+
+Changes save instantly
+
+After sign out, user returns to Login screen
+
+Login stays persistent unless Sign Out is pressed
+
+✔️ END OF PROMPT
