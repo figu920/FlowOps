@@ -350,23 +350,33 @@ export async function registerRoutes(
   
   app.get("/api/inventory", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
-    const items = await storage.getInventoryByEstablishment(req.session.user.establishment);
+    let items;
+    if (isSystemAdminUser(req.session.user)) {
+      items = await storage.getAllInventory();
+    } else {
+      items = await storage.getInventoryByEstablishment(req.session.user.establishment);
+    }
     res.json(items);
   });
   
   app.post("/api/inventory", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
     try {
+      // System admin can specify any establishment, regular users use their own
+      const establishment = isSystemAdminUser(req.session.user) && req.body.establishment 
+        ? req.body.establishment 
+        : req.session.user.establishment;
+      
       const data = insertInventorySchema.parse({
         ...req.body,
-        establishment: req.session.user.establishment,
+        establishment,
         updatedBy: req.session.user.name
       });
       const item = await storage.createInventoryItem(data);
       
       await storage.createTimelineEvent({
         text: `Added new item: ${item.name}`,
-        establishment: req.session.user.establishment,
+        establishment: item.establishment,
         author: req.session.user.name,
         authorRole: req.session.user.role,
         type: 'info'
@@ -416,22 +426,32 @@ export async function registerRoutes(
   
   app.get("/api/equipment", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
-    const items = await storage.getEquipmentByEstablishment(req.session.user.establishment);
+    let items;
+    if (isSystemAdminUser(req.session.user)) {
+      items = await storage.getAllEquipment();
+    } else {
+      items = await storage.getEquipmentByEstablishment(req.session.user.establishment);
+    }
     res.json(items);
   });
   
   app.post("/api/equipment", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
     try {
+      // System admin can specify any establishment, regular users use their own
+      const establishment = isSystemAdminUser(req.session.user) && req.body.establishment 
+        ? req.body.establishment 
+        : req.session.user.establishment;
+      
       const data = insertEquipmentSchema.parse({
         ...req.body,
-        establishment: req.session.user.establishment
+        establishment
       });
       const item = await storage.createEquipmentItem(data);
       
       await storage.createTimelineEvent({
         text: `Added new equipment: ${item.name}`,
-        establishment: req.session.user.establishment,
+        establishment: item.establishment,
         author: req.session.user.name,
         authorRole: req.session.user.role,
         type: 'info'
@@ -496,22 +516,32 @@ export async function registerRoutes(
   app.get("/api/checklists", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
     const listType = req.query.listType as string | undefined;
-    const items = await storage.getChecklistItemsByEstablishment(req.session.user.establishment, listType);
+    let items;
+    if (isSystemAdminUser(req.session.user)) {
+      items = await storage.getAllChecklistItems(listType);
+    } else {
+      items = await storage.getChecklistItemsByEstablishment(req.session.user.establishment, listType);
+    }
     res.json(items);
   });
   
   app.post("/api/checklists", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
     try {
+      // System admin can specify any establishment, regular users use their own
+      const establishment = isSystemAdminUser(req.session.user) && req.body.establishment 
+        ? req.body.establishment 
+        : req.session.user.establishment;
+      
       const data = insertChecklistItemSchema.parse({
         ...req.body,
-        establishment: req.session.user.establishment
+        establishment
       });
       const item = await storage.createChecklistItem(data);
       
       await storage.createTimelineEvent({
         text: `New ${data.listType} item: ${item.text} (Assigned to ${item.assignedTo})`,
-        establishment: req.session.user.establishment,
+        establishment: item.establishment,
         author: req.session.user.name,
         authorRole: req.session.user.role,
         type: 'info'
@@ -563,22 +593,32 @@ export async function registerRoutes(
   
   app.get("/api/tasks", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
-    const tasks = await storage.getWeeklyTasksByEstablishment(req.session.user.establishment);
+    let tasks;
+    if (isSystemAdminUser(req.session.user)) {
+      tasks = await storage.getAllWeeklyTasks();
+    } else {
+      tasks = await storage.getWeeklyTasksByEstablishment(req.session.user.establishment);
+    }
     res.json(tasks);
   });
   
   app.post("/api/tasks", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
     try {
+      // System admin can specify any establishment, regular users use their own
+      const establishment = isSystemAdminUser(req.session.user) && req.body.establishment 
+        ? req.body.establishment 
+        : req.session.user.establishment;
+      
       const data = insertWeeklyTaskSchema.parse({
         ...req.body,
-        establishment: req.session.user.establishment
+        establishment
       });
       const task = await storage.createWeeklyTask(data);
       
       await storage.createTimelineEvent({
         text: `New Weekly Task: ${task.text} (Assigned to ${task.assignedTo})`,
-        establishment: req.session.user.establishment,
+        establishment: task.establishment,
         author: req.session.user.name,
         authorRole: req.session.user.role,
         type: 'info'
@@ -663,16 +703,26 @@ export async function registerRoutes(
   
   app.get("/api/chat", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
-    const messages = await storage.getChatMessagesByEstablishment(req.session.user.establishment);
+    let messages;
+    if (isSystemAdminUser(req.session.user)) {
+      messages = await storage.getAllChatMessages();
+    } else {
+      messages = await storage.getChatMessagesByEstablishment(req.session.user.establishment);
+    }
     res.json(messages);
   });
   
   app.post("/api/chat", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
     try {
+      // System admin can specify any establishment, regular users use their own
+      const establishment = isSystemAdminUser(req.session.user) && req.body.establishment 
+        ? req.body.establishment 
+        : req.session.user.establishment;
+      
       const data = insertChatMessageSchema.parse({
         ...req.body,
-        establishment: req.session.user.establishment,
+        establishment,
         sender: req.session.user.name,
         senderRole: req.session.user.role
       });
@@ -690,16 +740,26 @@ export async function registerRoutes(
   
   app.get("/api/timeline", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
-    const events = await storage.getTimelineEventsByEstablishment(req.session.user.establishment);
+    let events;
+    if (isSystemAdminUser(req.session.user)) {
+      events = await storage.getAllTimelineEvents();
+    } else {
+      events = await storage.getTimelineEventsByEstablishment(req.session.user.establishment);
+    }
     res.json(events);
   });
   
   app.post("/api/timeline", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
     try {
+      // System admin can specify any establishment, regular users use their own
+      const establishment = isSystemAdminUser(req.session.user) && req.body.establishment 
+        ? req.body.establishment 
+        : req.session.user.establishment;
+      
       const data = insertTimelineEventSchema.parse({
         ...req.body,
-        establishment: req.session.user.establishment,
+        establishment,
         author: req.session.user.name,
         authorRole: req.session.user.role
       });
@@ -717,7 +777,12 @@ export async function registerRoutes(
   
   app.get("/api/menu", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
-    const items = await storage.getMenuItemsByEstablishment(req.session.user.establishment);
+    let items;
+    if (isSystemAdminUser(req.session.user)) {
+      items = await storage.getAllMenuItems();
+    } else {
+      items = await storage.getMenuItemsByEstablishment(req.session.user.establishment);
+    }
     
     // Include ingredients for each menu item
     const itemsWithIngredients = await Promise.all(
@@ -731,19 +796,24 @@ export async function registerRoutes(
   });
   
   app.post("/api/menu", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || (!isSystemAdminUser(req.session.user) && req.session.user.role !== 'manager')) {
       return res.status(403).json({ message: "Only managers can add menu items" });
     }
     try {
+      // System admin can specify any establishment, regular users use their own
+      const establishment = isSystemAdminUser(req.session.user) && req.body.establishment 
+        ? req.body.establishment 
+        : req.session.user.establishment;
+      
       const data = insertMenuItemSchema.parse({
         ...req.body,
-        establishment: req.session.user.establishment
+        establishment
       });
       const item = await storage.createMenuItem(data);
       
       await storage.createTimelineEvent({
         text: `Menu Item Added: ${item.name}`,
-        establishment: req.session.user.establishment,
+        establishment: item.establishment,
         author: req.session.user.name,
         authorRole: req.session.user.role,
         type: 'info'
@@ -759,7 +829,7 @@ export async function registerRoutes(
   });
   
   app.delete("/api/menu/:id", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || (!isSystemAdminUser(req.session.user) && req.session.user.role !== 'manager')) {
       return res.status(403).json({ message: "Only managers can delete menu items" });
     }
     await storage.deleteMenuItem(req.params.id);
@@ -769,7 +839,7 @@ export async function registerRoutes(
   // ==================== INGREDIENTS ====================
   
   app.post("/api/menu/:menuItemId/ingredients", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || (!isSystemAdminUser(req.session.user) && req.session.user.role !== 'manager')) {
       return res.status(403).json({ message: "Only managers can add ingredients" });
     }
     try {
@@ -788,7 +858,7 @@ export async function registerRoutes(
   });
   
   app.patch("/api/ingredients/:id", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || (!isSystemAdminUser(req.session.user) && req.session.user.role !== 'manager')) {
       return res.status(403).json({ message: "Only managers can update ingredients" });
     }
     const ingredient = await storage.updateIngredient(req.params.id, req.body);
@@ -797,7 +867,7 @@ export async function registerRoutes(
   });
   
   app.delete("/api/ingredients/:id", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || (!isSystemAdminUser(req.session.user) && req.session.user.role !== 'manager')) {
       return res.status(403).json({ message: "Only managers can delete ingredients" });
     }
     await storage.deleteIngredient(req.params.id);

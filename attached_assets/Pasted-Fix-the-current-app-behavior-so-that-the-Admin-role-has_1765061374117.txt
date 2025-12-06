@@ -1,0 +1,146 @@
+Fix the current app behavior so that the Admin role has full functional access to all features.
+Right now, the Admin cannot see any tasks, inventory, checklists, or menu items, and cannot approve newly registered users.
+This must be corrected immediately.
+
+Apply the following fixes:
+🔥 1. ADMIN MUST HAVE FULL PERMISSIONS EVERYWHERE
+
+Give the Admin role explicit access to:
+
+View all establishments
+
+View all tabs: Inventory, Equipment, Tasks, Weekly Tasks, Menu & Portion Sizes, Checklists, Employees
+
+Add new inventory items
+
+Add new equipment items
+
+Add new tasks
+
+Add new checklists
+
+Add menu items and portion sizes
+
+Edit and delete any item
+
+Manage users
+
+Admin must never see “no data” unless the data is truly empty.
+
+🔥 2. ADMIN MUST SEE ALL EXISTING DATA
+
+Right now the Admin sees zero items because:
+
+The Admin is not linked to an establishment
+
+Or the filters exclude Admin users
+
+Fix this by applying:
+
+Admin must ALWAYS be able to see:
+
+All inventory items
+
+All tasks
+
+All checklists
+
+All weekly tasks
+
+All menu items
+
+All portion sizes
+
+All equipment issue categories
+
+Regardless of establishment filters.
+
+🔥 3. ADMIN MUST SEE ALL PENDING USERS
+
+Fix the approval system so that:
+
+When a user registers, the Admin is notified
+
+The Admin can open a section (like “Pending Users”)
+
+The Admin can approve, reject, and assign roles
+
+Approval must work even if no Manager exists yet
+
+Admin must always be able to approve the first Manager.
+
+🔥 4. ADMIN MUST ALWAYS BE ABLE TO ASSIGN ROLES
+
+Fix logic:
+
+Admin can assign roles (Employee, Lead, Manager) to ANY user
+
+Admin can promote someone to Manager so they can manage their employees
+
+Admin must be able to manage all establishments
+
+🔥 5. ADMIN ESTABLISHMENT VISIBILITY FIX
+
+Currently the Admin may not be linked to any establishment.
+
+Fix:
+
+Admin must be “Global Access”
+
+Admin can view all establishments
+
+Admin is not restricted by the user’s establishment filter
+
+Admin sees all users in all establishments
+
+🔥 6. RESTORE PREVIOUS FUNCTIONALITY WHILE KEEPING ADMIN ACCESS
+
+Bring back the previous system where:
+
+Inventory items appeared normally
+
+Weekly tasks appeared normally
+
+Checklists appeared normally
+
+Menu & Portion sizes appeared normally
+
+But now ensure the Admin has access to ALL of them.
+
+🔥 7. ENSURE TABS ARE NOT HIDDEN FROM ADMIN
+
+If the builder hides tabs based on role permissions:
+
+Make sure Admin is included in the role-permissions of EVERY tab.
+
+Do not hide or restrict ANY operational tab from the Admin.
+
+🔥 8. ADMIN MUST BE ABLE TO MANUALLY CREATE OR EDIT MANAGERS
+
+Fix the interface so Admin can:
+
+Open the Employees tab
+
+See ALL users
+
+Approve pending users
+
+Assign roles
+
+Promote a user to Manager
+
+Create proper hierarchy
+
+🔥 9. SIGN-IN FIX FOR ADMIN
+
+Ensure that when the Admin logs in:
+
+The correct role is loaded
+
+Permissions are applied instantly
+
+All tabs show real data
+
+All management features are available
+
+✔️ END OF FIX PROMPT

@@ -29,24 +29,28 @@ export interface IStorage {
   
   // Inventory
   getInventoryByEstablishment(establishment: string): Promise<Inventory[]>;
+  getAllInventory(): Promise<Inventory[]>;
   createInventoryItem(item: InsertInventory): Promise<Inventory>;
   updateInventoryItem(id: string, updates: Partial<InsertInventory>): Promise<Inventory | undefined>;
   deleteInventoryItem(id: string): Promise<void>;
   
   // Equipment
   getEquipmentByEstablishment(establishment: string): Promise<Equipment[]>;
+  getAllEquipment(): Promise<Equipment[]>;
   createEquipmentItem(item: InsertEquipment): Promise<Equipment>;
   updateEquipmentItem(id: string, updates: Partial<InsertEquipment>): Promise<Equipment | undefined>;
   deleteEquipmentItem(id: string): Promise<void>;
   
   // Checklists
   getChecklistItemsByEstablishment(establishment: string, listType?: string): Promise<ChecklistItem[]>;
+  getAllChecklistItems(listType?: string): Promise<ChecklistItem[]>;
   createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem>;
   updateChecklistItem(id: string, updates: Partial<InsertChecklistItem>): Promise<ChecklistItem | undefined>;
   deleteChecklistItem(id: string): Promise<void>;
   
   // Weekly Tasks
   getWeeklyTasksByEstablishment(establishment: string): Promise<WeeklyTask[]>;
+  getAllWeeklyTasks(): Promise<WeeklyTask[]>;
   createWeeklyTask(task: InsertWeeklyTask): Promise<WeeklyTask>;
   updateWeeklyTask(id: string, updates: Partial<InsertWeeklyTask>): Promise<WeeklyTask | undefined>;
   deleteWeeklyTask(id: string): Promise<void>;
@@ -57,14 +61,17 @@ export interface IStorage {
   
   // Chat
   getChatMessagesByEstablishment(establishment: string): Promise<ChatMessage[]>;
+  getAllChatMessages(): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   
   // Timeline
   getTimelineEventsByEstablishment(establishment: string): Promise<TimelineEvent[]>;
+  getAllTimelineEvents(): Promise<TimelineEvent[]>;
   createTimelineEvent(event: InsertTimelineEvent): Promise<TimelineEvent>;
   
   // Menu
   getMenuItemsByEstablishment(establishment: string): Promise<MenuItem[]>;
+  getAllMenuItems(): Promise<MenuItem[]>;
   createMenuItem(item: InsertMenuItem): Promise<MenuItem>;
   deleteMenuItem(id: string): Promise<void>;
   
@@ -125,6 +132,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(inventory).where(eq(inventory.establishment, establishment));
   }
 
+  async getAllInventory(): Promise<Inventory[]> {
+    return await db.select().from(inventory);
+  }
+
   async createInventoryItem(item: InsertInventory): Promise<Inventory> {
     const [created] = await db.insert(inventory).values(item).returning();
     return created;
@@ -142,6 +153,10 @@ export class DatabaseStorage implements IStorage {
   // ===== EQUIPMENT =====
   async getEquipmentByEstablishment(establishment: string): Promise<Equipment[]> {
     return await db.select().from(equipment).where(eq(equipment.establishment, establishment));
+  }
+
+  async getAllEquipment(): Promise<Equipment[]> {
+    return await db.select().from(equipment);
   }
 
   async createEquipmentItem(item: InsertEquipment): Promise<Equipment> {
@@ -168,6 +183,13 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(checklistItems).where(eq(checklistItems.establishment, establishment));
   }
 
+  async getAllChecklistItems(listType?: string): Promise<ChecklistItem[]> {
+    if (listType) {
+      return await db.select().from(checklistItems).where(eq(checklistItems.listType, listType));
+    }
+    return await db.select().from(checklistItems);
+  }
+
   async createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem> {
     const [created] = await db.insert(checklistItems).values(item).returning();
     return created;
@@ -185,6 +207,10 @@ export class DatabaseStorage implements IStorage {
   // ===== WEEKLY TASKS =====
   async getWeeklyTasksByEstablishment(establishment: string): Promise<WeeklyTask[]> {
     return await db.select().from(weeklyTasks).where(eq(weeklyTasks.establishment, establishment));
+  }
+
+  async getAllWeeklyTasks(): Promise<WeeklyTask[]> {
+    return await db.select().from(weeklyTasks);
   }
 
   async createWeeklyTask(task: InsertWeeklyTask): Promise<WeeklyTask> {
@@ -220,6 +246,10 @@ export class DatabaseStorage implements IStorage {
       .orderBy(chatMessages.timestamp);
   }
 
+  async getAllChatMessages(): Promise<ChatMessage[]> {
+    return await db.select().from(chatMessages).orderBy(chatMessages.timestamp);
+  }
+
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     const [created] = await db.insert(chatMessages).values(message).returning();
     return created;
@@ -232,6 +262,10 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(timelineEvents.timestamp));
   }
 
+  async getAllTimelineEvents(): Promise<TimelineEvent[]> {
+    return await db.select().from(timelineEvents).orderBy(desc(timelineEvents.timestamp));
+  }
+
   async createTimelineEvent(event: InsertTimelineEvent): Promise<TimelineEvent> {
     const [created] = await db.insert(timelineEvents).values(event).returning();
     return created;
@@ -240,6 +274,10 @@ export class DatabaseStorage implements IStorage {
   // ===== MENU =====
   async getMenuItemsByEstablishment(establishment: string): Promise<MenuItem[]> {
     return await db.select().from(menuItems).where(eq(menuItems.establishment, establishment));
+  }
+
+  async getAllMenuItems(): Promise<MenuItem[]> {
+    return await db.select().from(menuItems);
   }
 
   async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
