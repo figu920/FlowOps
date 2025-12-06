@@ -160,22 +160,22 @@ export default function Menu() {
               className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors relative"
             >
                {canManageMenu && (
-                  <>
+                  <div className="absolute top-5 right-12 flex items-center gap-1 z-10">
                     <button 
                       onClick={(e) => { e.stopPropagation(); openEditDish(dish); }}
-                      className="absolute top-5 right-20 p-2 text-muted-foreground hover:text-flow-green opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      className="p-2 text-muted-foreground hover:text-flow-green transition-colors"
                       data-testid={`button-edit-dish-${dish.id}`}
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button 
                       onClick={(e) => { e.stopPropagation(); deleteMenuItemMutation.mutate(dish.id); }}
-                      className="absolute top-5 right-12 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      className="p-2 text-muted-foreground hover:text-flow-red transition-colors"
                       data-testid={`button-delete-${dish.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                  </>
+                  </div>
                )}
               
               <div className="flex items-center gap-4">
