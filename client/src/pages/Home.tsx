@@ -7,16 +7,21 @@ import {
   ClipboardList, 
   CalendarDays, 
   MessageCircle, 
-  Activity 
+  Activity,
+  Users
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 export default function Home() {
   const { inventory, equipment, currentUser } = useStore();
   
+  if (!currentUser) return null;
+
   // Dynamic status counts
   const lowStockCount = inventory.filter(i => i.status !== 'OK').length;
   const brokenCount = equipment.filter(e => e.status === 'Broken').length;
+
+  const canManageEmployees = currentUser.role === 'manager' || currentUser.role === 'lead';
 
   const menuItems = [
     { 
@@ -65,6 +70,13 @@ export default function Home() {
       color: 'bg-orange-500',
       textColor: 'text-orange-400'
     },
+    ...(canManageEmployees ? [{
+      title: 'Employees', 
+      icon: Users, 
+      path: '/employees', 
+      color: 'bg-pink-500',
+      textColor: 'text-pink-400'
+    }] : [])
   ];
 
   return (

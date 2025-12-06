@@ -109,7 +109,7 @@ export default function Chat() {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder={`Message as ${currentUser.name}...`}
+              placeholder={`Message as ${currentUser?.name || 'Guest'}...`}
               className="rounded-full bg-[#1C1C1E] border-white/10 h-11 px-5 text-base focus:border-blue-500/50 focus:ring-0 placeholder:text-muted-foreground/50"
             />
           </div>

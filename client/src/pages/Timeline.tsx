@@ -9,7 +9,7 @@ export default function Timeline() {
   const { timeline, currentUser } = useStore();
 
   // Only managers can see all details
-  const isManager = currentUser.role === 'manager';
+  const isManager = currentUser?.role === 'manager';
 
   return (
     <Layout title="Timeline">

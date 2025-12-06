@@ -1,0 +1,235 @@
+Update FlowOps to include a secure user authentication system and a full role-management structure so that only Managers can assign roles and add/remove employees. Users must NOT be able to change their own role under any circumstance.
+
+🔐 1. SECURE LOGIN SYSTEM (MANDATORY)
+
+Add a Login & Password system with individual accounts for:
+
+Managers
+
+Leads
+
+Employees
+
+Each user MUST log in using:
+
+Email or username
+
+Password
+
+Once logged in, the app displays the features allowed for their role only.
+
+Users must NOT be able to:
+
+Change their role
+
+Access Manager-only features
+
+Access add/edit/delete screens unless allowed
+
+A user CANNOT mark themselves as Manager or Lead.
+
+👤 2. MANAGER ACCOUNT CREATION (TOP PRIORITY)
+
+The app must include:
+
+ONE manager account per store (or multiple if needed, but created manually)
+
+Manager account is the ONLY role that can:
+
+✔ create new users
+✔ assign roles
+✔ promote or demote employees
+✔ delete users
+✔ reset passwords
+✔ approve Leads
+
+Managers must be created from outside the app or manually as the "root" role.
+
+📁 3. NEW TAB: “Employees” (VISIBLE ONLY TO MANAGERS AND LEADS)
+
+Add a new tab on the main menu:
+
+Employees
+
+Inside this screen:
+
+Managers can:
+
+Add new employees
+
+Add new Leads
+
+Add new Managers (optional)
+
+Edit employee information
+
+Assign or change user roles
+
+Remove (deactivate) employees
+
+Reset employee passwords
+
+View full employee list
+
+Leads can:
+
+Add employees
+
+Edit employee information
+
+Assign tasks to employees
+
+Cannot promote users to Lead or Manager
+
+Cannot delete users
+
+Employees:
+
+Cannot see this tab
+
+Cannot add/edit/delete users
+
+Cannot view employee list
+
+This page must include:
+
+Employee name
+
+Role (Manager / Lead / Employee)
+
+Edit button (Manager only)
+
+Delete/Deactivate button (Manager only)
+
+📝 4. USER LIST & ROLE ASSIGNMENT SCREEN
+
+When the manager taps “Add Employee” or “Edit Employee”, show a form:
+
+ADD EMPLOYEE FORM:
+
+Name
+
+Email / Username
+
+Password
+
+Role dropdown → (Employee, Lead, Manager)
+
+Save
+
+IMPORTANT:
+
+Only Managers may set a user as a Lead or Manager.
+
+Leads can only add Employees (not Leads or Managers).
+
+EDIT EMPLOYEE FORM:
+
+Name
+
+Email
+
+Role (editable only by Manager)
+
+Reset password (optional)
+
+Save changes
+
+🎭 5. ROLE-BASED APP PERMISSIONS
+Employee
+
+Can update inventory statuses
+
+Can mark checklists
+
+Can complete weekly tasks
+
+Can report equipment issues
+
+Cannot edit items
+
+Cannot add items
+
+Cannot see the “Employees” tab
+
+Cannot assign tasks
+
+Cannot change roles
+
+Employee Lead
+
+All Employee permissions
+
+Can add inventory items
+
+Can add equipment items
+
+Can assign weekly tasks
+
+Can create checklist items
+
+Can edit names/items
+
+Can view Employees tab
+
+Cannot change roles
+
+Cannot delete employees
+
+Cannot promote/demote users
+
+Manager
+
+Full system access
+
+Create users
+
+Delete users
+
+Assign roles
+
+Promote/demote users
+
+Add/edit/delete items
+
+Reset passwords
+
+View entire timeline and complete logs
+
+🛠 6. LINK TO ASSIGNMENT FEATURES
+
+Weekly Tasks and Checklists must now use the employee list from the Employees tab.
+
+Meaning:
+
+When creating a weekly task or checklist item:
+
+Assign To: (dropdown generated from Employees tab)
+
+Employees must automatically appear in:
+
+Weekly Tasks assignment
+
+Checklist assignment
+
+Incident reports
+
+Timeline logs
+
+No hard-coded names.
+
+🔒 7. SECURITY REQUIREMENTS
+
+No one can change their own role.
+
+No one can access Manager screens unless their login role = Manager.
+
+No one can access Lead features unless role = Lead.
+
+Users cannot access any part of the app without logging in first.
+
+Passwords must be stored securely.
+
+Only Manager can assign or revoke roles.
+
+✔️ END OF PROMPT

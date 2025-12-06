@@ -3,7 +3,8 @@ import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Plus, Trash2, UserCircle } from 'lucide-react';
+import { Check, Calendar, Plus, Trash2, UserCircle } from 'lucide-react';
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +21,8 @@ export default function Checklists() {
   const [assignedTo, setAssignedTo] = useState("");
   const [notes, setNotes] = useState("");
 
-  const canEdit = currentUser.role === 'manager' || currentUser.role === 'lead';
-  const canDelete = currentUser.role === 'manager';
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead';
+  const canDelete = currentUser?.role === 'manager';
 
   const handleAddItem = () => {
     if (taskName && assignedTo) {

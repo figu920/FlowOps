@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,35 +16,19 @@ interface LayoutProps {
 export default function Layout({ children, title, showBack = true, className, action }: LayoutProps) {
   const [_, setLocation] = useLocation();
   const [scrolled, setScrolled] = useState(false);
-  const { currentUser, switchUser } = useStore();
-  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const { currentUser, logout } = useStore();
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setScrolled(e.currentTarget.scrollTop > 20);
   };
 
+  const handleLogout = () => {
+    logout();
+    setLocation('/login');
+  };
+
   return (
     <div className="h-screen bg-background text-foreground flex flex-col font-sans overflow-hidden">
-      {/* Role Switcher (Hidden/Debug) */}
-      <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
-        <DialogContent className="bg-card border-white/10 text-white">
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg">Switch User Role</h3>
-            <div className="grid gap-2">
-              <Button onClick={() => { switchUser('manager'); setRoleDialogOpen(false); }} variant="outline" className="justify-start border-white/10 hover:bg-white/5">
-                👨‍💼 Manager (Full Access)
-              </Button>
-              <Button onClick={() => { switchUser('lead'); setRoleDialogOpen(false); }} variant="outline" className="justify-start border-white/10 hover:bg-white/5">
-                👷 Lead (Edit/Add)
-              </Button>
-              <Button onClick={() => { switchUser('employee'); setRoleDialogOpen(false); }} variant="outline" className="justify-start border-white/10 hover:bg-white/5">
-                👤 Employee (View Only)
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* iOS-style Header */}
       <header 
         className={cn(
@@ -66,17 +48,17 @@ export default function Layout({ children, title, showBack = true, className, ac
                 <span className="text-[17px] font-medium leading-none pb-0.5">Back</span>
               </motion.button>
             ) : (
-              // User Avatar/Role Trigger on Home
+              // User Avatar/Logout on Home
               <motion.button
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setRoleDialogOpen(true)}
-                className="flex items-center gap-2 bg-white/5 pr-3 pl-1 py-1 rounded-full border border-white/5"
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-white/5 pr-3 pl-1 py-1 rounded-full border border-white/5 group hover:bg-red-500/10 hover:border-red-500/20 transition-all"
               >
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] font-bold">
-                  {currentUser.name.charAt(0)}
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] font-bold group-hover:from-red-500 group-hover:to-red-600">
+                  {currentUser?.name.charAt(0)}
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="text-[10px] font-bold leading-none uppercase text-muted-foreground">{currentUser.role}</span>
+                  <span className="text-[10px] font-bold leading-none uppercase text-muted-foreground group-hover:text-red-400">Log Out</span>
                 </div>
               </motion.button>
             )}

@@ -18,8 +18,8 @@ export default function Tasks() {
   const [assignedTo, setAssignedTo] = useState("");
   const [notes, setNotes] = useState("");
 
-  const canEdit = currentUser.role === 'manager' || currentUser.role === 'lead';
-  const canDelete = currentUser.role === 'manager';
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead';
+  const canDelete = currentUser?.role === 'manager';
 
   const handleAddTask = () => {
     if (taskName && assignedTo) {
