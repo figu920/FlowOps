@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -178,7 +178,7 @@ export const ingredients = pgTable("ingredients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   menuItemId: varchar("menu_item_id").notNull().references(() => menuItems.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
-  quantity: integer("quantity").notNull(),
+  quantity: real("quantity").notNull(),
   unit: text("unit").notNull(), // 'grams' | 'oz' | 'cups' | 'bowls' | 'tablespoons' | 'pieces'
   notes: text("notes"),
 });
