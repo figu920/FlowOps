@@ -846,6 +846,20 @@ export async function registerRoutes(
     }
   });
   
+  app.patch("/api/menu/:id", async (req: Request, res: Response) => {
+    if (!req.session.user || (!isSystemAdminUser(req.session.user) && req.session.user.role !== 'manager')) {
+      return res.status(403).json({ message: "Only managers can update menu items" });
+    }
+    const { name, category } = req.body;
+    const updates: { name?: string; category?: string } = {};
+    if (name) updates.name = name;
+    if (category) updates.category = category;
+    
+    const item = await storage.updateMenuItem(req.params.id, updates);
+    if (!item) return res.status(404).json({ message: "Menu item not found" });
+    res.json(item);
+  });
+  
   app.delete("/api/menu/:id", async (req: Request, res: Response) => {
     if (!req.session.user || (!isSystemAdminUser(req.session.user) && req.session.user.role !== 'manager')) {
       return res.status(403).json({ message: "Only managers can delete menu items" });

@@ -74,6 +74,7 @@ export interface IStorage {
   getMenuItemsByEstablishment(establishment: string): Promise<MenuItem[]>;
   getAllMenuItems(): Promise<MenuItem[]>;
   createMenuItem(item: InsertMenuItem): Promise<MenuItem>;
+  updateMenuItem(id: string, updates: Partial<InsertMenuItem>): Promise<MenuItem | undefined>;
   deleteMenuItem(id: string): Promise<void>;
   
   // Ingredients
@@ -292,6 +293,11 @@ export class DatabaseStorage implements IStorage {
   async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
     const [created] = await db.insert(menuItems).values(item).returning();
     return created;
+  }
+
+  async updateMenuItem(id: string, updates: Partial<InsertMenuItem>): Promise<MenuItem | undefined> {
+    const [updated] = await db.update(menuItems).set(updates).where(eq(menuItems.id, id)).returning();
+    return updated || undefined;
   }
 
   async deleteMenuItem(id: string): Promise<void> {

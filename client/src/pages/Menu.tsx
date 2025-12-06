@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore, type MenuItem, type MeasurementUnit } from '@/lib/store';
-import { useMenu, useCreateMenuItem, useDeleteMenuItem, useAddIngredient, useUpdateIngredient, useDeleteIngredient } from '@/lib/hooks';
+import { useMenu, useCreateMenuItem, useUpdateMenuItem, useDeleteMenuItem, useAddIngredient, useUpdateIngredient, useDeleteIngredient } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, ChevronDown, Utensils, Edit2 } from 'lucide-react';
@@ -15,15 +15,20 @@ export default function Menu() {
   const { currentUser } = useStore();
   const { data: menu = [] } = useMenu();
   const createMenuItemMutation = useCreateMenuItem();
+  const updateMenuItemMutation = useUpdateMenuItem();
   const deleteMenuItemMutation = useDeleteMenuItem();
   const addIngredientMutation = useAddIngredient();
   const updateIngredientMutation = useUpdateIngredient();
   const deleteIngredientMutation = useDeleteIngredient();
   
-  // State for Add/Edit
+  // State for Add/Edit Dish
   const [isAddingDish, setIsAddingDish] = useState(false);
   const [newDishName, setNewDishName] = useState("");
   const [newDishCategory, setNewDishCategory] = useState("");
+  
+  const [editingDish, setEditingDish] = useState<string | null>(null);
+  const [editDishName, setEditDishName] = useState("");
+  const [editDishCategory, setEditDishCategory] = useState("");
 
   const [addingIngredientTo, setAddingIngredientTo] = useState<string | null>(null);
   const [editingIngredient, setEditingIngredient] = useState<{menuId: string, ingId: string} | null>(null);
@@ -53,6 +58,24 @@ export default function Menu() {
       setIsAddingDish(false);
       setNewDishName("");
       setNewDishCategory("");
+    }
+  };
+
+  const openEditDish = (dish: any) => {
+    setEditingDish(dish.id);
+    setEditDishName(dish.name);
+    setEditDishCategory(dish.category);
+  };
+
+  const handleEditDish = () => {
+    if (editingDish && editDishName && editDishCategory) {
+      updateMenuItemMutation.mutate({
+        id: editingDish,
+        updates: { name: editDishName, category: editDishCategory }
+      });
+      setEditingDish(null);
+      setEditDishName("");
+      setEditDishCategory("");
     }
   };
 
@@ -137,13 +160,22 @@ export default function Menu() {
               className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors relative"
             >
                {canManageMenu && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); deleteMenuItemMutation.mutate(dish.id); }}
-                    className="absolute top-5 right-12 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                    data-testid={`button-delete-${dish.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); openEditDish(dish); }}
+                      className="absolute top-5 right-20 p-2 text-muted-foreground hover:text-flow-green opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      data-testid={`button-edit-dish-${dish.id}`}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteMenuItemMutation.mutate(dish.id); }}
+                      className="absolute top-5 right-12 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      data-testid={`button-delete-${dish.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
                )}
               
               <div className="flex items-center gap-4">
@@ -228,7 +260,7 @@ export default function Menu() {
 
       {/* Add Dish Dialog */}
       <Dialog open={isAddingDish} onOpenChange={setIsAddingDish}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add New Dish</DialogTitle>
           </DialogHeader>
@@ -258,9 +290,41 @@ export default function Menu() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Dish Dialog */}
+      <Dialog open={!!editingDish} onOpenChange={(open) => !open && setEditingDish(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Edit Dish</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Dish Name</label>
+              <Input 
+                value={editDishName}
+                onChange={(e) => setEditDishName(e.target.value)}
+                placeholder="e.g. Spicy Chicken Sandwich"
+                className="bg-black/20 border-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category</label>
+              <Input 
+                value={editDishCategory}
+                onChange={(e) => setEditDishCategory(e.target.value)}
+                placeholder="e.g. Burgers"
+                className="bg-black/20 border-white/10"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleEditDish} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">Update Dish</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add/Edit Ingredient Dialog */}
       <Dialog open={!!addingIngredientTo || !!editingIngredient} onOpenChange={() => { setAddingIngredientTo(null); setEditingIngredient(null); }}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}</DialogTitle>
           </DialogHeader>

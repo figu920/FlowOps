@@ -152,6 +152,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    update: (id: string, updates: any) =>
+      fetchAPI(`/menu/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      }),
     delete: (id: string) =>
       fetchAPI(`/menu/${id}`, { method: 'DELETE' }),
     getIngredients: (id: string) =>

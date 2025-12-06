@@ -148,7 +148,7 @@ export default function Inventory() {
 
       {/* LOW Comment Dialog */}
       <Dialog open={!!lowCommentItem} onOpenChange={(open) => !open && setLowCommentItem(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Low Stock Alert</DialogTitle>
           </DialogHeader>
@@ -170,7 +170,7 @@ export default function Inventory() {
 
       {/* Add Item Dialog */}
       <Dialog open={isAddingItem} onOpenChange={setIsAddingItem}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add Inventory Item</DialogTitle>
           </DialogHeader>

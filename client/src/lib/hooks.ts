@@ -303,6 +303,17 @@ export function useCreateMenuItem() {
   });
 }
 
+export function useUpdateMenuItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
+      api.menu.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+    },
+  });
+}
+
 export function useDeleteMenuItem() {
   const queryClient = useQueryClient();
   return useMutation({

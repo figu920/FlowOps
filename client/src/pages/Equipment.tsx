@@ -171,7 +171,7 @@ export default function Equipment() {
 
       {/* Report Modal */}
       <Dialog open={!!selectedIssueId} onOpenChange={(open) => !open && setSelectedIssueId(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Report Issue</DialogTitle>
           </DialogHeader>
@@ -195,7 +195,7 @@ export default function Equipment() {
 
       {/* Add Equipment Dialog */}
       <Dialog open={isAddingItem} onOpenChange={setIsAddingItem}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add Equipment</DialogTitle>
           </DialogHeader>
