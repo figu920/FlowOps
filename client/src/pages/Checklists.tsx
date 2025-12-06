@@ -27,8 +27,9 @@ export default function Checklists() {
   const [assignedTo, setAssignedTo] = useState("");
   const [notes, setNotes] = useState("");
 
-  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead';
-  const canDelete = currentUser?.role === 'manager';
+  const isAdmin = currentUser?.isSystemAdmin === true;
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
+  const canDelete = currentUser?.role === 'manager' || isAdmin;
 
   const handleAddItem = () => {
     if (taskName && assignedTo) {

@@ -32,8 +32,9 @@ export default function Tasks() {
   // History View State
   const [viewingHistoryTask, setViewingHistoryTask] = useState<string | null>(null);
 
-  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead';
-  const canDelete = currentUser?.role === 'manager';
+  const isAdmin = currentUser?.isSystemAdmin === true;
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
+  const canDelete = currentUser?.role === 'manager' || isAdmin;
 
   const handleAddTask = () => {
     if (taskName && assignedTo) {
