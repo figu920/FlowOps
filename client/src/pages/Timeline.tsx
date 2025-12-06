@@ -6,16 +6,10 @@ import { AlertCircle, Info, CheckCircle2, AlertTriangle, Clock } from 'lucide-re
 import { motion } from 'framer-motion';
 
 export default function Timeline() {
-  const { timeline } = useStore();
+  const { timeline, currentUser } = useStore();
 
-  const getIcon = (type: string) => {
-    switch(type) {
-      case 'alert': return <AlertCircle className="w-5 h-5 text-flow-red" />;
-      case 'warning': return <AlertTriangle className="w-5 h-5 text-flow-yellow" />;
-      case 'success': return <CheckCircle2 className="w-5 h-5 text-flow-green" />;
-      default: return <Info className="w-5 h-5 text-blue-400" />;
-    }
-  };
+  // Only managers can see all details
+  const isManager = currentUser.role === 'manager';
 
   return (
     <Layout title="Timeline">
@@ -23,6 +17,8 @@ export default function Timeline() {
         {timeline.map((event, i) => {
           const date = parseISO(event.timestamp);
           const timeStr = format(date, 'h:mm a');
+          
+          // Employees see basic info, Managers see everything
           
           return (
             <motion.div 
@@ -47,12 +43,21 @@ export default function Timeline() {
                      {timeStr}
                    </span>
                    <span className="text-sm font-bold text-white">{event.author}</span>
+                   {isManager && (
+                     <span className="text-[10px] uppercase bg-white/10 px-1 rounded text-white/50">{event.role}</span>
+                   )}
                 </div>
                 
                 <div className="bg-card p-4 rounded-2xl border border-white/[0.06] shadow-sm">
                   <p className="text-[15px] leading-normal text-white/90 font-medium">
                     {event.text}
                   </p>
+                  
+                  {event.comment && (isManager || event.role === 'lead') && (
+                    <div className="mt-2 pt-2 border-t border-white/5">
+                      <p className="text-xs text-muted-foreground italic">"{event.comment}"</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

@@ -3,15 +3,24 @@ import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, AlertTriangle, XCircle, PenLine } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, PenLine, Plus, Trash2, Camera } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 
 export default function Equipment() {
-  const { equipment, updateEquipment } = useStore();
+  const { equipment, currentUser, updateEquipment, addEquipmentItem, deleteEquipmentItem } = useStore();
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [issueText, setIssueText] = useState("");
+
+  // Add Equipment State
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemCategory, setNewItemCategory] = useState("");
+
+  const canEdit = currentUser.role === 'manager' || currentUser.role === 'lead';
+  const canDelete = currentUser.role === 'manager';
 
   const handleBrokenReport = () => {
     if (selectedIssueId) {
@@ -21,8 +30,30 @@ export default function Equipment() {
     }
   };
 
+  const handleAddItem = () => {
+    if (newItemName.trim()) {
+      addEquipmentItem(newItemName, newItemCategory);
+      setIsAddingItem(false);
+      setNewItemName("");
+      setNewItemCategory("");
+    }
+  };
+
   return (
-    <Layout title="Equipment">
+    <Layout 
+      title="Equipment"
+      action={
+        canEdit && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setIsAddingItem(true)}
+            className="w-9 h-9 rounded-full bg-flow-yellow text-black flex items-center justify-center shadow-lg shadow-flow-yellow/20"
+          >
+            <Plus className="w-5 h-5" strokeWidth={3} />
+          </motion.button>
+        )
+      }
+    >
       <div className="space-y-4">
         {equipment.map((item, idx) => (
           <motion.div 
@@ -31,13 +62,25 @@ export default function Equipment() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.05 }}
             className={cn(
-              "bg-card rounded-[20px] p-1 border transition-colors duration-300",
+              "bg-card rounded-[20px] p-1 border transition-colors duration-300 relative group",
               item.status === 'Broken' ? "border-flow-red/50" : "border-white/[0.04]"
             )}
           >
+             {canDelete && (
+                <button 
+                  onClick={() => deleteEquipmentItem(item.id)}
+                  className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+             )}
+
              <div className="p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-bold text-white tracking-tight">{item.name}</span>
+                <div className="flex justify-between items-center mb-4 pr-8">
+                  <div>
+                    <span className="text-lg font-bold text-white tracking-tight block">{item.name}</span>
+                    {item.category && <span className="text-[10px] text-muted-foreground uppercase font-bold">{item.category}</span>}
+                  </div>
                   <div className={cn(
                     "h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]",
                     item.status === 'Working' ? "text-flow-green bg-flow-green" : 
@@ -113,7 +156,7 @@ export default function Equipment() {
         ))}
       </div>
 
-      {/* Modern Report Modal */}
+      {/* Report Modal */}
       <Dialog open={!!selectedIssueId} onOpenChange={(open) => !open && setSelectedIssueId(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader>
@@ -133,6 +176,45 @@ export default function Equipment() {
             <Button onClick={handleBrokenReport} className="flex-1 bg-flow-red hover:bg-flow-red/90 text-white font-bold h-12 rounded-xl shadow-[0_0_20px_rgba(255,69,58,0.4)] border-0">
               Report Broken
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Equipment Dialog */}
+      <Dialog open={isAddingItem} onOpenChange={setIsAddingItem}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle>Add Equipment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex justify-center">
+              <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
+                <Camera className="w-8 h-8 text-muted-foreground" />
+              </div>
+            </div>
+            
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Name</label>
+              <Input 
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder="e.g. Salamander"
+                className="bg-black/20 border-white/10"
+              />
+            </div>
+            
+            <div>
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category</label>
+              <Input 
+                value={newItemCategory}
+                onChange={(e) => setNewItemCategory(e.target.value)}
+                placeholder="Kitchen"
+                className="bg-black/20 border-white/10"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleAddItem} className="w-full bg-flow-yellow text-black font-bold hover:bg-flow-yellow/90">Save Equipment</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

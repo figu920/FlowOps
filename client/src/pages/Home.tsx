@@ -12,7 +12,7 @@ import {
 import { useStore } from '@/lib/store';
 
 export default function Home() {
-  const { inventory, equipment } = useStore();
+  const { inventory, equipment, currentUser } = useStore();
   
   // Dynamic status counts
   const lowStockCount = inventory.filter(i => i.status !== 'OK').length;
@@ -68,7 +68,7 @@ export default function Home() {
   ];
 
   return (
-    <Layout title="FlowOps" showBack={false}>
+    <Layout title={`Hello, ${currentUser.name.split(' ')[0]}`} showBack={false}>
       <div className="grid grid-cols-2 gap-4">
         {menuItems.map((item, index) => (
           <Link key={item.title} href={item.path}>
@@ -104,7 +104,9 @@ export default function Home() {
       </div>
       
       <div className="mt-8 text-center">
-        <p className="text-white/20 text-xs font-medium uppercase tracking-widest">University Dining • v1.0</p>
+        <p className="text-white/20 text-xs font-medium uppercase tracking-widest">
+           Role: {currentUser.role}
+        </p>
       </div>
     </Layout>
   );

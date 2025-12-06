@@ -16,7 +16,7 @@ const QUICK_ACTIONS = [
 ];
 
 export default function Chat() {
-  const { chat, sendMessage } = useStore();
+  const { chat, sendMessage, currentUser } = useStore();
   const [inputText, setInputText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +54,10 @@ export default function Chat() {
               )}
             >
               {!msg.isMe && !isSequence && (
-                <span className="text-[11px] text-muted-foreground mb-1 ml-3 font-medium">{msg.sender}</span>
+                <div className="flex items-center gap-2 mb-1 ml-3">
+                   <span className="text-[11px] text-muted-foreground font-medium">{msg.sender}</span>
+                   <span className="text-[9px] uppercase bg-white/5 px-1 rounded text-white/30">{msg.role}</span>
+                </div>
               )}
               
               <div className={cn(
@@ -106,7 +109,7 @@ export default function Chat() {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Message team..."
+              placeholder={`Message as ${currentUser.name}...`}
               className="rounded-full bg-[#1C1C1E] border-white/10 h-11 px-5 text-base focus:border-blue-500/50 focus:ring-0 placeholder:text-muted-foreground/50"
             />
           </div>

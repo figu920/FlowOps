@@ -1,0 +1,157 @@
+Update the FlowOps app with a new role-based permission system and improved inventory/equipment functionality.
+The app must now support 3 user types with different levels of access: Manager, Lead, and Employee.
+
+👤 1. USER ROLES AND PERMISSIONS
+Employee (Basic User)
+
+Can view inventory
+
+Can update item status (OK / LOW / OUT)
+
+When selecting LOW, must enter a short comment such as “15% left”, “almost empty”, etc.
+
+Can report equipment issues (Working / Needs Attention / Broken)
+
+Cannot add or delete inventory items
+
+Cannot add or delete equipment items
+
+Cannot edit names, photos, or categories
+
+Employee Lead (Intermediate Role — Manager-Approved)
+
+Employee Leads should have all employee permissions, plus:
+
+Can add new inventory items
+
+Can upload photos for each new inventory item
+
+Can add new equipment items
+
+Can upload photos for each new equipment item
+
+Can modify item categories
+
+Can edit names of inventory/equipment items
+
+Can NOT delete items permanently (only managers may delete)
+
+Lead users must see the “+” button on both:
+
+Inventory screen
+
+Equipment screen
+
+Employees should NOT see the “+” button.
+
+Manager (Full Access)
+
+Managers have all permissions, including:
+
+Add inventory items
+
+Edit inventory items
+
+Delete inventory items
+
+Add equipment items
+
+Edit and delete equipment items
+
+Approve or remove Employee Leads
+
+View all LOW comments and timestamps
+
+Access full timeline logs
+
+Managers always see the “+” button in Inventory and Equipment.
+
+📦 2. INVENTORY UPDATES
+
+Modify the Inventory screen so that:
+
+✔ Managers and Leads see a + button (top right)
+
+When tapped, show a form:
+
+ADD INVENTORY ITEM FORM:
+
+Item Name
+
+Category (optional)
+
+Upload Photo/Icon
+
+Save
+
+Once saved, the new item appears instantly with OK/LOW/OUT buttons.
+
+✔ LOW status must include a comment box
+
+Whenever LOW is selected:
+
+“How much is left approximately?”
+[ short text input ]
+[ Save ]
+
+Then automatically:
+
+Log comment + timestamp
+
+Add to Timeline
+
+Make visible to managers and leads
+
+🔧 3. EQUIPMENT UPDATES
+
+Modify the Equipment screen exactly the same way:
+
+✔ Managers and Leads see a “+” button (top right)
+
+ADD EQUIPMENT FORM:
+
+Equipment Name
+
+Upload Photo/Icon
+
+Category (optional)
+
+Save
+
+New equipment items appear with statuses:
+
+Working (Green)
+
+Needs Attention (Yellow)
+
+Broken (Red)
+
+Employees cannot add new equipment.
+
+🕒 4. ROLE ACCESS LOGIC
+
+Employee Leads can only be created or approved by Managers.
+
+App must hide or show buttons based on role:
+
+Employees: no + button, no edit options
+
+Leads: + button + edit options (no delete)
+
+Managers: full access including delete
+
+💾 5. DATA LOGGING REQUIREMENTS
+
+For every action (LOW, OUT, Broken, Completed Task, New Item, etc.):
+
+Save user role
+
+Save username
+
+Save timestamp
+
+Save comment (if provided)
+
+Add entry to Timeline
+
+✔️ END OF PROMPT

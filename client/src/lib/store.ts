@@ -3,19 +3,30 @@ import { format } from 'date-fns';
 
 export type Status = 'OK' | 'LOW' | 'OUT';
 export type EquipmentStatus = 'Working' | 'Attention' | 'Broken';
+export type UserRole = 'manager' | 'lead' | 'employee';
+
+export interface User {
+  id: string;
+  name: string;
+  role: UserRole;
+  avatar?: string;
+}
 
 export interface InventoryItem {
   id: string;
   emoji: string;
   name: string;
+  category?: string;
   status: Status;
   lastUpdated: string;
   updatedBy: string;
+  lowComment?: string;
 }
 
 export interface EquipmentItem {
   id: string;
   name: string;
+  category?: string;
   status: EquipmentStatus;
   lastIssue?: string;
 }
@@ -39,6 +50,7 @@ export interface ChatMessage {
   id: string;
   text: string;
   sender: string;
+  role: UserRole;
   isMe: boolean;
   timestamp: string;
   type: 'text' | 'action';
@@ -48,12 +60,15 @@ export interface TimelineEvent {
   id: string;
   text: string;
   author: string;
-  timestamp: string; // ISO string
+  role: UserRole;
+  timestamp: string;
   type: 'alert' | 'info' | 'success' | 'warning';
+  comment?: string;
 }
 
 interface FlowState {
-  currentUser: string;
+  currentUser: User;
+  users: User[];
   inventory: InventoryItem[];
   equipment: EquipmentItem[];
   checklists: {
@@ -65,29 +80,47 @@ interface FlowState {
   chat: ChatMessage[];
   timeline: TimelineEvent[];
 
-  updateInventory: (id: string, status: Status) => void;
+  // User Actions
+  switchUser: (role: UserRole) => void;
+
+  // Inventory Actions
+  updateInventory: (id: string, status: Status, comment?: string) => void;
+  addInventoryItem: (name: string, emoji: string, category?: string) => void;
+  deleteInventoryItem: (id: string) => void;
+
+  // Equipment Actions
   updateEquipment: (id: string, status: EquipmentStatus, issueDescription?: string) => void;
+  addEquipmentItem: (name: string, category?: string) => void;
+  deleteEquipmentItem: (id: string) => void;
+
+  // Other Actions
   toggleChecklist: (listType: 'opening' | 'shift' | 'closing', taskId: string) => void;
   toggleTask: (taskId: string) => void;
   sendMessage: (text: string, isAction?: boolean) => void;
-  addTimelineEntry: (text: string, type: TimelineEvent['type']) => void;
+  addTimelineEntry: (text: string, type: TimelineEvent['type'], comment?: string) => void;
 }
 
+const INITIAL_USERS: User[] = [
+  { id: 'u1', name: 'Angel (Manager)', role: 'manager' },
+  { id: 'u2', name: 'Hunter (Lead)', role: 'lead' },
+  { id: 'u3', name: 'Bella (Employee)', role: 'employee' },
+];
+
 const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: '1', emoji: '🍔', name: 'Beef Patties', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
-  { id: '2', emoji: '🥬', name: 'Lettuce', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
-  { id: '3', emoji: '🍅', name: 'Tomatoes', status: 'LOW', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
-  { id: '4', emoji: '🧀', name: 'Cheese Slices', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
-  { id: '5', emoji: '🍟', name: 'French Fries', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
-  { id: '6', emoji: '🥤', name: 'Cola Syrup', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
+  { id: '1', emoji: '🍔', name: 'Beef Patties', category: 'Food', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
+  { id: '2', emoji: '🥬', name: 'Lettuce', category: 'Food', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
+  { id: '3', emoji: '🍅', name: 'Tomatoes', category: 'Food', status: 'LOW', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
+  { id: '4', emoji: '🧀', name: 'Cheese Slices', category: 'Food', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
+  { id: '5', emoji: '🍟', name: 'French Fries', category: 'Food', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
+  { id: '6', emoji: '🥤', name: 'Cola Syrup', category: 'Drink', status: 'OK', lastUpdated: new Date().toISOString(), updatedBy: 'System' },
 ];
 
 const INITIAL_EQUIPMENT: EquipmentItem[] = [
-  { id: '1', name: 'Fryer', status: 'Working' },
-  { id: '2', name: 'Grill', status: 'Working' },
-  { id: '3', name: 'Fridge', status: 'Attention' },
-  { id: '4', name: 'Ice Machine', status: 'Working' },
-  { id: '5', name: 'Dishwasher', status: 'Working' },
+  { id: '1', name: 'Fryer', category: 'Kitchen', status: 'Working' },
+  { id: '2', name: 'Grill', category: 'Kitchen', status: 'Working' },
+  { id: '3', name: 'Fridge', category: 'Kitchen', status: 'Attention' },
+  { id: '4', name: 'Ice Machine', category: 'Bar', status: 'Working' },
+  { id: '5', name: 'Dishwasher', category: 'Kitchen', status: 'Working' },
 ];
 
 const INITIAL_CHECKLISTS = {
@@ -116,19 +149,20 @@ const INITIAL_TASKS: TaskItem[] = [
 ];
 
 const INITIAL_CHAT: ChatMessage[] = [
-  { id: 'm1', text: 'Inventory arrived', sender: 'Supervisor', isMe: false, timestamp: '10:00 AM', type: 'action' },
-  { id: 'm2', text: 'Can someone cover my shift tomorrow?', sender: 'Hunter', isMe: false, timestamp: '10:15 AM', type: 'text' },
+  { id: 'm1', text: 'Inventory arrived', sender: 'Angel (Manager)', role: 'manager', isMe: false, timestamp: '10:00 AM', type: 'action' },
+  { id: 'm2', text: 'Can someone cover my shift tomorrow?', sender: 'Hunter (Lead)', role: 'lead', isMe: false, timestamp: '10:15 AM', type: 'text' },
 ];
 
 const INITIAL_TIMELINE: TimelineEvent[] = [
-  { id: 'e1', text: 'Fryer reported BROKEN', author: 'Angel', timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), type: 'alert' }, // 15 mins ago
-  { id: 'e2', text: 'Lettuce LOW', author: 'Hunter', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), type: 'warning' }, // 45 mins ago
-  { id: 'e3', text: 'Beef Patties OUT', author: 'Angel', timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), type: 'alert' }, // 1 hour ago
-  { id: 'e4', text: 'Opening checklist completed', author: 'Bella', timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), type: 'success' }, // 2 hours ago
+  { id: 'e1', text: 'Fryer reported BROKEN', author: 'Angel', role: 'manager', timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), type: 'alert' },
+  { id: 'e2', text: 'Lettuce LOW', author: 'Hunter', role: 'lead', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), type: 'warning' },
+  { id: 'e3', text: 'Beef Patties OUT', author: 'Angel', role: 'manager', timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), type: 'alert' },
+  { id: 'e4', text: 'Opening checklist completed', author: 'Bella', role: 'employee', timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), type: 'success' },
 ];
 
 export const useStore = create<FlowState>((set, get) => ({
-  currentUser: 'Angel', // Hardcoded for demo
+  currentUser: INITIAL_USERS[0], // Default to Manager
+  users: INITIAL_USERS,
   inventory: INITIAL_INVENTORY,
   equipment: INITIAL_EQUIPMENT,
   checklists: INITIAL_CHECKLISTS,
@@ -136,27 +170,65 @@ export const useStore = create<FlowState>((set, get) => ({
   chat: INITIAL_CHAT,
   timeline: INITIAL_TIMELINE,
 
-  addTimelineEntry: (text, type) => {
+  switchUser: (role) => {
+    const user = INITIAL_USERS.find(u => u.role === role);
+    if (user) set({ currentUser: user });
+  },
+
+  addTimelineEntry: (text, type, comment) => {
+    const { currentUser } = get();
     const newEvent: TimelineEvent = {
       id: Math.random().toString(36).substr(2, 9),
       text,
-      author: get().currentUser,
+      author: currentUser.name,
+      role: currentUser.role,
       timestamp: new Date().toISOString(),
       type,
+      comment
     };
     set((state) => ({ timeline: [newEvent, ...state.timeline] }));
   },
 
-  updateInventory: (id, status) => {
+  updateInventory: (id, status, comment) => {
+    const { currentUser } = get();
     set((state) => ({
       inventory: state.inventory.map((item) =>
-        item.id === id ? { ...item, status, lastUpdated: new Date().toISOString(), updatedBy: state.currentUser } : item
+        item.id === id ? { 
+          ...item, 
+          status, 
+          lastUpdated: new Date().toISOString(), 
+          updatedBy: currentUser.name,
+          lowComment: comment 
+        } : item
       ),
     }));
 
     const item = get().inventory.find((i) => i.id === id);
     if (item && (status === 'LOW' || status === 'OUT')) {
-      get().addTimelineEntry(`${item.name} marked ${status}`, status === 'OUT' ? 'alert' : 'warning');
+      const text = `${item.name} marked ${status}`;
+      get().addTimelineEntry(text, status === 'OUT' ? 'alert' : 'warning', comment);
+    }
+  },
+
+  addInventoryItem: (name, emoji, category) => {
+    const newItem: InventoryItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      emoji,
+      category,
+      status: 'OK',
+      lastUpdated: new Date().toISOString(),
+      updatedBy: get().currentUser.name
+    };
+    set(state => ({ inventory: [...state.inventory, newItem] }));
+    get().addTimelineEntry(`Added new item: ${name}`, 'info');
+  },
+
+  deleteInventoryItem: (id) => {
+    const item = get().inventory.find(i => i.id === id);
+    if (item) {
+      set(state => ({ inventory: state.inventory.filter(i => i.id !== id) }));
+      get().addTimelineEntry(`Deleted item: ${item.name}`, 'warning');
     }
   },
 
@@ -170,7 +242,7 @@ export const useStore = create<FlowState>((set, get) => ({
     const item = get().equipment.find((i) => i.id === id);
     if (item) {
       if (status === 'Broken') {
-        get().addTimelineEntry(`${item.name} reported BROKEN: ${issueDescription || 'No description'}`, 'alert');
+        get().addTimelineEntry(`${item.name} reported BROKEN`, 'alert', issueDescription);
       } else if (status === 'Attention') {
         get().addTimelineEntry(`${item.name} needs attention`, 'warning');
       } else if (status === 'Working' && item.status !== 'Working') {
@@ -179,7 +251,27 @@ export const useStore = create<FlowState>((set, get) => ({
     }
   },
 
+  addEquipmentItem: (name, category) => {
+    const newItem: EquipmentItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      category,
+      status: 'Working'
+    };
+    set(state => ({ equipment: [...state.equipment, newItem] }));
+    get().addTimelineEntry(`Added new equipment: ${name}`, 'info');
+  },
+
+  deleteEquipmentItem: (id) => {
+    const item = get().equipment.find(i => i.id === id);
+    if (item) {
+      set(state => ({ equipment: state.equipment.filter(i => i.id !== id) }));
+      get().addTimelineEntry(`Deleted equipment: ${item.name}`, 'warning');
+    }
+  },
+
   toggleChecklist: (listType, taskId) => {
+    const { currentUser } = get();
     set((state) => ({
       checklists: {
         ...state.checklists,
@@ -189,7 +281,7 @@ export const useStore = create<FlowState>((set, get) => ({
                 ...task,
                 completed: !task.completed,
                 completedAt: !task.completed ? new Date().toISOString() : undefined,
-                completedBy: !task.completed ? state.currentUser : undefined,
+                completedBy: !task.completed ? currentUser.name : undefined,
               }
             : task
         ),
@@ -197,7 +289,7 @@ export const useStore = create<FlowState>((set, get) => ({
     }));
     
     const task = get().checklists[listType].find(t => t.id === taskId);
-    if (task && !task.completed) { // It was just completed
+    if (task && !task.completed) {
        get().addTimelineEntry(`Completed task: ${task.text}`, 'success');
     }
   },
@@ -218,10 +310,12 @@ export const useStore = create<FlowState>((set, get) => ({
   },
 
   sendMessage: (text, isAction = false) => {
+    const { currentUser } = get();
     const newMsg: ChatMessage = {
       id: Math.random().toString(36).substr(2, 9),
       text,
-      sender: get().currentUser,
+      sender: currentUser.name,
+      role: currentUser.role,
       isMe: true,
       timestamp: format(new Date(), 'h:mm a'),
       type: isAction ? 'action' : 'text',
