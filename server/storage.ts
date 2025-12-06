@@ -9,8 +9,9 @@ import {
   type TimelineEvent, type InsertTimelineEvent,
   type MenuItem, type InsertMenuItem,
   type Ingredient, type InsertIngredient,
+  type Notification, type InsertNotification,
   users, inventory, equipment, checklistItems, weeklyTasks, taskCompletions,
-  chatMessages, timelineEvents, menuItems, ingredients
+  chatMessages, timelineEvents, menuItems, ingredients, notifications
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -80,6 +81,14 @@ export interface IStorage {
   createIngredient(ingredient: InsertIngredient): Promise<Ingredient>;
   updateIngredient(id: string, updates: Partial<InsertIngredient>): Promise<Ingredient | undefined>;
   deleteIngredient(id: string): Promise<void>;
+  
+  // Notifications
+  getNotificationsByRecipient(recipientId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(recipientId: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: string): Promise<Notification | undefined>;
+  markAllNotificationsAsRead(recipientId: string): Promise<void>;
+  getSystemAdmins(): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -306,6 +315,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteIngredient(id: string): Promise<void> {
     await db.delete(ingredients).where(eq(ingredients.id, id));
+  }
+
+  // ===== NOTIFICATIONS =====
+  async getNotificationsByRecipient(recipientId: string): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(eq(notifications.recipientId, recipientId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getUnreadNotificationCount(recipientId: string): Promise<number> {
+    const result = await db.select().from(notifications)
+      .where(and(
+        eq(notifications.recipientId, recipientId),
+        eq(notifications.isRead, false)
+      ));
+    return result.length;
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async markNotificationAsRead(id: string): Promise<Notification | undefined> {
+    const [updated] = await db.update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async markAllNotificationsAsRead(recipientId: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.recipientId, recipientId));
+  }
+
+  async getSystemAdmins(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isSystemAdmin, true));
   }
 }
 

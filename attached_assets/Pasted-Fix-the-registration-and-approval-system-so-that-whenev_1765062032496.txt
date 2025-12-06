@@ -1,0 +1,161 @@
+Fix the registration and approval system so that whenever a new user registers, the Admin account (username: angelglezz_ ) receives an automatic notification and can see the user inside a new “Pending Users” screen.
+The Admin must be able to approve each user and assign their role (Employee, Lead, or Manager).
+Additionally, restore full Admin permissions so the Admin can add inventory items, equipment items, tasks, checklists, menu items, and all other operational data.
+
+🔔 1. NOTIFICATION TO ADMIN ON USER REGISTRATION
+
+Whenever a new user completes registration:
+
+The Admin must immediately receive:
+
+An in-app notification
+
+A badge indicator on the Admin home screen
+
+A visible count showing how many users are waiting approval
+
+Example notification:
+
+“New user registration: [Full Name]. Tap to approve or assign role.”
+
+Notifications must ONLY be sent to Admin users.
+
+📋 2. ADD NEW TAB FOR ADMIN: “Pending Users” / “Requesting Users”
+
+Add a new tab or section visible ONLY to Admin:
+
+Pending Users
+
+(or “Requesting Users”)
+
+This screen must show:
+
+List of all new, unapproved accounts
+
+Full name
+
+Username
+
+Establishment they selected
+
+Time registered
+
+When the Admin taps a user:
+
+Show options:
+
+Approve
+
+Reject
+
+Assign Role:
+
+Employee
+
+Lead
+
+Manager
+
+After approval:
+
+The user immediately gains access according to their role
+
+They no longer appear in the Pending Users list
+
+Managers should NOT receive these notifications unless you later want that.
+
+👤 3. ADMIN MUST HAVE FULL PERMISSIONS RESTORED
+
+Fix the Admin role so that it regains access to ALL operational features:
+
+Admin must be able to:
+
+Add inventory items
+
+Edit inventory
+
+Add equipment items
+
+Add tasks
+
+Add weekly tasks
+
+Add checklists
+
+Add menu items
+
+Edit portion sizes
+
+View all data in every tab regardless of establishment
+
+Add employees (optional)
+
+Ensure the Admin role is applied to ALL tab permission checks.
+
+🧩 4. ADMIN ROLE MUST OVERRIDE ALL ESTABLISHMENT FILTERS
+
+Fix the behavior where Admin sees empty lists:
+
+Admin must bypass establishment filtering
+
+Admin must see inventory, tasks, checklists, menu items, etc. even if they were created under another establishment
+
+Admin must NOT be restricted by permission checks meant for Managers or Leads
+
+👥 5. ALLOW ADMIN TO CREATE ADDITIONAL ACCOUNTS FOR THEMSELVES
+
+Add a feature allowing Admin to manually create new accounts under their control:
+
+“Create New User” button inside the Admin panel.
+
+Admin can:
+
+Enter username
+
+Email
+
+Password
+
+Establishment
+
+Assign a role immediately
+
+This is important because you want to create one additional account for yourself.
+
+🔑 6. ROLE ASSIGNMENT REQUIRED BEFORE ACCESS
+
+Fix the system so:
+
+No user can access the app until the Admin assigns a role
+
+Default role is NOT assigned automatically
+
+Only Admin can give the first Manager role to someone
+
+This ensures Managers cannot self-assign permissions.
+
+🔐 7. ADMIN MUST SEE THEIR OWN ROLE & HAVE UNRESTRICTED ACCESS
+
+Inside Admin profile:
+
+Role: Admin (read-only)
+
+Admin must ALWAYS have access to:
+
+Pending Users tab
+
+Employees tab
+
+Inventory tab
+
+Equipment tab
+
+Tasks tab
+
+Menu & Portions tab
+
+Checklists tab
+
+All operational data in every establishment
+
+✔️ END OF PROMPT

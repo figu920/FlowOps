@@ -190,3 +190,23 @@ export const insertIngredientSchema = createInsertSchema(ingredients).omit({
 
 export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
 export type Ingredient = typeof ingredients.$inferSelect;
+
+// ============ NOTIFICATIONS ============
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  recipientId: varchar("recipient_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: text("type").notNull(), // 'user_registration' | 'system'
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  relatedUserId: varchar("related_user_id"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
