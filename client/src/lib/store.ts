@@ -5,14 +5,19 @@ import { format } from 'date-fns';
 export type Status = 'OK' | 'LOW' | 'OUT';
 export type EquipmentStatus = 'Working' | 'Attention' | 'Broken';
 export type UserRole = 'manager' | 'lead' | 'employee';
+export type UserStatus = 'active' | 'pending' | 'removed';
+export type Establishment = 'Bison Den' | 'Trailblazer Café';
 
 export interface User {
   id: string;
   name: string;
   email: string;
+  username: string;
   role: UserRole;
-  password?: string; // In a real app this would be hashed on backend
-  avatar?: string;
+  status: UserStatus;
+  establishment: Establishment;
+  password?: string;
+  phoneNumber?: string;
 }
 
 export interface InventoryItem {
@@ -82,7 +87,6 @@ export interface TimelineEvent {
   photo?: string;
 }
 
-// NEW INTERFACES FOR MENU
 export type MeasurementUnit = 'grams' | 'oz' | 'cups' | 'bowls' | 'tablespoons' | 'pieces';
 
 export interface Ingredient {
@@ -116,13 +120,16 @@ interface FlowState {
   menu: MenuItem[]; 
 
   // Auth Actions
-  login: (email: string, password: string) => boolean;
+  login: (usernameOrEmail: string, password: string) => { success: boolean; message?: string };
+  register: (user: Omit<User, 'id' | 'role' | 'status'>) => void;
   logout: () => void;
   
   // User Management (Manager Only)
-  addUser: (name: string, email: string, role: UserRole, password: string) => void;
-  updateUser: (id: string, updates: Partial<User>) => void;
-  deleteUser: (id: string) => void;
+  approveUser: (userId: string, role: UserRole) => void;
+  rejectUser: (userId: string) => void;
+  updateUserRole: (userId: string, role: UserRole) => void;
+  removeUser: (userId: string) => void;
+  updateUser: (id: string, updates: Partial<User>) => void; // General update
 
   // Inventory Actions
   updateInventory: (id: string, status: Status, comment?: string) => void;
@@ -140,8 +147,8 @@ interface FlowState {
   deleteChecklistItem: (listType: 'opening' | 'shift' | 'closing', taskId: string) => void;
 
   // Task Actions
-  completeTask: (taskId: string, photo: string) => void; // REPLACED toggleTask
-  undoTaskCompletion: (taskId: string) => void; // New for managers
+  completeTask: (taskId: string, photo: string) => void;
+  undoTaskCompletion: (taskId: string) => void;
   addWeeklyTask: (text: string, assignedTo: string, notes?: string) => void;
   deleteWeeklyTask: (taskId: string) => void;
 
@@ -157,11 +164,18 @@ interface FlowState {
   addTimelineEntry: (text: string, type: TimelineEvent['type'], comment?: string, photo?: string) => void;
 }
 
+// Initial Admin User (The Manager)
 const INITIAL_USERS: User[] = [
-  { id: 'u1', name: 'Angel', email: 'manager', role: 'manager', password: '123' },
-  { id: 'u2', name: 'Hunter', email: 'lead', role: 'lead', password: '123' },
-  { id: 'u3', name: 'Bella', email: 'employee', role: 'employee', password: '123' },
-  { id: 'u4', name: 'Sam', email: 'sam', role: 'employee', password: '123' },
+  { 
+    id: 'admin1', 
+    name: 'Admin Manager', 
+    email: 'admin@flowops.com', 
+    username: 'admin', 
+    role: 'manager', 
+    status: 'active', 
+    establishment: 'Bison Den', 
+    password: 'password123' 
+  }
 ];
 
 const INITIAL_INVENTORY: InventoryItem[] = [
@@ -264,61 +278,103 @@ export const useStore = create<FlowState>()(
       timeline: INITIAL_TIMELINE,
       menu: INITIAL_MENU,
 
-      login: (email, password) => {
-        const user = get().users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-        if (user) {
-          set({ currentUser: user });
-          get().addTimelineEntry(`User logged in: ${user.name}`, 'info');
-          return true;
+      login: (usernameOrEmail, password) => {
+        const user = get().users.find(u => 
+          (u.email.toLowerCase() === usernameOrEmail.toLowerCase() || u.username.toLowerCase() === usernameOrEmail.toLowerCase()) && 
+          u.password === password
+        );
+
+        if (!user) {
+          return { success: false, message: 'Invalid credentials' };
         }
-        return false;
+
+        if (user.status === 'pending') {
+          return { success: false, message: 'Your account is pending approval from your Manager.' };
+        }
+
+        if (user.status === 'removed') {
+          return { success: false, message: 'This account has been deactivated.' };
+        }
+
+        set({ currentUser: user });
+        get().addTimelineEntry(`User logged in: ${user.name}`, 'info');
+        return { success: true };
       },
 
       logout: () => {
         set({ currentUser: null });
       },
 
-      addUser: (name, email, role, password) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'manager' && currentUser?.role !== 'lead') return;
-
-        // Leads can only add employees
-        if (currentUser.role === 'lead' && role !== 'employee') return;
-
+      register: (userData) => {
         const newUser: User = {
           id: Math.random().toString(36).substr(2, 9),
-          name,
-          email,
-          role,
-          password
+          ...userData,
+          role: 'employee', // Default role, pending approval
+          status: 'pending'
         };
         set(state => ({ users: [...state.users, newUser] }));
-        get().addTimelineEntry(`New user added: ${name} (${role})`, 'info');
+        // Note: No timeline entry yet as they aren't approved
+      },
+
+      approveUser: (userId, role) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+
+        set(state => ({
+          users: state.users.map(u => 
+            u.id === userId 
+              ? { ...u, status: 'active', role } 
+              : u
+          )
+        }));
+        
+        const approvedUser = get().users.find(u => u.id === userId);
+        if (approvedUser) {
+           get().addTimelineEntry(`User approved: ${approvedUser.name} as ${role}`, 'success');
+        }
+      },
+
+      rejectUser: (userId) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+        set(state => ({ users: state.users.filter(u => u.id !== userId) }));
+      },
+
+      updateUserRole: (userId, role) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+
+        set(state => ({
+          users: state.users.map(u => u.id === userId ? { ...u, role } : u)
+        }));
+        
+        const updatedUser = get().users.find(u => u.id === userId);
+        if (updatedUser) {
+           get().addTimelineEntry(`Role updated for ${updatedUser.name} to ${role}`, 'info');
+        }
+      },
+
+      removeUser: (userId) => {
+        const { currentUser } = get();
+        if (currentUser?.role !== 'manager') return;
+
+        const user = get().users.find(u => u.id === userId);
+        if (user) {
+          set(state => ({ 
+             users: state.users.map(u => u.id === userId ? { ...u, status: 'removed' } : u)
+          }));
+          get().addTimelineEntry(`User deactivated: ${user.name}`, 'warning');
+        }
       },
 
       updateUser: (id, updates) => {
-        const { currentUser } = get();
-        if (currentUser?.role !== 'manager' && currentUser?.role !== 'lead') return;
-        
-        // Leads cannot promote/demote or edit roles
-        if (currentUser.role === 'lead' && updates.role) delete updates.role;
-
-        set(state => ({
-          users: state.users.map(u => u.id === id ? { ...u, ...updates } : u)
-        }));
-        get().addTimelineEntry(`User updated: ${updates.name || 'User'}`, 'info');
-      },
-
-      deleteUser: (id) => {
          const { currentUser } = get();
+         // Only managers can update other users. Users can't update themselves in this mockup yet.
          if (currentUser?.role !== 'manager') return;
 
-         const userToDelete = get().users.find(u => u.id === id);
-         set(state => ({ users: state.users.filter(u => u.id !== id) }));
-         
-         if (userToDelete) {
-           get().addTimelineEntry(`User deleted: ${userToDelete.name}`, 'warning');
-         }
+         set(state => ({
+           users: state.users.map(u => u.id === id ? { ...u, ...updates } : u)
+         }));
       },
 
       addTimelineEntry: (text, type, comment, photo) => {
@@ -654,7 +710,7 @@ export const useStore = create<FlowState>()(
       },
     }),
     {
-      name: 'flowops-storage', // unique name
+      name: 'flowops-storage-v2', // Updated to clear old demo data
       partialize: (state) => ({ 
         inventory: state.inventory,
         equipment: state.equipment,
@@ -664,7 +720,6 @@ export const useStore = create<FlowState>()(
         timeline: state.timeline,
         users: state.users, 
         menu: state.menu, 
-        // Don't persist currentUser to force login
       }),
     }
   )
