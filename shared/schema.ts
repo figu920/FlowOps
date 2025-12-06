@@ -10,10 +10,11 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default('employee'), // 'employee' | 'lead' | 'manager'
+  role: text("role").notNull().default('employee'), // 'employee' | 'lead' | 'manager' | 'admin'
   status: text("status").notNull().default('pending'), // 'active' | 'pending' | 'removed'
-  establishment: text("establishment").notNull(), // 'Bison Den' | 'Trailblazer Café'
+  establishment: text("establishment").notNull(), // 'Bison Den' | 'Trailblazer Café' | 'Global'
   phoneNumber: text("phone_number"),
+  isSystemAdmin: boolean("is_system_admin").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

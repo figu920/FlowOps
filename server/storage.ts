@@ -23,7 +23,9 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
   getUsersByEstablishment(establishment: string): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
   getAllPendingUsers(establishment: string): Promise<User[]>;
+  getAllPendingUsersGlobal(): Promise<User[]>;
   
   // Inventory
   getInventoryByEstablishment(establishment: string): Promise<Inventory[]>;
@@ -104,10 +106,18 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users).where(eq(users.establishment, establishment));
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
   async getAllPendingUsers(establishment: string): Promise<User[]> {
     return await db.select().from(users).where(
       and(eq(users.establishment, establishment), eq(users.status, 'pending'))
     );
+  }
+
+  async getAllPendingUsersGlobal(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.status, 'pending'));
   }
 
   // ===== INVENTORY =====

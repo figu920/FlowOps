@@ -24,12 +24,24 @@ interface SessionUser {
   name: string;
   role: string;
   establishment: string;
+  isSystemAdmin: boolean;
 }
 
 declare module 'express-session' {
   interface SessionData {
     user?: SessionUser;
   }
+}
+
+// Helper to check if user is system admin (has global access)
+// Only the isSystemAdmin flag grants system admin privileges - NOT the role
+function isSystemAdminUser(user: SessionUser | undefined): boolean {
+  return user?.isSystemAdmin === true;
+}
+
+// Helper to check if user can manage (manager or system admin)
+function canManageUsers(user: SessionUser | undefined): boolean {
+  return user?.role === 'manager' || isSystemAdminUser(user);
 }
 
 export async function registerRoutes(
@@ -118,7 +130,8 @@ export async function registerRoutes(
         id: user.id,
         name: user.name,
         role: user.role,
-        establishment: user.establishment
+        establishment: user.establishment,
+        isSystemAdmin: user.isSystemAdmin
       };
       
       const { password: _, ...userWithoutPassword } = user;
@@ -154,37 +167,60 @@ export async function registerRoutes(
   // ==================== USER MANAGEMENT ====================
   
   // Get all users for an establishment (filtered by role)
+  // System admin is NEVER exposed in this list
   app.get("/api/users", async (req: Request, res: Response) => {
     if (!req.session.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
     
-    const users = await storage.getUsersByEstablishment(req.session.user.establishment);
-    const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+    let users;
+    if (isSystemAdminUser(req.session.user)) {
+      // System admin sees all users from all establishments
+      users = await storage.getAllUsers();
+    } else {
+      users = await storage.getUsersByEstablishment(req.session.user.establishment);
+    }
+    
+    // Filter out system admin accounts from the response - they should never appear in UI
+    const filteredUsers = users.filter(u => !u.isSystemAdmin);
+    const usersWithoutPasswords = filteredUsers.map(({ password, ...user }) => user);
     
     res.json(usersWithoutPasswords);
   });
   
-  // Get pending users (managers only)
+  // Get pending users (managers or system admin)
   app.get("/api/users/pending", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || !canManageUsers(req.session.user)) {
       return res.status(403).json({ message: "Only managers can view pending users" });
     }
     
-    const pendingUsers = await storage.getAllPendingUsers(req.session.user.establishment);
-    const usersWithoutPasswords = pendingUsers.map(({ password, ...user }) => user);
+    let pendingUsers;
+    if (isSystemAdminUser(req.session.user)) {
+      // System admin sees pending users from all establishments
+      pendingUsers = await storage.getAllPendingUsersGlobal();
+    } else {
+      pendingUsers = await storage.getAllPendingUsers(req.session.user.establishment);
+    }
+    
+    // Filter out system admin accounts
+    const filteredUsers = pendingUsers.filter(u => !u.isSystemAdmin);
+    const usersWithoutPasswords = filteredUsers.map(({ password, ...user }) => user);
     
     res.json(usersWithoutPasswords);
   });
   
-  // Approve user (managers only)
+  // Approve user (managers or system admin)
   app.post("/api/users/:id/approve", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || !canManageUsers(req.session.user)) {
       return res.status(403).json({ message: "Only managers can approve users" });
     }
     
     const { role } = req.body;
-    if (!role || !['employee', 'lead', 'manager'].includes(role)) {
+    // Only allow standard roles - admin role cannot be assigned through approval
+    // The isSystemAdmin flag is the only way to grant system admin privileges
+    const allowedRoles = ['employee', 'lead', 'manager'];
+    
+    if (!role || !allowedRoles.includes(role)) {
       return res.status(400).json({ message: "Valid role is required" });
     }
     
@@ -196,7 +232,7 @@ export async function registerRoutes(
     // Log to timeline
     await storage.createTimelineEvent({
       text: `User approved: ${user.name} as ${role}`,
-      establishment: req.session.user.establishment,
+      establishment: user.establishment,
       author: req.session.user.name,
       authorRole: req.session.user.role,
       type: 'success'
@@ -206,18 +242,22 @@ export async function registerRoutes(
     res.json(userWithoutPassword);
   });
   
-  // Reject user (managers only)
+  // Reject user (managers or system admin)
   app.delete("/api/users/:id/reject", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || !canManageUsers(req.session.user)) {
       return res.status(403).json({ message: "Only managers can reject users" });
     }
     
-    // For now, just delete the user (could also mark as rejected)
+    const targetUser = await storage.getUser(req.params.id);
+    if (targetUser?.isSystemAdmin) {
+      return res.status(403).json({ message: "This account cannot be modified" });
+    }
+    
     await storage.updateUser(req.params.id, { status: 'removed' });
     res.json({ message: "User rejected" });
   });
   
-  // Update user (managers only, or leads for employees)
+  // Update user (managers, leads for employees, or system admin for anyone)
   app.patch("/api/users/:id", async (req: Request, res: Response) => {
     if (!req.session.user) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -228,17 +268,33 @@ export async function registerRoutes(
       return res.status(404).json({ message: "User not found" });
     }
     
+    // System admin accounts cannot be modified by anyone (including other system admins)
+    if (targetUser.isSystemAdmin && !req.session.user.isSystemAdmin) {
+      return res.status(403).json({ message: "This account cannot be modified" });
+    }
+    
+    // Only system admin can modify their own account
+    if (targetUser.isSystemAdmin && req.session.user.id !== targetUser.id) {
+      return res.status(403).json({ message: "This account cannot be modified" });
+    }
+    
     // Check permissions
+    const isSysAdmin = isSystemAdminUser(req.session.user);
     const isManager = req.session.user.role === 'manager';
     const isLead = req.session.user.role === 'lead' && targetUser.role === 'employee';
     
-    if (!isManager && !isLead) {
+    if (!isSysAdmin && !isManager && !isLead) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
     
-    // Only managers can change roles
-    if (req.body.role && !isManager) {
+    // Only managers and system admin can change roles
+    if (req.body.role && !isManager && !isSysAdmin) {
       return res.status(403).json({ message: "Only managers can change roles" });
+    }
+    
+    // Prevent changing isSystemAdmin flag
+    if ('isSystemAdmin' in req.body) {
+      delete req.body.isSystemAdmin;
     }
     
     const updatedUser = await storage.updateUser(req.params.id, req.body);
@@ -250,7 +306,7 @@ export async function registerRoutes(
     if (req.body.role && req.body.role !== targetUser.role) {
       await storage.createTimelineEvent({
         text: `Role updated for ${updatedUser.name} to ${req.body.role}`,
-        establishment: req.session.user.establishment,
+        establishment: updatedUser.establishment,
         author: req.session.user.name,
         authorRole: req.session.user.role,
         type: 'info'
@@ -261,9 +317,9 @@ export async function registerRoutes(
     res.json(userWithoutPassword);
   });
   
-  // Remove user (managers only)
+  // Remove user (managers or system admin, but never system admin accounts)
   app.delete("/api/users/:id", async (req: Request, res: Response) => {
-    if (!req.session.user || req.session.user.role !== 'manager') {
+    if (!req.session.user || !canManageUsers(req.session.user)) {
       return res.status(403).json({ message: "Only managers can remove users" });
     }
     
@@ -272,11 +328,16 @@ export async function registerRoutes(
       return res.status(404).json({ message: "User not found" });
     }
     
+    // System admin accounts cannot be deleted
+    if (user.isSystemAdmin) {
+      return res.status(403).json({ message: "This account cannot be deleted" });
+    }
+    
     await storage.updateUser(req.params.id, { status: 'removed' });
     
     await storage.createTimelineEvent({
       text: `User deactivated: ${user.name}`,
-      establishment: req.session.user.establishment,
+      establishment: user.establishment,
       author: req.session.user.name,
       authorRole: req.session.user.role,
       type: 'warning'
