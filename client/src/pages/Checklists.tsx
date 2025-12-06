@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
-import { useStore } from '@/lib/store';
+import { useStore, type ChecklistItem } from '@/lib/store';
+import { useChecklists, useUpdateChecklist, useCreateChecklist, useDeleteChecklist, useUsers } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Calendar, Plus, Trash2, UserCircle } from 'lucide-react';
@@ -12,8 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 export default function Checklists() {
-  const { checklists, toggleChecklist, currentUser, users, addChecklistItem, deleteChecklistItem } = useStore();
+  const { currentUser } = useStore();
   const [activeTab, setActiveTab] = useState<"opening" | "shift" | "closing">("opening");
+  const { data: checklistsData = [] } = useChecklists(activeTab);
+  const { data: users = [] } = useUsers();
+  const updateMutation = useUpdateChecklist();
+  const createMutation = useCreateChecklist();
+  const deleteMutation = useDeleteChecklist();
   
   // Add Item State
   const [isAdding, setIsAdding] = useState(false);
@@ -26,7 +32,13 @@ export default function Checklists() {
 
   const handleAddItem = () => {
     if (taskName && assignedTo) {
-      addChecklistItem(activeTab, taskName, assignedTo, notes);
+      createMutation.mutate({
+        text: taskName,
+        listType: activeTab,
+        assignedTo,
+        notes: notes || undefined,
+        completed: false
+      });
       setIsAdding(false);
       setTaskName("");
       setAssignedTo("");
@@ -54,8 +66,9 @@ export default function Checklists() {
     >
       {canDelete && (
         <button 
-          onClick={(e) => { e.stopPropagation(); deleteChecklistItem(type, task.id); }}
+          onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(task.id); }}
           className="absolute top-2 right-2 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-20"
+          data-testid={`button-delete-${task.id}`}
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -63,7 +76,7 @@ export default function Checklists() {
 
       <div 
         className="flex items-center gap-4 cursor-pointer"
-        onClick={() => toggleChecklist(type, task.id)}
+        onClick={() => updateMutation.mutate({ id: task.id, updates: { completed: !task.completed } })}
       >
         <div className={cn(
           "w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0",
@@ -161,11 +174,11 @@ export default function Checklists() {
              exit={{ opacity: 0, y: -10 }}
              transition={{ duration: 0.2 }}
            >
-             {checklists[activeTab].map(task => (
+             {checklistsData.map(task => (
                <TaskRow key={task.id} task={task} type={activeTab} />
              ))}
              
-             {checklists[activeTab].length === 0 && (
+             {checklistsData.length === 0 && (
                <div className="text-center text-muted-foreground py-10">
                  No tasks for this checklist.
                </div>

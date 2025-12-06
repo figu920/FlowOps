@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
-import { useStore, UserRole, User } from '@/lib/store';
+import { useStore, type UserRole, type User } from '@/lib/store';
+import { useUsers, usePendingUsers, useApproveUser, useRejectUser, useUpdateUser, useRemoveUser } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Edit2, Shield, User as UserIcon, ShieldCheck, Check, X, Clock } from 'lucide-react';
@@ -10,7 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Employees() {
-  const { users, currentUser, updateUser, removeUser, approveUser, rejectUser, updateUserRole } = useStore();
+  const { currentUser } = useStore();
+  const { data: allUsers = [] } = useUsers();
+  const { data: pendingUsersData = [] } = usePendingUsers();
+  const approveMutation = useApproveUser();
+  const rejectMutation = useRejectUser();
+  const updateMutation = useUpdateUser();
+  const removeMutation = useRemoveUser();
   const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
   
   // Edit State
@@ -26,9 +33,9 @@ export default function Employees() {
   const canManage = currentUser?.role === 'manager';
   
   // Filter users by establishment and status
-  const myUsers = users.filter(u => u.establishment === currentUser?.establishment);
+  const myUsers = allUsers.filter(u => u.establishment === currentUser?.establishment);
   const activeUsers = myUsers.filter(u => u.status === 'active');
-  const pendingUsers = myUsers.filter(u => u.status === 'pending');
+  const pendingUsers = pendingUsersData.filter(u => u.establishment === currentUser?.establishment);
 
   const startEdit = (user: User) => {
     setEditName(user.name);
@@ -39,17 +46,21 @@ export default function Employees() {
 
   const saveEdit = () => {
     if (editingUser) {
-      updateUser(editingUser, { name: editName, email: editEmail });
-      if (canManage) {
-        updateUserRole(editingUser, editRole);
-      }
+      updateMutation.mutate({ 
+        id: editingUser, 
+        updates: { 
+          name: editName, 
+          email: editEmail,
+          role: editRole
+        } 
+      });
       setEditingUser(null);
     }
   };
 
   const handleApprove = () => {
     if (approvingUser) {
-      approveUser(approvingUser.id, approvalRole);
+      approveMutation.mutate({ id: approvingUser.id, role: approvalRole });
       setApprovingUser(null);
     }
   };
@@ -97,8 +108,9 @@ export default function Employees() {
             >
               {canManage && user.id !== currentUser?.id && (
                 <button 
-                  onClick={(e) => { e.stopPropagation(); removeUser(user.id); }}
+                  onClick={(e) => { e.stopPropagation(); removeMutation.mutate(user.id); }}
                   className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity"
+                  data-testid={`button-remove-${user.id}`}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -163,15 +175,17 @@ export default function Employees() {
 
                 <div className="flex gap-3">
                   <Button 
-                    onClick={() => rejectUser(user.id)}
+                    onClick={() => rejectMutation.mutate(user.id)}
                     variant="outline" 
                     className="flex-1 border-flow-red/30 text-flow-red hover:bg-flow-red/10 hover:text-flow-red h-10 rounded-xl"
+                    data-testid={`button-reject-${user.id}`}
                   >
                     Reject
                   </Button>
                   <Button 
                     onClick={() => setApprovingUser(user)}
                     className="flex-1 bg-flow-green text-black font-bold hover:bg-flow-green/90 h-10 rounded-xl"
+                    data-testid={`button-approve-${user.id}`}
                   >
                     Approve
                   </Button>

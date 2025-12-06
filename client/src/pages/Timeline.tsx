@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
+import { useTimeline } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { AlertCircle, Info, CheckCircle2, AlertTriangle, Clock, Camera } from 'lucide-react';
@@ -8,7 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export default function Timeline() {
-  const { timeline, currentUser } = useStore();
+  const { currentUser } = useStore();
+  const { data: timeline = [] } = useTimeline();
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // Only managers can see all details

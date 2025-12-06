@@ -12,9 +12,12 @@ import {
   Utensils
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { useInventory, useEquipment } from '@/lib/hooks';
 
 export default function Home() {
-  const { inventory, equipment, currentUser } = useStore();
+  const { currentUser } = useStore();
+  const { data: inventory = [] } = useInventory();
+  const { data: equipment = [] } = useEquipment();
   
   if (!currentUser) return null;
 

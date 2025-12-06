@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
-import { useStore } from '@/lib/store';
+import { useStore, type EquipmentItem } from '@/lib/store';
+import { useEquipment, useUpdateEquipment, useCreateEquipment, useDeleteEquipment } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, AlertTriangle, XCircle, PenLine, Plus, Trash2, Camera } from 'lucide-react';
@@ -10,7 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 
 export default function Equipment() {
-  const { equipment, currentUser, updateEquipment, addEquipmentItem, deleteEquipmentItem } = useStore();
+  const { currentUser } = useStore();
+  const { data: equipment = [] } = useEquipment();
+  const updateMutation = useUpdateEquipment();
+  const createMutation = useCreateEquipment();
+  const deleteMutation = useDeleteEquipment();
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [issueText, setIssueText] = useState("");
 
@@ -24,7 +29,7 @@ export default function Equipment() {
 
   const handleBrokenReport = () => {
     if (selectedIssueId) {
-      updateEquipment(selectedIssueId, 'Broken', issueText);
+      updateMutation.mutate({ id: selectedIssueId, updates: { status: 'Broken', lastIssue: issueText } });
       setSelectedIssueId(null);
       setIssueText("");
     }
@@ -32,7 +37,11 @@ export default function Equipment() {
 
   const handleAddItem = () => {
     if (newItemName.trim()) {
-      addEquipmentItem(newItemName, newItemCategory);
+      createMutation.mutate({ 
+        name: newItemName, 
+        category: newItemCategory || undefined,
+        status: 'Working'
+      });
       setIsAddingItem(false);
       setNewItemName("");
       setNewItemCategory("");
@@ -68,8 +77,9 @@ export default function Equipment() {
           >
              {canDelete && (
                 <button 
-                  onClick={() => deleteEquipmentItem(item.id)}
+                  onClick={() => deleteMutation.mutate(item.id)}
                   className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  data-testid={`button-delete-${item.id}`}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -92,13 +102,14 @@ export default function Equipment() {
                 <div className="grid grid-cols-3 gap-3">
                   {/* Working Button */}
                   <button
-                    onClick={() => updateEquipment(item.id, 'Working')}
+                    onClick={() => updateMutation.mutate({ id: item.id, updates: { status: 'Working', lastIssue: undefined } })}
                     className={cn(
                       "flex flex-col items-center justify-center py-3 px-2 rounded-xl border transition-all duration-200",
                       item.status === 'Working'
                         ? "bg-flow-green/10 border-flow-green text-flow-green"
                         : "bg-white/[0.02] border-transparent text-muted-foreground opacity-50 hover:opacity-100"
                     )}
+                    data-testid={`button-status-working-${item.id}`}
                   >
                     <CheckCircle2 className="w-6 h-6 mb-1" />
                     <span className="text-[10px] font-bold uppercase tracking-wider">OK</span>
@@ -106,13 +117,14 @@ export default function Equipment() {
 
                   {/* Attention Button */}
                   <button
-                    onClick={() => updateEquipment(item.id, 'Attention')}
+                    onClick={() => updateMutation.mutate({ id: item.id, updates: { status: 'Attention' } })}
                     className={cn(
                       "flex flex-col items-center justify-center py-3 px-2 rounded-xl border transition-all duration-200",
                       item.status === 'Attention'
                         ? "bg-flow-yellow/10 border-flow-yellow text-flow-yellow"
                         : "bg-white/[0.02] border-transparent text-muted-foreground opacity-50 hover:opacity-100"
                     )}
+                    data-testid={`button-status-attention-${item.id}`}
                   >
                     <AlertTriangle className="w-6 h-6 mb-1" />
                     <span className="text-[10px] font-bold uppercase tracking-wider">Check</span>

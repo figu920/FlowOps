@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
-import { useStore } from '@/lib/store';
+import { useStore, type InventoryItem } from '@/lib/store';
+import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventory } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Camera } from 'lucide-react';
@@ -9,7 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function Inventory() {
-  const { inventory, currentUser, updateInventory, addInventoryItem, deleteInventoryItem } = useStore();
+  const { currentUser } = useStore();
+  const { data: inventory = [] } = useInventory();
+  const updateMutation = useUpdateInventory();
+  const createMutation = useCreateInventory();
+  const deleteMutation = useDeleteInventory();
   
   // State for LOW comment
   const [lowCommentItem, setLowCommentItem] = useState<string | null>(null);
@@ -28,13 +33,13 @@ export default function Inventory() {
     if (newStatus === 'LOW') {
       setLowCommentItem(id);
     } else {
-      updateInventory(id, newStatus);
+      updateMutation.mutate({ id, updates: { status: newStatus, lowComment: null } });
     }
   };
 
   const submitLowComment = () => {
     if (lowCommentItem) {
-      updateInventory(lowCommentItem, 'LOW', commentText);
+      updateMutation.mutate({ id: lowCommentItem, updates: { status: 'LOW', lowComment: commentText } });
       setLowCommentItem(null);
       setCommentText("");
     }
@@ -42,7 +47,12 @@ export default function Inventory() {
 
   const handleAddItem = () => {
     if (newItemName.trim()) {
-      addInventoryItem(newItemName, newItemEmoji, newItemCategory);
+      createMutation.mutate({ 
+        name: newItemName, 
+        emoji: newItemEmoji, 
+        category: newItemCategory || undefined,
+        status: 'OK'
+      });
       setIsAddingItem(false);
       setNewItemName("");
       setNewItemCategory("");
@@ -75,8 +85,9 @@ export default function Inventory() {
           >
             {canDelete && (
               <button 
-                onClick={() => deleteInventoryItem(item.id)}
+                onClick={() => deleteMutation.mutate(item.id)}
                 className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity"
+                data-testid={`button-delete-${item.id}`}
               >
                 <Trash2 className="w-4 h-4" />
               </button>

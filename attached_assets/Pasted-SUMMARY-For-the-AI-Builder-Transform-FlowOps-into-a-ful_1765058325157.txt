@@ -1,0 +1,332 @@
+SUMMARY (For the AI Builder)
+
+Transform FlowOps into a fully functional, secure, role-based operational app for university dining establishments.
+Replace demo login, add a real authentication system, add roles (Admin, Manager, Lead, Employee), create a complete Profile feature, a secure approval workflow, and ensure that all operational functions (Inventory, Equipment Issues, Tasks, Weekly Tasks w/ photo, Menu & Portion Sizes) work with correct permissions.
+
+🔐 1. REMOVE DEMO LOGIN & ENABLE REAL REGISTRATION
+
+Delete all demo usernames and demo passwords.
+
+When opening the app:
+
+Show Login screen (username/email + password)
+
+Show Register option
+
+Registration form fields:
+
+Full name
+
+Username
+
+Email
+
+Password
+
+Confirm password
+
+Establishment (dropdown), starting with:
+
+Bison Den
+
+(Managers & Admin can add more later)
+
+After registering:
+
+User enters Pending Approval status
+
+Cannot access any app features
+
+Must see: “Your account is pending approval from your Manager or Admin.”
+
+👑 2. ADD THE NEW TOP-LEVEL ROLE: ADMIN
+
+Replace “Creator” with Admin.
+
+The Admin role is the highest level in FlowOps.
+
+Admin permissions:
+
+Approve ANY new user
+
+Assign roles (Employee, Lead, Manager)
+
+Modify roles
+
+Delete or deactivate users
+
+Reset passwords
+
+Create, edit, or delete establishments
+
+See all establishments and all users
+
+Override ANY Manager decision
+
+Control global settings
+
+Access and edit all operational areas
+
+IMPORTANT
+
+The Admin account must be created privately inside the system (for Ángel),
+and MUST NOT display the username or password in the interface.
+
+Managers cannot edit or delete the Admin.
+
+👤 3. USER APPROVAL SYSTEM
+
+When users register:
+
+They appear in a “Pending Users” list inside their establishment.
+
+Admin or Manager can approve or reject them.
+
+Upon approval, default role = Employee (Admin or Manager may change it).
+
+Roles users cannot self-assign:
+
+Lead
+
+Manager
+
+Admin
+
+🧑‍💼 4. EMPLOYEES TAB (Manager & Admin Only)
+
+Create a new tab called:
+
+Employees
+
+Features:
+
+View all employees in the establishment
+
+See role + status
+
+Approve/reject pending users
+
+Promote/demote users
+
+Reset passwords
+
+Deactivate employees
+
+Leads: View-only
+Employees: Cannot access this tab
+
+Admin sees ALL establishments and ALL users.
+
+📝 5. MY PROFILE SCREEN (NO AUTO LOGOUT)
+
+Tapping “Profile” must NEVER sign the user out.
+
+Instead open:
+
+My Profile
+The user must be able to:
+
+Add/change profile photo
+
+Change username
+
+Change email
+
+Change password (old + new + confirm)
+
+View role (read-only)
+
+View establishment (read-only unless Manager/Admin changes it)
+
+At the bottom:
+
+Sign Out button
+→ Only logs out when tapped intentionally.
+
+📸 6. WEEKLY TASKS REQUIRE PHOTO VERIFICATION
+
+Modify Weekly Tasks so that:
+
+When a user taps the checkmark to complete a task,
+→ REQUIRE a photo.
+
+Open camera/upload window automatically.
+
+The task is completed ONLY after the photo is submitted.
+
+Store:
+
+Photo
+
+Timestamp
+
+User
+
+Task name
+
+Managers and Admin can view photo history inside each task.
+
+📦 7. INVENTORY SYSTEM (Color-coded)
+
+Inventory items must have:
+
+OK = Green
+
+Low = Yellow (optional note with quantity remaining)
+
+Out = Red
+
+Employees & Leads can update inventory status.
+Managers & Admin can add new inventory items (with photo).
+
+🔧 8. EQUIPMENT / INCIDENT REPORTING
+
+Add preset buttons like:
+
+Fryer Broken
+
+Help Needed
+
+Equipment Issue
+
+Plus a textbox for details.
+
+Managers & Admin can add new equipment items.
+
+Timeline must log:
+
+Issue
+
+Time
+
+User
+
+📑 9. CHECKLISTS & OPEN/CLOSING TASKS
+
+Managers & Admin can:
+
+Create checklists
+
+Assign tasks to specific employees
+
+Edit, delete, reorder tasks
+
+Employees:
+
+Complete tasks
+
+Mark completion
+
+Provide optional comment
+
+Leads:
+
+Assign tasks
+
+Oversee completion
+
+🍔 10. MENU & PORTION SIZES TAB
+
+Add a new tab:
+
+Menu & Portion Sizes
+
+Employees & Leads: View-only
+Managers & Admin: Full edit access
+
+Managers & Admin can:
+
+Add menu items (Honkytonk, Americana, Bites on Bites, Wings, etc.)
+
+Add ingredients and their portion sizes
+
+Units supported:
+
+grams
+
+ounces
+
+cups
+
+bowls
+
+tablespoons
+
+pieces
+
+Add notes (e.g., “Fill bowl to top”)
+
+Edit or delete ingredients
+
+Edit or delete menu items
+
+Employees must see clear, simple portion instructions to ensure consistency and control food cost.
+
+🔒 11. ROLE PERMISSIONS SUMMARY
+EMPLOYEE
+
+Update inventory
+
+Report equipment issues
+
+Complete checklists (with or without photos depending on configuration)
+
+View portion sizes
+
+View schedule/tasks
+
+LEAD
+
+Everything Employee can do
+
+Can assign tasks
+
+Cannot approve users
+
+Cannot modify roles
+
+MANAGER
+
+Approve Employees & Leads
+
+Manage establishment team
+
+Add/edit/delete inventory
+
+Add equipment items
+
+Create/edit checklists
+
+Add/edit menu items & portion sizes
+
+ADMIN
+
+Full access across ALL establishments
+
+Approve ANY user
+
+Assign ANY role
+
+Override ANY setting
+
+Add/delete establishments
+
+Reset passwords
+
+Manage Managers
+
+Full system control
+
+🛡 12. SECURITY REQUIREMENTS
+
+Users must log in with username/email + password
+
+No one can change their own role
+
+Admin account cannot be modified or deleted by others
+
+Passwords must be stored securely
+
+Registration requires approval before access
+
+✔️ END OF MASTER PROMPT

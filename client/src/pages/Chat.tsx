@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
+import { useChat, useSendMessage } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { Send, Plus } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,9 @@ const QUICK_ACTIONS = [
 ];
 
 export default function Chat() {
-  const { chat, sendMessage, currentUser } = useStore();
+  const { currentUser } = useStore();
+  const { data: chat = [] } = useChat();
+  const sendMutation = useSendMessage();
   const [inputText, setInputText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -26,10 +29,11 @@ export default function Chat() {
     }
   }, [chat]);
 
-  const handleSend = () => {
-    if (inputText.trim()) {
-      sendMessage(inputText);
-      setInputText("");
+  const handleSend = (text?: string, isAction?: boolean) => {
+    const messageText = text || inputText;
+    if (messageText.trim()) {
+      sendMutation.mutate({ text: messageText, type: isAction ? 'action' : 'text' });
+      if (!text) setInputText("");
     }
   };
 
@@ -91,8 +95,9 @@ export default function Chat() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: idx * 0.05 }}
               key={action}
-              onClick={() => sendMessage(action, true)}
+              onClick={() => handleSend(action, true)}
               className="whitespace-nowrap px-4 py-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] active:scale-95 rounded-full text-xs font-semibold border border-white/5 transition-all text-white"
+              data-testid={`button-quick-action-${idx}`}
             >
               {action}
             </motion.button>
@@ -111,17 +116,19 @@ export default function Chat() {
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder={`Message as ${currentUser?.name || 'Guest'}...`}
               className="rounded-full bg-[#1C1C1E] border-white/10 h-11 px-5 text-base focus:border-blue-500/50 focus:ring-0 placeholder:text-muted-foreground/50"
+              data-testid="input-chat-message"
             />
           </div>
           
           <Button 
-            onClick={handleSend}
+            onClick={() => handleSend()}
             size="icon" 
             disabled={!inputText.trim()}
             className={cn(
               "rounded-full w-11 h-11 transition-all duration-200 shrink-0",
               inputText.trim() ? "bg-blue-600 hover:bg-blue-500 text-white" : "bg-[#2C2C2E] text-muted-foreground"
             )}
+            data-testid="button-send-message"
           >
             <Send className="w-5 h-5 ml-0.5" />
           </Button>

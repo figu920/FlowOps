@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import Layout from '@/components/Layout';
-import { useStore } from '@/lib/store';
+import { useStore, type TaskItem } from '@/lib/store';
+import { useTasks, useCompleteTask, useCreateTask, useDeleteTask, useUpdateTask, useUsers } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Calendar, Plus, Trash2, UserCircle, Camera, Upload, Eye, X, RefreshCw } from 'lucide-react';
@@ -11,7 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 export default function Tasks() {
-  const { weeklyTasks, completeTask, undoTaskCompletion, currentUser, users, addWeeklyTask, deleteWeeklyTask } = useStore();
+  const { currentUser } = useStore();
+  const { data: weeklyTasks = [] } = useTasks();
+  const { data: users = [] } = useUsers();
+  const completeMutation = useCompleteTask();
+  const createMutation = useCreateTask();
+  const deleteMutation = useDeleteTask();
+  const updateMutation = useUpdateTask();
   const [isAdding, setIsAdding] = useState(false);
   const [taskName, setTaskName] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
@@ -30,7 +37,12 @@ export default function Tasks() {
 
   const handleAddTask = () => {
     if (taskName && assignedTo) {
-      addWeeklyTask(taskName, assignedTo, notes);
+      createMutation.mutate({
+        text: taskName,
+        assignedTo,
+        notes: notes || undefined,
+        completed: false
+      });
       setIsAdding(false);
       setTaskName("");
       setAssignedTo("");
@@ -38,7 +50,7 @@ export default function Tasks() {
     }
   };
 
-  const handleTaskClick = (task: any) => {
+  const handleTaskClick = (task: TaskItem) => {
     if (task.completed) {
       setViewingHistoryTask(task.id);
     } else {
@@ -60,7 +72,7 @@ export default function Tasks() {
 
   const submitCompletion = () => {
     if (verifyingTaskId && photoPreview) {
-      completeTask(verifyingTaskId, photoPreview);
+      completeMutation.mutate({ id: verifyingTaskId, photo: photoPreview });
       setVerifyingTaskId(null);
       setPhotoPreview(null);
     }
@@ -104,8 +116,9 @@ export default function Tasks() {
 
             {canDelete && (
               <button 
-                onClick={(e) => { e.stopPropagation(); deleteWeeklyTask(task.id); }}
+                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(task.id); }}
                 className="absolute top-2 right-2 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                data-testid={`button-delete-${task.id}`}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -234,7 +247,7 @@ export default function Tasks() {
                    <div className="p-4 border-t border-white/5">
                      <Button 
                        onClick={() => {
-                         if (viewingHistoryTask) undoTaskCompletion(viewingHistoryTask);
+                         if (viewingHistoryTask) updateMutation.mutate({ id: viewingHistoryTask, updates: { completed: false } });
                          setViewingHistoryTask(null);
                        }} 
                        variant="outline" 
