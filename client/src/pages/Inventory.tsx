@@ -26,8 +26,9 @@ export default function Inventory() {
   const [newItemEmoji, setNewItemEmoji] = useState("📦");
   const [newItemCategory, setNewItemCategory] = useState("");
 
-  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead';
-  const canDelete = currentUser?.role === 'manager';
+  const isAdmin = currentUser?.isSystemAdmin === true;
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
+  const canDelete = currentUser?.role === 'manager' || isAdmin;
 
   const handleStatusChange = (id: string, newStatus: 'OK' | 'LOW' | 'OUT') => {
     if (newStatus === 'LOW') {

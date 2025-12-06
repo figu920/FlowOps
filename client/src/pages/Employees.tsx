@@ -4,11 +4,12 @@ import { useStore, type UserRole, type User } from '@/lib/store';
 import { useUsers, usePendingUsers, useApproveUser, useRejectUser, useUpdateUser, useRemoveUser, useCreateUser } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit2, Shield, User as UserIcon, ShieldCheck, Check, X, Clock, UserPlus, Building } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Trash2, Edit2, Shield, User as UserIcon, ShieldCheck, Clock, UserPlus, Building, Mail, Phone, AlertTriangle, UserX, KeyRound } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function Employees() {
   const { currentUser } = useStore();
@@ -20,6 +21,10 @@ export default function Employees() {
   const removeMutation = useRemoveUser();
   const createUserMutation = useCreateUser();
   const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
+  
+  // User Details State (tapping a user opens this)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   // Edit State
   const [editingUser, setEditingUser] = useState<string | null>(null);
@@ -139,18 +144,10 @@ export default function Employees() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="bg-card rounded-[20px] p-4 border border-white/[0.04] flex items-center gap-4 relative group"
+              onClick={() => setSelectedUser(user)}
+              className="bg-card rounded-[20px] p-4 border border-white/[0.04] flex items-center gap-4 relative cursor-pointer hover:bg-white/[0.02] transition-colors"
+              data-testid={`user-card-${user.id}`}
             >
-              {canManage && user.id !== currentUser?.id && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); removeMutation.mutate(user.id); }}
-                  className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity"
-                  data-testid={`button-remove-${user.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-
               <div className={cn(
                  "w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border-2",
                  user.role === 'manager' ? "bg-purple-500/20 border-purple-500 text-purple-500" :
@@ -184,11 +181,9 @@ export default function Employees() {
                 </div>
               </div>
 
-              {(canManage || (currentUser?.role === 'lead' && user.role === 'employee')) && (
-                 <Button size="icon" variant="ghost" onClick={() => startEdit(user)} className="rounded-full h-8 w-8 text-muted-foreground hover:text-white">
-                   <Edit2 className="w-4 h-4" />
-                 </Button>
-              )}
+              <div className="text-muted-foreground">
+                <Edit2 className="w-4 h-4" />
+              </div>
             </motion.div>
           ))
         ) : (
@@ -224,7 +219,10 @@ export default function Employees() {
                     Reject
                   </Button>
                   <Button 
-                    onClick={() => setApprovingUser(user)}
+                    onClick={() => {
+                      setApprovalRole("employee");
+                      setApprovingUser(user);
+                    }}
                     className="flex-1 bg-flow-green text-black font-bold hover:bg-flow-green/90 h-10 rounded-xl"
                     data-testid={`button-approve-${user.id}`}
                   >
@@ -397,6 +395,128 @@ export default function Employees() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* User Details Dialog */}
+      <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>User Details</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              View and manage user information
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedUser && (
+            <div className="py-4">
+              <div className="flex items-center gap-4 mb-6">
+                <div className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold border-2",
+                  selectedUser.role === 'manager' ? "bg-purple-500/20 border-purple-500 text-purple-500" :
+                  selectedUser.role === 'lead' ? "bg-blue-500/20 border-blue-500 text-blue-500" :
+                  "bg-white/5 border-white/10 text-muted-foreground"
+                )}>
+                  {selectedUser.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">{selectedUser.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={cn(
+                      "text-[10px] uppercase font-bold px-2 py-0.5 rounded flex items-center gap-1",
+                      selectedUser.role === 'manager' ? "bg-purple-500/10 text-purple-400" :
+                      selectedUser.role === 'lead' ? "bg-blue-500/10 text-blue-400" :
+                      "bg-white/5 text-muted-foreground"
+                    )}>
+                      {selectedUser.role === 'manager' && <ShieldCheck className="w-3 h-3" />}
+                      {selectedUser.role === 'lead' && <Shield className="w-3 h-3" />}
+                      {selectedUser.role === 'employee' && <UserIcon className="w-3 h-3" />}
+                      {selectedUser.role}
+                    </span>
+                    <span className="text-xs text-muted-foreground">@{selectedUser.username}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                  <Mail className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-[10px] uppercase text-muted-foreground font-bold">Email</p>
+                    <p className="text-white">{selectedUser.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                  <Building className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-[10px] uppercase text-muted-foreground font-bold">Establishment</p>
+                    <p className="text-white">{selectedUser.establishment}</p>
+                  </div>
+                </div>
+              </div>
+
+              {canManage && selectedUser.id !== currentUser?.id && (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase text-muted-foreground font-bold mb-3">Actions</p>
+                  
+                  <Button 
+                    onClick={() => { setSelectedUser(null); startEdit(selectedUser); }}
+                    variant="ghost" 
+                    className="w-full justify-start h-12 text-white hover:bg-white/5"
+                    data-testid={`button-edit-user-${selectedUser.id}`}
+                  >
+                    <Edit2 className="w-5 h-5 mr-3 text-blue-400" />
+                    Edit Role & Information
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => { setShowDeleteConfirm(true); }}
+                    variant="ghost" 
+                    className="w-full justify-start h-12 text-flow-red hover:bg-flow-red/10 hover:text-flow-red"
+                    data-testid={`button-delete-user-${selectedUser.id}`}
+                  >
+                    <Trash2 className="w-5 h-5 mr-3" />
+                    Delete User
+                  </Button>
+                </div>
+              )}
+              
+              {selectedUser.id === currentUser?.id && (
+                <p className="text-center text-muted-foreground text-sm py-4">This is your account.</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-flow-red">
+              <AlertTriangle className="w-5 h-5" />
+              Delete User?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Are you sure you want to delete <span className="text-white font-semibold">{selectedUser?.name}</span>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel className="bg-white/10 border-0 text-white hover:bg-white/20">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (selectedUser) {
+                  removeMutation.mutate(selectedUser.id);
+                  setSelectedUser(null);
+                  setShowDeleteConfirm(false);
+                }
+              }}
+              className="bg-flow-red text-white hover:bg-flow-red/90 border-0"
+              data-testid="button-confirm-delete"
+            >
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Floating Create User Button (Admin Only) */}
       {isAdmin && (

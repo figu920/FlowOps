@@ -24,8 +24,9 @@ export default function Equipment() {
   const [newItemName, setNewItemName] = useState("");
   const [newItemCategory, setNewItemCategory] = useState("");
 
-  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead';
-  const canDelete = currentUser?.role === 'manager';
+  const isAdmin = currentUser?.isSystemAdmin === true;
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
+  const canDelete = currentUser?.role === 'manager' || isAdmin;
 
   const handleBrokenReport = () => {
     if (selectedIssueId) {

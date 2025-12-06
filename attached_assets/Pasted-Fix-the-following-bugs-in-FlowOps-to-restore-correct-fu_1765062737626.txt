@@ -1,0 +1,168 @@
+Fix the following bugs in FlowOps to restore correct functionality and prevent accidental user deletion:
+
+❗ BUG 1 — ACCEPTED USERS GET DELETED BY ACCIDENT WHEN TAPPED
+
+Currently, when an Admin or Manager taps an approved user inside the Employees list,
+the user is immediately deleted.
+This is a critical error.
+
+Fix it as follows:
+✔ Tapping a user should open a User Details screen
+
+Not delete them.
+
+✔ Add clear options inside User Details:
+
+“View Information”
+
+“Edit Role” (Admin/Manager only)
+
+“Reset Password” (Admin/Manager only)
+
+“Deactivate User”
+
+“Delete User”
+
+✔ User deletion must require:
+
+Tap “Delete User”
+
+Show confirmation popup:
+“Are you sure you want to delete this user? This action cannot be undone.”
+
+Only after confirming, delete the user.
+
+Users must NEVER be deleted automatically when tapped.
+
+❗ BUG 2 — INVENTORY ADD BUTTON (“+”) IS MISSING
+
+Previously, Admin and Manager could add new inventory items via a "+" button in the top-right.
+
+Now the button is gone.
+
+Fix:
+✔ Restore the “+” button in Inventory Screen
+
+Visible ONLY to Admin and Managers.
+
+✔ When pressed, open “Add Inventory Item” form:
+
+Item name
+
+Item photo (optional)
+
+Default status (OK / Low / Out)
+
+Category (optional)
+
+Employees should not see this button.
+
+❗ BUG 3 — CANNOT ADD NEW EQUIPMENT ITEMS
+
+The Equipment tab previously allowed adding new equipment types (e.g., Fryer, Grill, Dishwasher).
+
+Now the function is not available.
+
+Fix:
+✔ Restore the “+ Add Equipment Item” button in Equipment tab
+
+Visible to Admin & Managers only.
+
+✔ Add form:
+
+Equipment name
+
+Photo (optional)
+
+Default status
+
+Notes field
+
+Employees should only be able to report an issue, not add new equipment.
+
+❗ BUG 4 — CANNOT ADD NEW MENU ITEMS OR PORTION SIZES
+
+The Menu & Portion Sizes tab originally allowed Admin/Manager to:
+
+Add new menu items
+
+Add ingredients
+
+Assign portion sizes
+
+Edit quantities
+
+Now this feature is disabled.
+
+Fix:
+✔ Restore the “+ Add Menu Item” button
+
+Visible ONLY to Admin & Managers.
+
+✔ When adding a menu item, Admin/Manager can:
+
+Enter dish name
+
+Add ingredient list
+
+Define portion sizes
+
+Choose unit (grams, ounces, cups, bowls, pieces, tablespoons)
+
+✔ Also restore:
+
+“+ Add Ingredient” inside each dish
+
+Edit ingredient
+
+Delete ingredient
+
+Employees and Leads: View-only.
+
+❗ BUG 5 — ADMIN PERMISSIONS NOT APPLIED CORRECTLY
+
+Currently the Admin:
+
+Cannot add items
+
+Cannot edit items
+
+Cannot access or manage operational data
+
+This must be corrected.
+
+Fix:
+✔ Admin must have full access everywhere:
+
+Add inventory items
+
+Add equipment items
+
+Add tasks
+
+Add menu items
+
+Add portion sizes
+
+Edit/delete ANY item
+
+Access ALL establishments
+
+See ALL users
+
+Approve ANY user
+
+❗ BUG 6 — APPROVED USERS DISPLAY AS “EXISTING ACCOUNT” BUT HAVE NO ACCESS
+
+This happens when the user object is created but not fully assigned with correct role or approval status.
+
+Fix:
+✔ Ensure that approving a user automatically:
+
+Sets their status to Active
+
+Assigns the selected role
+
+Grants access immediately
+
+Removes them from Pending list

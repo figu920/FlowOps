@@ -17,6 +17,7 @@ export interface User {
   status: UserStatus;
   establishment: Establishment;
   phoneNumber?: string;
+  isSystemAdmin?: boolean;
 }
 
 export interface InventoryItem {

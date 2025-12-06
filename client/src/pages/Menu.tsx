@@ -33,7 +33,8 @@ export default function Menu() {
 
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const isManager = currentUser?.role === 'manager';
+  const isAdmin = currentUser?.isSystemAdmin === true;
+  const canManageMenu = currentUser?.role === 'manager' || isAdmin;
 
   const toggleExpand = (id: string) => {
     setExpandedItems(prev => 
@@ -95,7 +96,7 @@ export default function Menu() {
     <Layout 
       title="Menu & Portion Sizes"
       action={
-        isManager && (
+        canManageMenu && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsAddingDish(true)}
@@ -119,7 +120,7 @@ export default function Menu() {
               onClick={() => toggleExpand(dish.id)}
               className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors relative"
             >
-               {isManager && (
+               {canManageMenu && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); deleteMenuItemMutation.mutate(dish.id); }}
                     className="absolute top-5 right-12 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-10"
@@ -159,16 +160,16 @@ export default function Menu() {
                     {dish.ingredients.map((ing) => (
                       <div 
                         key={ing.id} 
-                        onClick={() => isManager && openEditIngredient(dish.id, ing)}
+                        onClick={() => canManageMenu && openEditIngredient(dish.id, ing)}
                         className={cn(
                           "flex items-start justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02]",
-                          isManager && "cursor-pointer hover:border-white/10 hover:bg-white/5 transition-all"
+                          canManageMenu && "cursor-pointer hover:border-white/10 hover:bg-white/5 transition-all"
                         )}
                       >
                          <div>
                            <div className="flex items-center gap-2">
                              <span className="font-semibold text-white">{ing.name}</span>
-                             {isManager && <Edit2 className="w-3 h-3 text-muted-foreground opacity-50" />}
+                             {canManageMenu && <Edit2 className="w-3 h-3 text-muted-foreground opacity-50" />}
                            </div>
                            {ing.notes && (
                              <p className="text-xs text-muted-foreground italic mt-0.5">"{ing.notes}"</p>
@@ -185,7 +186,7 @@ export default function Menu() {
                       <p className="text-center text-muted-foreground text-sm py-2">No ingredients listed.</p>
                     )}
 
-                    {isManager && (
+                    {canManageMenu && (
                       <Button 
                         onClick={() => openAddIngredient(dish.id)}
                         variant="ghost" 
