@@ -1,0 +1,220 @@
+Create a complete mobile application called “FlowOps.”
+FlowOps is a simple, ultra-intuitive restaurant operations app designed for university dining environments.
+The primary goals are speed, clarity, and effortless use.
+Every action must be ONE TAP.
+The app must require zero training and feel like a real native iOS app.
+
+⸻
+
+🎨 DESIGN REQUIREMENTS (EXTREMELY IMPORTANT)
+
+Style:
+	•	Modern, realistic, minimalistic (Apple-like)
+	•	Default in Dark Mode
+	•	Clean and professional (no clutter)
+	•	Rounded cards, soft shadows, premium look
+
+Color Palette (non-negotiable):
+	•	Green (#32D74B) → OK
+	•	Yellow (#F7D154) → LOW
+	•	Red (#FF453A) → OUT / ERROR / BROKEN
+	•	White (#FFFFFF) → Text/icons
+	•	Dark Navy (#0D1117) → Background
+
+Font:
+	•	iOS San Francisco style
+	•	Bold headers
+	•	High contrast text
+
+Icons:
+	•	Minimalistic, consistent line icons
+	•	Allowed: small emojis for food items
+
+Usability rule:
+	•	Large buttons
+	•	Clear spacing
+	•	Everything must be understandable instantly
+	•	No hidden menus
+
+⸻
+
+🏠 MAIN SCREEN (FlowOps Home)
+
+The home screen must show six large rounded cards, neatly spaced:
+	•	Inventory
+	•	Equipment / Issues
+	•	Checklists
+	•	Weekly Tasks
+	•	Chat
+	•	Timeline
+
+Cards should look premium, clickable and organized.
+
+⸻
+
+📦 INVENTORY (TOP PRIORITY)
+
+Inventory screen must include a list of products with:
+	•	Emoji/icon
+	•	Product name
+	•	Three status buttons:
+
+Green → OK
+
+Yellow → LOW
+
+Red → OUT
+
+The user must update status with ONE tap.
+
+When LOW or OUT is tapped:
+
+✔ Save timestamp
+✔ Save employee name
+✔ Add entry to TIMELINE
+✔ Notify Supervisor immediately
+✔ Update visual status instantly
+
+Example row:
+
+🍔 Beef Patties — [ OK ] [ LOW ] [ OUT ]
+
+The app must also allow the manager to see when the item was marked LOW/OUT (timeline connection).
+
+⸻
+
+🔧 EQUIPMENT / ISSUES
+
+List of core equipment:
+	•	Fryer
+	•	Grill
+	•	Fridge
+	•	Ice Machine
+	•	Dishwasher
+
+Each with 3 status levels:
+	•	Green = Working
+	•	Yellow = Needs Attention
+	•	Red = Broken
+
+Tapping Broken opens:
+
+Description Textbox → “Describe the issue”
+
+Then:
+
+✔ Save timestamp
+✔ Save employee
+✔ Notify Supervisor
+✔ Add entry to timeline
+
+⸻
+
+📝 CHECKLISTS
+
+Three checklists:
+
+Opening Checklist
+
+During Shift Checklist
+
+Closing Checklist
+
+Each task displayed as:
+	•	Task description
+	•	Tap → checkmark turns green → log in timeline
+
+Examples:
+	•	Turn on grill
+	•	Prep lettuce & tomato
+	•	Refill sauces
+	•	Unlock fridge
+	•	Clean fryer knob
+
+All checkmarks should be clean, big, and easy to tap.
+
+⸻
+
+📅 WEEKLY TASKS
+
+List view:
+	•	Deep clean fridge — Angel
+	•	Clean vents — Hunter
+	•	Wipe counters — Bella
+
+Tap once = complete
+Log event + timestamp
+Send optional supervisor alert
+
+Must look modern, simple, and organized.
+
+⸻
+
+💬 CHAT
+
+Very simple, minimal chat:
+	•	Message bubbles (light for you, dark for others)
+	•	Timestamp small and subtle
+	•	Quick-action buttons at top or bottom:
+	•	“Inventory arrived”
+	•	“Need help front”
+	•	“Backup grill”
+	•	“Rush incoming”
+
+Chat must be designed like a lightweight professional messenger (clean, calm, no distractions).
+
+⸻
+
+🕒 TIMELINE (Option A: Simple)
+
+A simple chronological activity feed:
+
+Example entries:
+	•	7:42 PM — Fryer reported BROKEN (Angel)
+	•	7:14 PM — Lettuce LOW (Hunter)
+	•	7:05 PM — Beef patties OUT (Angel)
+	•	6:10 PM — Opening checklist completed (Bella)
+
+Timeline must update automatically.
+
+⸻
+
+👤 USER ROLES
+
+Employee
+	•	Update inventory
+	•	Report equipment issues
+	•	Complete checklists
+	•	Complete weekly tasks
+	•	Chat
+
+Supervisor / Manager
+	•	Read notifications
+	•	View timeline
+	•	Monitor inventory
+	•	See all issues and tasks
+
+⸻
+
+⚙️ REQUIREMENTS (MANDATORY)
+	•	One-tap actions only
+	•	Automatic timeline logging
+	•	Automatic supervisor notifications
+	•	Strict color coding (green/yellow/red)
+	•	Extremely simple navigation
+	•	Fully mobile-friendly
+	•	Professional realistic UI
+	•	Zero unnecessary complexity
+
+⸻
+
+📱 APP SCREENS (FlowOps)
+
+Your app must include:
+	1.	FlowOps Main Screen
+	2.	Inventory (with color-coded statuses)
+	3.	Equipment / Issues
+	4.	Checklists
+	5.	Weekly Tasks
+	6.	Chat
+	7.	Timeline
