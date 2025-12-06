@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Calendar, Plus, Trash2, UserCircle } from 'lucide-react';
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Check, Calendar, Plus, Trash2, UserCircle, Camera, Upload, Eye, X, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +11,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 export default function Tasks() {
-  const { weeklyTasks, toggleTask, currentUser, users, addWeeklyTask, deleteWeeklyTask } = useStore();
+  const { weeklyTasks, completeTask, undoTaskCompletion, currentUser, users, addWeeklyTask, deleteWeeklyTask } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [taskName, setTaskName] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Photo Verification State
+  const [verifyingTaskId, setVerifyingTaskId] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // History View State
+  const [viewingHistoryTask, setViewingHistoryTask] = useState<string | null>(null);
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead';
   const canDelete = currentUser?.role === 'manager';
@@ -28,6 +35,34 @@ export default function Tasks() {
       setTaskName("");
       setAssignedTo("");
       setNotes("");
+    }
+  };
+
+  const handleTaskClick = (task: any) => {
+    if (task.completed) {
+      setViewingHistoryTask(task.id);
+    } else {
+      setVerifyingTaskId(task.id);
+      setPhotoPreview(null);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const submitCompletion = () => {
+    if (verifyingTaskId && photoPreview) {
+      completeTask(verifyingTaskId, photoPreview);
+      setVerifyingTaskId(null);
+      setPhotoPreview(null);
     }
   };
 
@@ -78,13 +113,13 @@ export default function Tasks() {
 
             <div 
               className="relative p-5 flex items-start gap-4 cursor-pointer"
-              onClick={() => toggleTask(task.id)}
+              onClick={() => handleTaskClick(task)}
             >
               <div className={cn(
                 "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-300 shrink-0",
                 task.completed ? "bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]" : "bg-white/5 text-muted-foreground"
               )}>
-                {task.completed ? <Check className="w-6 h-6 stroke-[3]" /> : <Calendar className="w-6 h-6" />}
+                {task.completed ? <Check className="w-6 h-6 stroke-[3]" /> : <Camera className="w-6 h-6" />}
               </div>
 
               <div className="flex-1 min-w-0">
@@ -111,12 +146,110 @@ export default function Tasks() {
                        Done {new Date(task.completedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </span>
                   )}
+                  {task.completed && <div className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-1.5 py-0.5 rounded"><Camera className="w-3 h-3"/> PROOF</div>}
                 </div>
               </div>
             </div>
           </motion.div>
         ))}
       </div>
+
+      {/* Photo Verification Dialog */}
+      <Dialog open={!!verifyingTaskId} onOpenChange={(open) => !open && setVerifyingTaskId(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle>Photo Proof Required</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4 flex flex-col items-center">
+            <p className="text-muted-foreground text-center text-sm">
+              You must upload a photo to verify this task is complete.
+            </p>
+            
+            <input 
+              type="file" 
+              accept="image/*" 
+              capture="environment" 
+              className="hidden" 
+              ref={fileInputRef}
+              onChange={handleFileChange}
+            />
+
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full aspect-[4/3] bg-black/40 rounded-xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:bg-black/50 transition-all overflow-hidden relative"
+            >
+              {photoPreview ? (
+                <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <>
+                  <Camera className="w-10 h-10 text-muted-foreground mb-2" />
+                  <span className="text-sm text-muted-foreground font-medium">Tap to take photo</span>
+                </>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={submitCompletion} disabled={!photoPreview} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">
+              Submit & Complete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task History Dialog */}
+      <Dialog open={!!viewingHistoryTask} onOpenChange={(open) => !open && setViewingHistoryTask(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] h-[80vh] rounded-2xl p-0 flex flex-col overflow-hidden">
+           {(() => {
+             const task = weeklyTasks.find(t => t.id === viewingHistoryTask);
+             if (!task) return null;
+
+             return (
+               <>
+                 <div className="p-6 pb-2 border-b border-white/5">
+                   <DialogTitle>{task.text}</DialogTitle>
+                   <p className="text-sm text-muted-foreground mt-1">Completion History</p>
+                 </div>
+                 
+                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                   {task.history && task.history.length > 0 ? (
+                     task.history.map((entry, idx) => (
+                       <div key={idx} className="space-y-2">
+                         <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{new Date(entry.completedAt).toLocaleString()}</span>
+                            <span className="text-white font-bold">{entry.completedBy}</span>
+                         </div>
+                         <div className="rounded-xl overflow-hidden border border-white/10 bg-black/20">
+                           <img src={entry.photo} alt="Proof" className="w-full h-auto" />
+                         </div>
+                       </div>
+                     ))
+                   ) : (
+                     <div className="text-center text-muted-foreground py-10">
+                       No history available.
+                     </div>
+                   )}
+                 </div>
+
+                 {canEdit && (
+                   <div className="p-4 border-t border-white/5">
+                     <Button 
+                       onClick={() => {
+                         if (viewingHistoryTask) undoTaskCompletion(viewingHistoryTask);
+                         setViewingHistoryTask(null);
+                       }} 
+                       variant="outline" 
+                       className="w-full border-flow-red/30 text-flow-red hover:bg-flow-red/10 hover:text-flow-red"
+                     >
+                       <RefreshCw className="w-4 h-4 mr-2" />
+                       Reopen Task
+                     </Button>
+                   </div>
+                 )}
+               </>
+             );
+           })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Add Task Dialog */}
       <Dialog open={isAdding} onOpenChange={setIsAdding}>

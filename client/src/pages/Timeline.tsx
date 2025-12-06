@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
-import { AlertCircle, Info, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { AlertCircle, Info, CheckCircle2, AlertTriangle, Clock, Camera } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export default function Timeline() {
   const { timeline, currentUser } = useStore();
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // Only managers can see all details
   const isManager = currentUser?.role === 'manager';
@@ -17,8 +20,6 @@ export default function Timeline() {
         {timeline.map((event, i) => {
           const date = parseISO(event.timestamp);
           const timeStr = format(date, 'h:mm a');
-          
-          // Employees see basic info, Managers see everything
           
           return (
             <motion.div 
@@ -53,7 +54,19 @@ export default function Timeline() {
                     {event.text}
                   </p>
                   
-                  {event.comment && (isManager || event.role === 'lead') && (
+                  {event.photo && (
+                    <div 
+                      onClick={() => setSelectedPhoto(event.photo!)}
+                      className="mt-3 cursor-pointer group relative overflow-hidden rounded-xl border border-white/10"
+                    >
+                       <img src={event.photo} alt="Evidence" className="w-full h-32 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-transparent transition-colors">
+                          <Camera className="w-6 h-6 text-white drop-shadow-md group-hover:opacity-0 transition-opacity" />
+                       </div>
+                    </div>
+                  )}
+
+                  {event.comment && (isManager || event.role === 'lead') && !event.photo && (
                     <div className="mt-2 pt-2 border-t border-white/5">
                       <p className="text-xs text-muted-foreground italic">"{event.comment}"</p>
                     </div>
@@ -64,6 +77,21 @@ export default function Timeline() {
           );
         })}
       </div>
+
+      {/* Photo Viewer */}
+      <Dialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
+        <DialogContent className="bg-transparent border-none shadow-none max-w-sm p-0 flex items-center justify-center">
+           {selectedPhoto && (
+             <motion.img 
+               initial={{ scale: 0.9, opacity: 0 }}
+               animate={{ scale: 1, opacity: 1 }}
+               src={selectedPhoto} 
+               alt="Full Proof" 
+               className="w-full rounded-2xl border border-white/10 shadow-2xl" 
+             />
+           )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

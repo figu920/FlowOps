@@ -1,0 +1,117 @@
+Update FlowOps to add mandatory photo verification for all Weekly Tasks.
+Whenever a user marks a Weekly Task as completed, the app must immediately open a photo capture window and require the user to take a picture as proof.
+This photo must be saved inside the task history so Managers can review it later.
+
+📸 1. PHOTO REQUIREMENT ON COMPLETION
+
+Modify the Weekly Tasks system so that:
+
+✔ When a user taps the checkbox to complete a task:
+
+Do NOT complete it immediately
+
+Instead, open a camera/photo upload window
+
+Require the user to take a photo or upload one
+
+After submitting the photo, mark the task as completed
+
+Save timestamp + user + photo
+
+✔ The task should NOT be able to be completed without a photo.
+
+This prevents employees from checking tasks without actually doing them.
+
+📝 2. STORE PHOTO INSIDE THE TASK ENTRY
+
+Each completed Weekly Task must include:
+
+Completion timestamp
+
+Completed by (employee name)
+
+Photo proof
+
+Optional comment field (if you want to expand later)
+
+The photo must be stored permanently inside FlowOps (not in the chat).
+
+👤 3. ROLE PERMISSIONS
+Employees & Leads
+
+Can complete tasks
+
+Must upload a photo every time
+
+Cannot delete photos
+
+Cannot edit photo proofs
+
+Managers
+
+Can view photo proofs of every completed Weekly Task
+
+Can scroll through photos organized by:
+
+Task name
+
+Date
+
+Employee
+
+Can delete or archive tasks if needed
+
+Can leave comments (optional future feature)
+
+📁 4. PHOTO GALLERY INSIDE EACH TASK (MANAGER + LEAD VIEW)
+
+Inside every Weekly Task, add a section:
+
+Task Completion History
+
+Each entry shows:
+
+Photo thumbnail
+
+Timestamp
+
+User
+
+Tap to view full-screen photo
+
+Managers can see ALL history.
+Leads can see history too, but only Managers can delete.
+
+🕒 5. TIMELINE INTEGRATION
+
+Every completed task with a photo must also log to the timeline:
+
+Example:
+
+“8:21 PM — Weekly Task completed: Clean vent #3. Completed by Bella. Photo proof attached.”
+
+Managers should be able to tap the timeline entry to view the photo.
+
+📱 6. REQUIRED UI CHANGES
+
+Weekly Tasks must show a “photo required” logic
+
+Camera window should open automatically
+
+Task is only marked complete after taking/uploading a photo
+
+Photo preview before submitting
+
+Clear error if no photo is provided
+
+🔒 7. SECURITY / STORAGE
+
+Photos must be stored securely inside the task record
+
+Only Managers and Leads may view the full gallery
+
+Employees may only see their own photos (optional)
+
+No photos sent to chat or external apps
+
+✔️ END OF PROMPT

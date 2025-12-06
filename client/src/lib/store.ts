@@ -44,6 +44,13 @@ export interface ChecklistItem {
   notes?: string;
 }
 
+export interface TaskCompletion {
+  id: string;
+  completedAt: string;
+  completedBy: string;
+  photo: string;
+}
+
 export interface TaskItem {
   id: string;
   text: string;
@@ -51,6 +58,7 @@ export interface TaskItem {
   completed: boolean;
   notes?: string;
   completedAt?: string;
+  history: TaskCompletion[];
 }
 
 export interface ChatMessage {
@@ -71,6 +79,7 @@ export interface TimelineEvent {
   timestamp: string;
   type: 'alert' | 'info' | 'success' | 'warning';
   comment?: string;
+  photo?: string;
 }
 
 // NEW INTERFACES FOR MENU
@@ -104,7 +113,7 @@ interface FlowState {
   weeklyTasks: TaskItem[];
   chat: ChatMessage[];
   timeline: TimelineEvent[];
-  menu: MenuItem[]; // NEW
+  menu: MenuItem[]; 
 
   // Auth Actions
   login: (email: string, password: string) => boolean;
@@ -131,7 +140,8 @@ interface FlowState {
   deleteChecklistItem: (listType: 'opening' | 'shift' | 'closing', taskId: string) => void;
 
   // Task Actions
-  toggleTask: (taskId: string) => void;
+  completeTask: (taskId: string, photo: string) => void; // REPLACED toggleTask
+  undoTaskCompletion: (taskId: string) => void; // New for managers
   addWeeklyTask: (text: string, assignedTo: string, notes?: string) => void;
   deleteWeeklyTask: (taskId: string) => void;
 
@@ -144,7 +154,7 @@ interface FlowState {
 
   // Other Actions
   sendMessage: (text: string, isAction?: boolean) => void;
-  addTimelineEntry: (text: string, type: TimelineEvent['type'], comment?: string) => void;
+  addTimelineEntry: (text: string, type: TimelineEvent['type'], comment?: string, photo?: string) => void;
 }
 
 const INITIAL_USERS: User[] = [
@@ -191,9 +201,9 @@ const INITIAL_CHECKLISTS = {
 };
 
 const INITIAL_TASKS: TaskItem[] = [
-  { id: 't1', text: 'Deep clean fridge', assignedTo: 'Angel', completed: false, notes: 'Use the heavy duty cleaner' },
-  { id: 't2', text: 'Clean vents', assignedTo: 'Hunter', completed: false },
-  { id: 't3', text: 'Wipe counters', assignedTo: 'Bella', completed: true, completedAt: new Date().toISOString() },
+  { id: 't1', text: 'Deep clean fridge', assignedTo: 'Angel', completed: false, notes: 'Use the heavy duty cleaner', history: [] },
+  { id: 't2', text: 'Clean vents', assignedTo: 'Hunter', completed: false, history: [] },
+  { id: 't3', text: 'Wipe counters', assignedTo: 'Bella', completed: true, completedAt: new Date().toISOString(), history: [] },
 ];
 
 const INITIAL_CHAT: ChatMessage[] = [
@@ -311,7 +321,7 @@ export const useStore = create<FlowState>()(
          }
       },
 
-      addTimelineEntry: (text, type, comment) => {
+      addTimelineEntry: (text, type, comment, photo) => {
         const { currentUser } = get();
         const newEvent: TimelineEvent = {
           id: Math.random().toString(36).substr(2, 9),
@@ -320,7 +330,8 @@ export const useStore = create<FlowState>()(
           role: currentUser?.role || 'employee',
           timestamp: new Date().toISOString(),
           type,
-          comment
+          comment,
+          photo
         };
         set((state) => ({ timeline: [newEvent, ...state.timeline] }));
       },
@@ -468,26 +479,51 @@ export const useStore = create<FlowState>()(
       },
 
       // TASK ACTIONS
-      toggleTask: (taskId) => {
+      completeTask: (taskId, photo) => {
         const { currentUser } = get();
         if (!currentUser) return;
+
+        const completion: TaskCompletion = {
+          id: Math.random().toString(36).substr(2, 9),
+          completedAt: new Date().toISOString(),
+          completedBy: currentUser.name,
+          photo
+        };
 
         set((state) => ({
           weeklyTasks: state.weeklyTasks.map((task) =>
             task.id === taskId
               ? { 
                   ...task, 
-                  completed: !task.completed,
-                  completedAt: !task.completed ? new Date().toISOString() : undefined
+                  completed: true,
+                  completedAt: completion.completedAt,
+                  history: [completion, ...(task.history || [])] // Prepend new completion
                 }
               : task
           ),
         }));
         
         const task = get().weeklyTasks.find(t => t.id === taskId);
-        if (task && !task.completed) {
-           get().addTimelineEntry(`Weekly task completed: ${task.text} by ${currentUser.name}`, 'success');
+        if (task) {
+           get().addTimelineEntry(`Weekly task completed: ${task.text} by ${currentUser.name}`, 'success', 'Photo proof attached', photo);
         }
+      },
+
+      undoTaskCompletion: (taskId) => {
+        const { currentUser } = get();
+        if (!currentUser || currentUser.role === 'employee') return; // Only managers/leads
+
+        set((state) => ({
+          weeklyTasks: state.weeklyTasks.map((task) =>
+            task.id === taskId
+              ? { 
+                  ...task, 
+                  completed: false,
+                  completedAt: undefined
+                }
+              : task
+          ),
+        }));
       },
 
       addWeeklyTask: (text, assignedTo, notes) => {
@@ -496,7 +532,8 @@ export const useStore = create<FlowState>()(
           text,
           assignedTo,
           completed: false,
-          notes
+          notes,
+          history: []
         };
         
         set(state => ({ weeklyTasks: [...state.weeklyTasks, newTask] }));
@@ -626,7 +663,7 @@ export const useStore = create<FlowState>()(
         chat: state.chat,
         timeline: state.timeline,
         users: state.users, 
-        menu: state.menu, // Persist menu
+        menu: state.menu, 
         // Don't persist currentUser to force login
       }),
     }
