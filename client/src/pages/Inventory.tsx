@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore, type InventoryItem } from '@/lib/store';
 import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventory } from '@/lib/hooks';
+import type { Inventory } from '@shared/schema';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Camera } from 'lucide-react';
@@ -76,7 +77,7 @@ export default function Inventory() {
       }
     >
       <div className="space-y-3">
-        {inventory.map((item, idx) => (
+        {inventory.map((item: Inventory, idx: number) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 20 }}

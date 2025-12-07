@@ -27,8 +27,8 @@ export default function Home() {
   if (!currentUser) return null;
 
   // Dynamic status counts
-  const lowStockCount = inventory.filter(i => i.status !== 'OK').length;
-  const brokenCount = equipment.filter(e => e.status === 'Broken').length;
+  const lowStockCount = inventory.filter((i: { status: string }) => i.status !== 'OK').length;
+  const brokenCount = equipment.filter((e: { status: string }) => e.status === 'Broken').length;
   const pendingCount = canManageUsers ? pendingUsers.length : 0;
   const unreadNotifications = notificationData?.count || 0;
 
