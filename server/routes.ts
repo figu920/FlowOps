@@ -114,23 +114,34 @@ export async function registerRoutes(
     try {
       const { usernameOrEmail, password } = req.body;
       
+      // Debug logging
+      console.log(`[LOGIN] Attempt for: "${usernameOrEmail}" (length: ${usernameOrEmail?.length})`);
+      
       if (!usernameOrEmail || !password) {
         return res.status(400).json({ message: "Username/email and password are required" });
       }
       
+      // Trim whitespace from input
+      const trimmedUsername = usernameOrEmail.trim();
+      const trimmedPassword = password;
+      
       // Check username or email
-      let user = await storage.getUserByUsername(usernameOrEmail);
+      let user = await storage.getUserByUsername(trimmedUsername);
       if (!user) {
-        user = await storage.getUserByEmail(usernameOrEmail);
+        user = await storage.getUserByEmail(trimmedUsername);
       }
       
       if (!user) {
+        console.log(`[LOGIN] User not found: "${trimmedUsername}"`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
+      console.log(`[LOGIN] User found: ${user.username}, checking password...`);
+      
       // Check password
-      const passwordMatch = await bcrypt.compare(password, user.password);
+      const passwordMatch = await bcrypt.compare(trimmedPassword, user.password);
       if (!passwordMatch) {
+        console.log(`[LOGIN] Password mismatch for: ${user.username}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
