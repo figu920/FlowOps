@@ -1,5 +1,5 @@
 import { db } from './db';
-import { users } from '@shared/schema';
+import { users, inventory, equipment, checklistItems, weeklyTasks, chatMessages, menuItems, ingredients } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 
@@ -31,7 +31,87 @@ export async function bootstrapSystemAdmin() {
     } else {
       console.log('[BOOTSTRAP] System admin already exists.');
     }
+
+    await seedInitialDataIfEmpty();
   } catch (error) {
     console.error('[BOOTSTRAP] Error during bootstrap:', error);
+  }
+}
+
+async function seedInitialDataIfEmpty() {
+  try {
+    const existingInventory = await db.select().from(inventory).limit(1);
+    
+    if (existingInventory.length === 0) {
+      console.log('[BOOTSTRAP] Seeding initial data...');
+      
+      await db.insert(inventory).values([
+        { emoji: '🍔', name: 'Beef Patties', category: 'Food', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
+        { emoji: '🥬', name: 'Lettuce', category: 'Food', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
+        { emoji: '🍅', name: 'Tomatoes', category: 'Food', status: 'LOW', establishment: 'Bison Den', updatedBy: 'System', lowComment: 'Need to restock soon' },
+        { emoji: '🧀', name: 'Cheese Slices', category: 'Food', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
+        { emoji: '🍟', name: 'French Fries', category: 'Food', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
+        { emoji: '🥤', name: 'Cola Syrup', category: 'Drink', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
+      ]);
+      console.log('[BOOTSTRAP] Inventory seeded');
+
+      await db.insert(equipment).values([
+        { name: 'Fryer', category: 'Kitchen', status: 'Working', establishment: 'Bison Den' },
+        { name: 'Grill', category: 'Kitchen', status: 'Working', establishment: 'Bison Den' },
+        { name: 'Fridge', category: 'Kitchen', status: 'Attention', establishment: 'Bison Den', lastIssue: 'Temperature fluctuating' },
+        { name: 'Ice Machine', category: 'Bar', status: 'Working', establishment: 'Bison Den' },
+        { name: 'Dishwasher', category: 'Kitchen', status: 'Working', establishment: 'Bison Den' },
+      ]);
+      console.log('[BOOTSTRAP] Equipment seeded');
+
+      await db.insert(checklistItems).values([
+        { text: 'Turn on grill', listType: 'opening', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
+        { text: 'Prep lettuce & tomato', listType: 'opening', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
+        { text: 'Refill sauces', listType: 'opening', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
+        { text: 'Wipe tables', listType: 'shift', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
+        { text: 'Check trash bins', listType: 'shift', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
+        { text: 'Clean fryer', listType: 'closing', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
+        { text: 'Sweep floors', listType: 'closing', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
+      ]);
+      console.log('[BOOTSTRAP] Checklists seeded');
+
+      await db.insert(weeklyTasks).values([
+        { text: 'Deep clean fridge', assignedTo: 'Team', establishment: 'Bison Den', completed: false },
+        { text: 'Clean vents', assignedTo: 'Team', establishment: 'Bison Den', completed: false },
+      ]);
+      console.log('[BOOTSTRAP] Weekly tasks seeded');
+
+      await db.insert(chatMessages).values([
+        { text: 'Welcome to FlowOps! Use this chat to communicate with your team.', sender: 'System', senderRole: 'manager', establishment: 'Bison Den', type: 'text' },
+      ]);
+      console.log('[BOOTSTRAP] Chat seeded');
+
+      const [burger] = await db.insert(menuItems).values({
+        name: 'Honkytonk Burger',
+        category: 'Burgers',
+        establishment: 'Bison Den'
+      }).returning();
+
+      const [wings] = await db.insert(menuItems).values({
+        name: 'Wings',
+        category: 'Appetizers',
+        establishment: 'Bison Den'
+      }).returning();
+
+      await db.insert(ingredients).values([
+        { menuItemId: burger.id, name: 'Beef Patty', quantity: 120, unit: 'grams' },
+        { menuItemId: burger.id, name: 'Bun', quantity: 1, unit: 'pieces' },
+        { menuItemId: burger.id, name: 'Lettuce', quantity: 15, unit: 'grams' },
+        { menuItemId: wings.id, name: 'Wings', quantity: 6, unit: 'pieces' },
+        { menuItemId: wings.id, name: 'Sauce', quantity: 2, unit: 'oz' },
+      ]);
+      console.log('[BOOTSTRAP] Menu items seeded');
+
+      console.log('[BOOTSTRAP] Initial data seeded successfully!');
+    } else {
+      console.log('[BOOTSTRAP] Data already exists, skipping seed.');
+    }
+  } catch (error) {
+    console.error('[BOOTSTRAP] Error seeding initial data:', error);
   }
 }
