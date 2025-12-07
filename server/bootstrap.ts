@@ -6,6 +6,20 @@ import bcrypt from 'bcrypt';
 const SALT_ROUNDS = 10;
 
 export async function bootstrapSystemAdmin() {
+  const env = process.env.NODE_ENV || 'development';
+  console.log(`[BOOTSTRAP] Starting bootstrap in ${env} environment...`);
+  console.log(`[BOOTSTRAP] Database URL exists: ${!!process.env.DATABASE_URL}`);
+  
+  try {
+    await ensureSystemAdmin();
+    await seedAllDataIfEmpty();
+    console.log('[BOOTSTRAP] Bootstrap completed successfully!');
+  } catch (error) {
+    console.error('[BOOTSTRAP] CRITICAL ERROR during bootstrap:', error);
+  }
+}
+
+async function ensureSystemAdmin() {
   console.log('[BOOTSTRAP] Checking for system admin...');
   
   try {
@@ -31,20 +45,27 @@ export async function bootstrapSystemAdmin() {
     } else {
       console.log('[BOOTSTRAP] System admin already exists.');
     }
-
-    await seedInitialDataIfEmpty();
   } catch (error) {
-    console.error('[BOOTSTRAP] Error during bootstrap:', error);
+    console.error('[BOOTSTRAP] Error ensuring system admin:', error);
+    throw error;
   }
 }
 
-async function seedInitialDataIfEmpty() {
+async function seedAllDataIfEmpty() {
+  console.log('[BOOTSTRAP] Checking if data needs to be seeded...');
+  
   try {
     const existingInventory = await db.select().from(inventory).limit(1);
+    const existingEquipment = await db.select().from(equipment).limit(1);
+    const existingChecklists = await db.select().from(checklistItems).limit(1);
+    const existingTasks = await db.select().from(weeklyTasks).limit(1);
+    const existingChat = await db.select().from(chatMessages).limit(1);
+    const existingMenu = await db.select().from(menuItems).limit(1);
+    
+    console.log(`[BOOTSTRAP] Data status - Inventory: ${existingInventory.length}, Equipment: ${existingEquipment.length}, Checklists: ${existingChecklists.length}, Tasks: ${existingTasks.length}, Chat: ${existingChat.length}, Menu: ${existingMenu.length}`);
     
     if (existingInventory.length === 0) {
-      console.log('[BOOTSTRAP] Seeding initial data...');
-      
+      console.log('[BOOTSTRAP] Seeding inventory...');
       await db.insert(inventory).values([
         { emoji: '🍔', name: 'Beef Patties', category: 'Food', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
         { emoji: '🥬', name: 'Lettuce', category: 'Food', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
@@ -54,7 +75,10 @@ async function seedInitialDataIfEmpty() {
         { emoji: '🥤', name: 'Cola Syrup', category: 'Drink', status: 'OK', establishment: 'Bison Den', updatedBy: 'System' },
       ]);
       console.log('[BOOTSTRAP] Inventory seeded');
+    }
 
+    if (existingEquipment.length === 0) {
+      console.log('[BOOTSTRAP] Seeding equipment...');
       await db.insert(equipment).values([
         { name: 'Fryer', category: 'Kitchen', status: 'Working', establishment: 'Bison Den' },
         { name: 'Grill', category: 'Kitchen', status: 'Working', establishment: 'Bison Den' },
@@ -63,7 +87,10 @@ async function seedInitialDataIfEmpty() {
         { name: 'Dishwasher', category: 'Kitchen', status: 'Working', establishment: 'Bison Den' },
       ]);
       console.log('[BOOTSTRAP] Equipment seeded');
+    }
 
+    if (existingChecklists.length === 0) {
+      console.log('[BOOTSTRAP] Seeding checklists...');
       await db.insert(checklistItems).values([
         { text: 'Turn on grill', listType: 'opening', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
         { text: 'Prep lettuce & tomato', listType: 'opening', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
@@ -74,18 +101,27 @@ async function seedInitialDataIfEmpty() {
         { text: 'Sweep floors', listType: 'closing', establishment: 'Bison Den', completed: false, assignedTo: 'Team' },
       ]);
       console.log('[BOOTSTRAP] Checklists seeded');
+    }
 
+    if (existingTasks.length === 0) {
+      console.log('[BOOTSTRAP] Seeding weekly tasks...');
       await db.insert(weeklyTasks).values([
         { text: 'Deep clean fridge', assignedTo: 'Team', establishment: 'Bison Den', completed: false },
         { text: 'Clean vents', assignedTo: 'Team', establishment: 'Bison Den', completed: false },
       ]);
       console.log('[BOOTSTRAP] Weekly tasks seeded');
+    }
 
+    if (existingChat.length === 0) {
+      console.log('[BOOTSTRAP] Seeding chat...');
       await db.insert(chatMessages).values([
         { text: 'Welcome to FlowOps! Use this chat to communicate with your team.', sender: 'System', senderRole: 'manager', establishment: 'Bison Den', type: 'text' },
       ]);
       console.log('[BOOTSTRAP] Chat seeded');
+    }
 
+    if (existingMenu.length === 0) {
+      console.log('[BOOTSTRAP] Seeding menu items...');
       const [burger] = await db.insert(menuItems).values({
         name: 'Honkytonk Burger',
         category: 'Burgers',
@@ -106,12 +142,11 @@ async function seedInitialDataIfEmpty() {
         { menuItemId: wings.id, name: 'Sauce', quantity: 2, unit: 'oz' },
       ]);
       console.log('[BOOTSTRAP] Menu items seeded');
-
-      console.log('[BOOTSTRAP] Initial data seeded successfully!');
-    } else {
-      console.log('[BOOTSTRAP] Data already exists, skipping seed.');
     }
+
+    console.log('[BOOTSTRAP] Data seeding check completed!');
   } catch (error) {
-    console.error('[BOOTSTRAP] Error seeding initial data:', error);
+    console.error('[BOOTSTRAP] Error seeding data:', error);
+    throw error;
   }
 }
