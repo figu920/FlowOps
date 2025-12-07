@@ -1,0 +1,124 @@
+Fix the issue where the demo version of FlowOps shows all tabs, inventory, equipment, tasks, menus, and all features correctly, but the published version does not show them.
+This happens because the demo/preview environment and the published environment are currently using different databases, or the published environment is missing the schema, data, or permissions needed for these screens.
+You must resolve this.
+
+Apply the following fixes:
+
+⸻
+
+🔧 1. THE PUBLISHED VERSION MUST USE THE SAME DATABASE STRUCTURE AS THE PREVIEW VERSION
+
+If the system cannot automatically migrate or copy the DB structure from preview to production:
+
+✔️ Revert to a previous checkpoint where published version DID show inventory and all tabs properly.
+
+✔️ Copy the working database schema and logic from that checkpoint.
+
+Then:
+
+✔️ Merge the newest changes (Admin role, approvals, profile, user roles, notifications) into that working baseline.
+
+The final published version must:
+	•	Show all tabs
+	•	Show inventory items
+	•	Show equipment items
+	•	Allow adding new items
+	•	Show menu & portion sizes
+	•	Show checklists & tasks
+	•	Use the same display and logic as the demo
+
+⸻
+
+🔁 2. IF MIGRATION FAILS, CLONE & PASTE THE WORKING CODE FROM THE CHECKPOINT
+
+If the AI cannot sync the DB:
+
+✔️ Go to the last checkpoint where the published version successfully showed all tabs and inventory
+
+✔️ Copy the full functional logic from that checkpoint
+
+✔️ Paste/merge that logic into the current build
+
+✔️ Then reapply the recent improvements:
+	•	Admin account and permissions
+	•	Manager approval flow
+	•	Role assignment
+	•	Inventory add button
+	•	Equipment add button
+	•	Menu item add button
+	•	Bug fixes
+
+Do NOT overwrite the Admin account or the new user-approval system.
+
+⸻
+
+🗃 3. ENSURE PUBLISHED BUILD HAS ACCESS TO ALL TABLES & COLLECTIONS
+
+The published version must have:
+	•	Inventory table
+	•	Equipment table
+	•	Menu items + portions
+	•	Weekly tasks
+	•	Checklists
+	•	Users
+	•	Roles
+	•	Approvals
+	•	Pending users
+
+If the published DB is missing these tables:
+
+👉 Create or sync them from the preview DB automatically.
+
+⸻
+
+🔒 4. FIX PERMISSIONS SO THE ADMIN CAN SEE THE PUBLISHED DATA
+
+Ensure the published app does NOT filter out data for Admin users.
+
+Admin must see:
+	•	All inventory
+	•	All tasks
+	•	All equipment
+	•	All menu items
+	•	All users
+	•	All establishments
+
+If the published version hides the tabs from Admin because of incorrect role filters:
+
+👉 Fix role logic so Admin = full access everywhere.
+
+⸻
+
+🧱 5. ENSURE PUBLISHED VERSION USES THE SAME UI COMPONENTS
+
+If published app references components or screens missing from production:
+
+👉 Copy screens & components from the working checkpoint.
+
+This includes:
+	•	Inventory screen
+	•	Equipment screen
+	•	Menu & Sizes
+	•	Tasks
+	•	Checklists
+	•	Profile
+	•	Employee Management
+	•	Pending Users screen
+
+Everything must be present in the published build.
+
+⸻
+
+🔁 6. FINAL REQUIREMENT
+
+The published version must behave identical to the demo version.
+
+If syncing fails:
+
+👉 Restore the system to the last working checkpoint
+👉 Insert all new features on top
+👉 Re-deploy with all admin functionality preserved
+
+⸻
+
+✔️ END OF PROMPT
