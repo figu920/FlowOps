@@ -22,6 +22,7 @@ export function usePendingUsers(enabled: boolean = true) {
     queryKey: ['users', 'pending'],
     queryFn: api.users.getPending,
     enabled,
+    refetchInterval: 10000,
   });
 }
 
