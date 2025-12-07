@@ -1006,5 +1006,58 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== ADMIN SEED ENDPOINT ====================
+  // This endpoint allows system admins to trigger data seeding in production
+  app.post("/api/admin/seed", async (req: Request, res: Response) => {
+    const user = req.session.user;
+    
+    if (!user || !isSystemAdminUser(user)) {
+      return res.status(403).json({ message: "Only system admins can trigger seeding" });
+    }
+    
+    try {
+      // Import and run bootstrap
+      const { bootstrapSystemAdmin } = await import('./bootstrap');
+      await bootstrapSystemAdmin();
+      
+      res.json({ message: "Seeding completed successfully" });
+    } catch (error) {
+      console.error("Seeding error:", error);
+      res.status(500).json({ message: "Failed to seed data" });
+    }
+  });
+
+  // ==================== DATABASE STATUS ENDPOINT ====================
+  // Check what data exists in the database
+  app.get("/api/admin/db-status", async (req: Request, res: Response) => {
+    const user = req.session.user;
+    
+    if (!user || !isSystemAdminUser(user)) {
+      return res.status(403).json({ message: "Only system admins can check database status" });
+    }
+    
+    try {
+      const inventoryCount = (await storage.getAllInventory()).length;
+      const equipmentCount = (await storage.getAllEquipment()).length;
+      const usersCount = (await storage.getAllUsers()).length;
+      const checklistsCount = (await storage.getAllChecklistItems()).length;
+      const tasksCount = (await storage.getAllWeeklyTasks()).length;
+      const menuCount = (await storage.getAllMenuItems()).length;
+      
+      res.json({
+        inventory: inventoryCount,
+        equipment: equipmentCount,
+        users: usersCount,
+        checklists: checklistsCount,
+        tasks: tasksCount,
+        menu: menuCount,
+        environment: process.env.NODE_ENV || 'development'
+      });
+    } catch (error) {
+      console.error("DB status error:", error);
+      res.status(500).json({ message: "Failed to get database status" });
+    }
+  });
+
   return httpServer;
 }
