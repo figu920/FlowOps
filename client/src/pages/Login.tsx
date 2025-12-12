@@ -226,7 +226,7 @@ export default function Login() {
 
           <div className="mt-8 text-center border-t border-white/5 pt-4">
              <p className="text-[10px] text-muted-foreground">
-               {isRegistering ? "Wait for manager approval after registering." : "Admin Login: admin / password123"}
+               {isRegistering ? "Wait for manager approval after registering." : null}
              </p>
           </div>
         </div>

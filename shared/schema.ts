@@ -1,22 +1,36 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, real, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
-// ============ USERS ============
+// 1. DEFINIR LOS ROLES
+export const ROLES = {
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  SUPERVISOR: 'supervisor',
+  LEAD: 'lead',
+  EMPLOYEE: 'employee',
+} as const;
+// ============ USERS (ACTUALIZADO) ============
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default('employee'), // 'employee' | 'lead' | 'manager' | 'admin'
+  
+  // AQUI EL CAMBIO: Añadimos 'supervisor' a los roles permitidos
+  role: text("role").notNull().default('employee'), // 'admin' | 'manager' | 'supervisor' | 'lead' | 'employee'
+  
   status: text("status").notNull().default('pending'), // 'active' | 'pending' | 'removed'
   establishment: text("establishment").notNull(), // 'Bison Den' | 'Trailblazer Café' | 'Global'
   phoneNumber: text("phone_number"),
   isSystemAdmin: boolean("is_system_admin").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+//... deja el insertUserSchema y el resto igual...
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -210,3 +224,8 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});

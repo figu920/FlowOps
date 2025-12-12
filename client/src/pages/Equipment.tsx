@@ -12,7 +12,13 @@ import { Input } from "@/components/ui/input";
 
 export default function Equipment() {
   const { currentUser } = useStore();
-  const { data: equipment = [] } = useEquipment();
+  
+  // --- CAMBIO AQUÍ: Ordenar Alfabéticamente ---
+  const { data: rawEquipment = [] } = useEquipment();
+  // Creamos la lista ordenada por nombre (A-Z)
+  const equipment = [...rawEquipment].sort((a, b) => a.name.localeCompare(b.name));
+  // -------------------------------------------
+
   const updateMutation = useUpdateEquipment();
   const createMutation = useCreateEquipment();
   const deleteMutation = useDeleteEquipment();

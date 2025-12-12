@@ -15,7 +15,10 @@ import {
   insertIngredientSchema
 } from "@shared/schema";
 import { z } from "zod";
-
+import { db } from "./db";
+// Añade 'asc' aquí:
+import { eq, and, inArray, asc } from "drizzle-orm"; 
+import { users, inventory } from "@shared/schema";
 const SALT_ROUNDS = 10;
 
 // Helper to get current user from session
@@ -193,198 +196,141 @@ export async function registerRoutes(
     res.json(userWithoutPassword);
   });
   
-  // ==================== USER MANAGEMENT ====================
-  
-  // Get all users for an establishment (filtered by role)
-  // System admin is NEVER exposed in this list
+// ============ USER MANAGEMENT (CORREGIDO FINAL) ============
+
+  // 1. CORRECCIÓN DE TIPO: Ahora usamos string (array de textos)
+  const APPROVAL_HIERARCHY: Record<string, string[]> = {
+  admin: ['manager'],
+  manager: ['supervisor'],
+  supervisor: ['lead'],
+  lead: ['employee'],
+  employee: []
+};
+
+  // 1. VER LISTA DE USUARIOS
   app.get("/api/users", async (req: Request, res: Response) => {
-    if (!req.session.user) {
-      return res.status(401).json({ message: "Not authenticated" });
+    if (!req.session.user) return res.sendStatus(401);
+
+    let query = db.select().from(users);
+    
+    if (!req.session.user.isSystemAdmin && req.session.user.role!== 'admin') {
+      query.where(eq(users.establishment, req.session.user.establishment));
     }
-    
-    let users;
-    if (isSystemAdminUser(req.session.user)) {
-      // System admin sees all users from all establishments
-      users = await storage.getAllUsers();
-    } else {
-      users = await storage.getUsersByEstablishment(req.session.user.establishment);
-    }
-    
-    // Filter out system admin accounts from the response - they should never appear in UI
-    const filteredUsers = users.filter(u => !u.isSystemAdmin);
-    const usersWithoutPasswords = filteredUsers.map(({ password, ...user }) => user);
-    
-    res.json(usersWithoutPasswords);
+
+    const allUsers = await query;
+    const safeUsers = allUsers.map(({ password,...u }) => u);
+    res.json(safeUsers);
   });
-  
-  // Get pending users (managers or system admin)
+
+  // 2. VER PENDIENTES
   app.get("/api/users/pending", async (req: Request, res: Response) => {
-    if (!req.session.user || !canManageUsers(req.session.user)) {
-      return res.status(403).json({ message: "Only managers can view pending users" });
+    if (!req.session.user) return res.sendStatus(401);
+
+    const currentUserRole = req.session.user.role;
+    const currentEst = req.session.user.establishment;
+
+    let conditions = [eq(users.status, 'pending')];
+
+    if (!req.session.user.isSystemAdmin && currentUserRole!== 'admin') {
+      conditions.push(eq(users.establishment, currentEst));
     }
+
+    const pendingUsers = await db.select().from(users).where(and(...conditions));
+
+    // 2. CORRECCIÓN DE SINTAXIS: Añadido (array vacío) si no encuentra el rol
+   const rolesICanApprove =
+  APPROVAL_HIERARCHY[req.session.user.role] || [];
+
     
-    let pendingUsers;
-    if (isSystemAdminUser(req.session.user)) {
-      // System admin sees pending users from all establishments
-      pendingUsers = await storage.getAllPendingUsersGlobal();
-    } else {
-      pendingUsers = await storage.getAllPendingUsers(req.session.user.establishment);
-    }
-    
-    // Filter out system admin accounts
-    const filteredUsers = pendingUsers.filter(u => !u.isSystemAdmin);
-    const usersWithoutPasswords = filteredUsers.map(({ password, ...user }) => user);
-    
-    res.json(usersWithoutPasswords);
+    const filteredUsers = pendingUsers.filter(u => 
+      rolesICanApprove.includes(u.role)
+    );
+
+    res.json(filteredUsers);
   });
-  
-  // Approve user (managers or system admin)
+
+  // 3. APROBAR USUARIO
   app.post("/api/users/:id/approve", async (req: Request, res: Response) => {
-    if (!req.session.user || !canManageUsers(req.session.user)) {
-      return res.status(403).json({ message: "Only managers can approve users" });
+    if (!req.session.user) return res.sendStatus(401);
+
+    // 3. CORRECCIÓN DE ARRAY: Usamos [targetUser] para sacar el primer resultado
+    const [targetUser] = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1);
+    
+    if (!targetUser) return res.status(404).send("Usuario no encontrado");
+
+    // Validación de Jerarquía
+   const rolesICanApprove =
+  APPROVAL_HIERARCHY[req.session.user.role] || [];
+
+    
+    if (!rolesICanApprove.includes(targetUser.role)) {
+      return res.status(403).json({ 
+        message: `Tu rol (${req.session.user.role}) no puede aprobar a un ${targetUser.role}.` 
+      });
     }
-    
-    const { role } = req.body;
-    // Only allow standard roles - admin role cannot be assigned through approval
-    // The isSystemAdmin flag is the only way to grant system admin privileges
-    const allowedRoles = ['employee', 'lead', 'manager'];
-    
-    if (!role || !allowedRoles.includes(role)) {
-      return res.status(400).json({ message: "Valid role is required" });
+
+    // Validación de Tienda
+    if (!req.session.user.isSystemAdmin && req.session.user.role!== 'admin') {
+      if (targetUser.establishment!== req.session.user.establishment) {
+        return res.status(403).json({ message: "No puedes aprobar usuarios de otra tienda." });
+      }
     }
-    
-    const user = await storage.updateUser(req.params.id, { status: 'active', role });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    // Log to timeline
+
+    await db.update(users)
+   .set({ status: 'active' })
+   .where(eq(users.id, targetUser.id));
+
     await storage.createTimelineEvent({
-      text: `User approved: ${user.name} as ${role}`,
-      establishment: user.establishment,
+      text: `Approved ${targetUser.name} as ${targetUser.role}`,
+      establishment: targetUser.establishment,
       author: req.session.user.name,
       authorRole: req.session.user.role,
       type: 'success'
     });
-    
-    const { password, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+
+    res.json({ message: "Usuario aprobado correctamente" });
   });
-  
-  // Reject user (managers or system admin)
+
+  // 4. RECHAZAR USUARIO
   app.delete("/api/users/:id/reject", async (req: Request, res: Response) => {
-    if (!req.session.user || !canManageUsers(req.session.user)) {
-      return res.status(403).json({ message: "Only managers can reject users" });
+    if (!req.session.user) return res.sendStatus(401);
+
+    const [targetUser] = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1);
+
+    if (!targetUser) return res.status(404).send("Usuario no encontrado");
+
+  const rolesICanApprove =
+  APPROVAL_HIERARCHY[req.session.user.role] || [];
+
+    if (!rolesICanApprove.includes(targetUser.role)) {
+      return res.status(403).json({ message: "No tienes permiso para rechazar a este usuario." });
     }
-    
-    const targetUser = await storage.getUser(req.params.id);
-    if (targetUser?.isSystemAdmin) {
-      return res.status(403).json({ message: "This account cannot be modified" });
-    }
-    
-    await storage.updateUser(req.params.id, { status: 'removed' });
-    res.json({ message: "User rejected" });
-  });
-  
-  // Update user (managers, leads for employees, or system admin for anyone)
-  app.patch("/api/users/:id", async (req: Request, res: Response) => {
-    if (!req.session.user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    
-    const targetUser = await storage.getUser(req.params.id);
-    if (!targetUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    // System admin accounts cannot be modified by anyone (including other system admins)
-    if (targetUser.isSystemAdmin && !req.session.user.isSystemAdmin) {
-      return res.status(403).json({ message: "This account cannot be modified" });
-    }
-    
-    // Only system admin can modify their own account
-    if (targetUser.isSystemAdmin && req.session.user.id !== targetUser.id) {
-      return res.status(403).json({ message: "This account cannot be modified" });
-    }
-    
-    // Check permissions
-    const isSysAdmin = isSystemAdminUser(req.session.user);
-    const isManager = req.session.user.role === 'manager';
-    const isLead = req.session.user.role === 'lead' && targetUser.role === 'employee';
-    
-    if (!isSysAdmin && !isManager && !isLead) {
-      return res.status(403).json({ message: "Insufficient permissions" });
-    }
-    
-    // Only managers and system admin can change roles
-    if (req.body.role && !isManager && !isSysAdmin) {
-      return res.status(403).json({ message: "Only managers can change roles" });
-    }
-    
-    // Prevent changing isSystemAdmin flag
-    if ('isSystemAdmin' in req.body) {
-      delete req.body.isSystemAdmin;
-    }
-    
-    const updatedUser = await storage.updateUser(req.params.id, req.body);
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    // Log role changes
-    if (req.body.role && req.body.role !== targetUser.role) {
-      await storage.createTimelineEvent({
-        text: `Role updated for ${updatedUser.name} to ${req.body.role}`,
-        establishment: updatedUser.establishment,
-        author: req.session.user.name,
-        authorRole: req.session.user.role,
-        type: 'info'
-      });
-    }
-    
-    const { password, ...userWithoutPassword } = updatedUser;
-    res.json(userWithoutPassword);
-  });
-  
-  // Remove user (managers or system admin, but never system admin accounts)
-  app.delete("/api/users/:id", async (req: Request, res: Response) => {
-    if (!req.session.user || !canManageUsers(req.session.user)) {
-      return res.status(403).json({ message: "Only managers can remove users" });
-    }
-    
-    const user = await storage.getUser(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    // System admin accounts cannot be deleted
-    if (user.isSystemAdmin) {
-      return res.status(403).json({ message: "This account cannot be deleted" });
-    }
-    
-    await storage.updateUser(req.params.id, { status: 'removed' });
-    
-    await storage.createTimelineEvent({
-      text: `User deactivated: ${user.name}`,
-      establishment: user.establishment,
-      author: req.session.user.name,
-      authorRole: req.session.user.role,
-      type: 'warning'
-    });
-    
-    res.json({ message: "User deactivated" });
+
+    await db.update(users)
+    .set({ status: 'removed' })
+    .where(eq(users.id, targetUser.id));
+
+    res.json({ message: "Usuario rechazado" });
   });
   
   // ==================== INVENTORY ====================
   
+// 1. OBTENER INVENTARIO (CON ORDEN ALFABÉTICO)
   app.get("/api/inventory", async (req: Request, res: Response) => {
-    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
-    let items;
-    if (isSystemAdminUser(req.session.user)) {
-      items = await storage.getAllInventory();
-    } else {
-      items = await storage.getInventoryByEstablishment(req.session.user.establishment);
+    if (!req.session.user) return res.sendStatus(401);
+
+    // Seleccionamos la tabla inventario
+    let query = db.select().from(inventory);
+
+    // Filtro: Si no es admin, solo ve los productos de su tienda
+    if (!req.session.user.isSystemAdmin && req.session.user.role!== 'admin') {
+      query.where(eq(inventory.establishment, req.session.user.establishment));
     }
+
+    // AQUÍ ESTÁ LA CLAVE: Ordenar por nombre ascendente (A-Z)
+    query.orderBy(asc(inventory.name));
+
+    const items = await query;
     res.json(items);
   });
   

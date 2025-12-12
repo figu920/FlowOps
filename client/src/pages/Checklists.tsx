@@ -15,7 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 export default function Checklists() {
   const { currentUser } = useStore();
   const [activeTab, setActiveTab] = useState<"opening" | "shift" | "closing">("opening");
-  const { data: checklistsData = [] } = useChecklists(activeTab);
+  
+  // --- CAMBIO AQUÍ: Ordenar Alfabéticamente ---
+  const { data: rawChecklists = [] } = useChecklists(activeTab);
+  // Creamos la lista ordenada por el texto de la tarea (A-Z)
+  const checklistsData = [...rawChecklists].sort((a, b) => a.text.localeCompare(b.text));
+  // -------------------------------------------
+
   const { data: users = [] } = useUsers();
   const updateMutation = useUpdateChecklist();
   const createMutation = useCreateChecklist();
@@ -252,7 +258,7 @@ export default function Checklists() {
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                  {users.map(user => (
+                  {users.map((user: { id: string; name: string }) => (
                     <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -299,7 +305,7 @@ export default function Checklists() {
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                  {users.map(user => (
+                  {users.map((user: { id: string; name: string }) => (
                     <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                   ))}
                 </SelectContent>

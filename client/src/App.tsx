@@ -43,31 +43,50 @@ function Router() {
       <Route path="/">
         {() => <PrivateRoute component={Home} />}
       </Route>
+
+      {/* 1. INVENTARIO (Verde) */}
       <Route path="/inventory">
-        {() => <PrivateRoute component={Inventory} />}
+        {() => <PrivateRoute component={Inventory} categoryColor="#4CAF50" />}
       </Route>
+
+      {/* 2. EQUIPAMIENTO (Amarillo/Dorado) */}
       <Route path="/equipment">
-         {() => <PrivateRoute component={Equipment} />}
+         {() => <PrivateRoute component={Equipment} categoryColor="#FFC107" />}
       </Route>
+
+      {/* 3. CHECKLISTS (Azul Cielo) */}
       <Route path="/checklists">
-         {() => <PrivateRoute component={Checklists} />}
+         {() => <PrivateRoute component={Checklists} categoryColor="#2196F3" />}
       </Route>
+
+      {/* 4. TASKS (Violeta) */}
       <Route path="/tasks">
-         {() => <PrivateRoute component={Tasks} />}
+         {() => <PrivateRoute component={Tasks} categoryColor="#9C27B0" />}
       </Route>
+
+      {/* 5. MENU (Verde Azulado / Teal) */}
       <Route path="/menu">
-         {() => <PrivateRoute component={Menu} />}
+         {() => <PrivateRoute component={Menu} categoryColor="#009688" />}
       </Route>
+
+      {/* 6. CHAT (Blanco o Gris Claro) */}
       <Route path="/chat">
-         {() => <PrivateRoute component={Chat} />}
+         {() => <PrivateRoute component={Chat} categoryColor="#FFFFFF" />}
       </Route>
+
+      {/* 7. TIMELINE (Naranja) */}
       <Route path="/timeline">
-         {() => <PrivateRoute component={Timeline} />}
+         {() => <PrivateRoute component={Timeline} categoryColor="#FF9800" />}
       </Route>
-      <Route path="/employees">
-         {() => currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin
-            ? <PrivateRoute component={Employees} /> 
-            : <NotFound />
+
+      {/* 8. EMPLOYEES (Rosa) - Nota: Aquí también se añade el color dentro de la lógica de roles */}
+     <Route path="/employees">
+         {() => (currentUser?.role === 'manager' ||
+
+ currentUser?.role === 'lead' ||
+ currentUser?.isSystemAdmin)
+          ? <PrivateRoute component={Employees} categoryColor="#E91E63" /> 
+           : <NotFound />
          }
       </Route>
       
