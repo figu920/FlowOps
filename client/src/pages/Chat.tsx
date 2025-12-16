@@ -6,9 +6,7 @@ import { cn } from '@/lib/utils';
 import { Send, Plus } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { motion, AnimatePresence } from 'framer-motion';
-import type { ChatMessage } from "@shared/schema";
-
+import { motion } from 'framer-motion';
 
 const QUICK_ACTIONS = [
   "Inventory arrived 📦",
@@ -25,9 +23,13 @@ export default function Chat() {
   const [inputText, setInputText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll al fondo cuando llega un mensaje nuevo
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   }, [chat]);
 
@@ -40,11 +42,13 @@ export default function Chat() {
   };
 
   return (
-    <Layout title="Team Chat" className="flex flex-col p-0 h-screen overflow-hidden">
-      {/* Messages Area */}
+    // CAMBIO 1: Usamos h-[100dvh] para móviles y flex-col
+    <Layout title="Team Chat" className="flex flex-col h-[100dvh] overflow-hidden p-0">
+      
+      {/* Messages Area - Este es el que hace scroll */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 pt-24 pb-4 space-y-6"
+        className="flex-1 overflow-y-auto px-4 pt-24 pb-4 space-y-6 w-full"
       >
         {chat.map((msg, i) => {
           const isMe = msg.sender === currentUser?.name;
@@ -57,7 +61,7 @@ export default function Chat() {
               key={msg.id} 
               className={cn(
                 "flex flex-col max-w-[85%]",
-               isMe ? "ml-auto items-end" : "mr-auto items-start"
+                isMe ? "ml-auto items-end" : "mr-auto items-start"
               )}
             >
               {!isMe && !isSequence && (
@@ -79,20 +83,18 @@ export default function Chat() {
               
               <span className={cn(
                 "text-[10px] text-white/20 mt-1 mx-2",
-               isMe ? "text-right" : "text-left"
+                isMe ? "text-right" : "text-left"
               )}>
-                {new Date(msg.timestamp).toLocaleTimeString([], {
-  hour: '2-digit',
-  minute: '2-digit'
-})}
+                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </motion.div>
           );
         })}
       </div>
 
-      {/* Input Area */}
-      <div className="bg-[#161618] border-t border-white/10 pb-8 pt-3 px-4 safe-area-bottom w-full z-20">
+      {/* Input Area - CAMBIO 2: Añadido 'shrink-0' para que NO se encoja nunca */}
+      <div className="shrink-0 bg-[#161618] border-t border-white/10 pb-6 pt-3 px-4 w-full z-20">
+        
         {/* Quick Actions */}
         <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar mask-fade-right">
           {QUICK_ACTIONS.map((action, idx) => (
@@ -102,8 +104,7 @@ export default function Chat() {
               transition={{ delay: idx * 0.05 }}
               key={action}
               onClick={() => handleSend(action, true)}
-              className="whitespace-nowrap px-4 py-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] active:scale-95 rounded-full text-xs font-semibold border border-white/5 transition-all text-white"
-              data-testid={`button-quick-action-${idx}`}
+              className="whitespace-nowrap px-4 py-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] active:scale-95 rounded-full text-xs font-semibold border border-white/5 transition-all text-white shrink-0"
             >
               {action}
             </motion.button>
@@ -122,7 +123,6 @@ export default function Chat() {
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder={`Message as ${currentUser?.name || 'Guest'}...`}
               className="rounded-full bg-[#1C1C1E] border-white/10 h-11 px-5 text-base focus:border-blue-500/50 focus:ring-0 placeholder:text-muted-foreground/50"
-              data-testid="input-chat-message"
             />
           </div>
           
@@ -134,7 +134,6 @@ export default function Chat() {
               "rounded-full w-11 h-11 transition-all duration-200 shrink-0",
               inputText.trim() ? "bg-blue-600 hover:bg-blue-500 text-white" : "bg-[#2C2C2E] text-muted-foreground"
             )}
-            data-testid="button-send-message"
           >
             <Send className="w-5 h-5 ml-0.5" />
           </Button>
