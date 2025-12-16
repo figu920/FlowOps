@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { WeeklyTask, TaskCompletion, User } from "@shared/schema";
 
 export default function Tasks() {
   const { currentUser } = useStore();
@@ -51,7 +52,7 @@ export default function Tasks() {
     }
   };
 
-  const handleTaskClick = (task: TaskItem) => {
+  const handleTaskClick = (task: WeeklyTask) => {
     if (task.completed) {
       setViewingHistoryTask(task.id);
     } else {
@@ -95,7 +96,7 @@ export default function Tasks() {
       }
     >
       <div className="space-y-3">
-        {weeklyTasks.map((task, idx) => (
+        {weeklyTasks.map((task: WeeklyTask, idx: number) => (
           <motion.div
             key={task.id}
             layout
@@ -214,7 +215,9 @@ export default function Tasks() {
       <Dialog open={!!viewingHistoryTask} onOpenChange={(open) => !open && setViewingHistoryTask(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] h-[80vh] rounded-2xl p-0 flex flex-col overflow-hidden">
            {(() => {
-             const task = weeklyTasks.find(t => t.id === viewingHistoryTask);
+             const task = weeklyTasks.find(
+  (t: WeeklyTask) => t.id === viewingHistoryTask
+);
              if (!task) return null;
 
              return (
@@ -226,7 +229,7 @@ export default function Tasks() {
                  
                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
                    {task.history && task.history.length > 0 ? (
-                     task.history.map((entry, idx) => (
+                     task.history.map((entry: TaskCompletion, idx: number) => (
                        <div key={idx} className="space-y-2">
                          <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>{new Date(entry.completedAt).toLocaleString()}</span>
@@ -289,7 +292,7 @@ export default function Tasks() {
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                  {users.map(user => (
+                  {users.map((user: User) => (
                     <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                   ))}
                 </SelectContent>

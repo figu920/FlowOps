@@ -50,9 +50,9 @@ export default function Employees() {
   
   // For Admin: show all users across all establishments
   // For Manager/Lead: show only users from their establishment
-  const filteredUsers = isAdmin ? allUsers : allUsers.filter(u => u.establishment === currentUser?.establishment);
-  const activeUsers = filteredUsers.filter(u => u.status === 'active');
-  const pendingUsers = isAdmin ? pendingUsersData : pendingUsersData.filter(u => u.establishment === currentUser?.establishment);
+  const filteredUsers = isAdmin ? allUsers : allUsers.filter((u: User) => u.establishment === currentUser?.establishment);
+  const activeUsers = filteredUsers.filter((u: User) => u.status === 'active');
+  const pendingUsers = isAdmin ? pendingUsersData : pendingUsersData.filter((u: User) => u.establishment === currentUser?.establishment);
 
   const startEdit = (user: User) => {
     setEditName(user.name);
@@ -138,7 +138,7 @@ export default function Employees() {
 
       <div className="space-y-3">
         {activeTab === 'active' ? (
-          activeUsers.map((user, idx) => (
+          activeUsers.map((user: User, idx: number) => (
             <motion.div
               key={user.id}
               initial={{ opacity: 0, y: 10 }}
@@ -191,7 +191,7 @@ export default function Employees() {
           pendingUsers.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">No pending approvals.</div>
           ) : (
-            pendingUsers.map((user, idx) => (
+           pendingUsers.map((user: User, idx: number) => (
               <motion.div
                 key={user.id}
                 initial={{ opacity: 0, y: 10 }}

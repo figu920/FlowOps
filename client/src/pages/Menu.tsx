@@ -147,7 +147,7 @@ export default function Menu() {
       }
     >
       <div className="space-y-4">
-        {menu.map((dish, idx) => (
+        {menu.map((dish: MenuItem, idx: number) => (
           <motion.div
             key={dish.id}
             initial={{ opacity: 0, y: 10 }}

@@ -252,10 +252,16 @@ export function useTaskCompletions(id: string) {
   });
 }
 
+import type { ChatMessage } from "@shared/schema";
+
 export function useChat() {
-  return useQuery({
+  return useQuery<ChatMessage[]>({
     queryKey: ['chat'],
-    queryFn: api.chat.getAll,
+    queryFn: async () => {
+      const res = await fetch('/api/chat');
+      if (!res.ok) throw new Error('Failed to fetch chat');
+      return res.json();
+    }
   });
 }
 

@@ -3,10 +3,11 @@ import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { useTimeline } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
-import { AlertCircle, Info, CheckCircle2, AlertTriangle, Clock, Camera } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns'; // <-- CORREGIDO: Ya no necesitamos parseISO
+import { Camera } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import type { TimelineEvent } from "@shared/schema";
 
 export default function Timeline() {
   const { currentUser } = useStore();
@@ -19,8 +20,9 @@ export default function Timeline() {
   return (
     <Layout title="Timeline">
       <div className="relative space-y-8 pl-2 before:absolute before:left-[19px] before:top-2 before:bottom-4 before:w-[2px] before:bg-white/[0.06]">
-        {timeline.map((event, i) => {
-          const date = parseISO(event.timestamp);
+        {timeline.map((event: TimelineEvent, i: number) => {
+          // CORREGIDO: event.timestamp ya es un Date, no usamos parseISO
+          const date = event.timestamp; 
           const timeStr = format(date, 'h:mm a');
           
           return (
@@ -47,7 +49,8 @@ export default function Timeline() {
                    </span>
                    <span className="text-sm font-bold text-white">{event.author}</span>
                    {isManager && (
-                     <span className="text-[10px] uppercase bg-white/10 px-1 rounded text-white/50">{event.role}</span>
+                     // CORREGIDO: Cambiado event.role por event.authorRole
+                     <span className="text-[10px] uppercase bg-white/10 px-1 rounded text-white/50">{event.authorRole}</span>
                    )}
                 </div>
                 
@@ -68,7 +71,8 @@ export default function Timeline() {
                     </div>
                   )}
 
-                  {event.comment && (isManager || event.role === 'lead') && !event.photo && (
+                  {/* CORREGIDO: Cambiado event.role por event.authorRole */}
+                  {event.comment && (isManager || event.authorRole === 'lead') && !event.photo && (
                     <div className="mt-2 pt-2 border-t border-white/5">
                       <p className="text-xs text-muted-foreground italic">"{event.comment}"</p>
                     </div>

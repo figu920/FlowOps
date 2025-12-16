@@ -7,6 +7,8 @@ import { Send, Plus } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from 'framer-motion';
+import type { ChatMessage } from "@shared/schema";
+
 
 const QUICK_ACTIONS = [
   "Inventory arrived 📦",
@@ -45,6 +47,7 @@ export default function Chat() {
         className="flex-1 overflow-y-auto px-4 pt-24 pb-4 space-y-6"
       >
         {chat.map((msg, i) => {
+          const isMe = msg.sender === currentUser?.name;
           const isSequence = i > 0 && chat[i-1].sender === msg.sender;
           
           return (
@@ -54,19 +57,19 @@ export default function Chat() {
               key={msg.id} 
               className={cn(
                 "flex flex-col max-w-[85%]",
-                msg.isMe ? "ml-auto items-end" : "mr-auto items-start"
+               isMe ? "ml-auto items-end" : "mr-auto items-start"
               )}
             >
-              {!msg.isMe && !isSequence && (
+              {!isMe && !isSequence && (
                 <div className="flex items-center gap-2 mb-1 ml-3">
                    <span className="text-[11px] text-muted-foreground font-medium">{msg.sender}</span>
-                   <span className="text-[9px] uppercase bg-white/5 px-1 rounded text-white/30">{msg.role}</span>
+                   <span className="text-[9px] uppercase bg-white/5 px-1 rounded text-white/30">{msg.senderRole}</span>
                 </div>
               )}
               
               <div className={cn(
                 "px-5 py-3 text-[15px] shadow-sm backdrop-blur-sm",
-                msg.isMe 
+                isMe 
                   ? "bg-blue-600 text-white rounded-[20px] rounded-tr-sm" 
                   : "bg-[#2C2C2E] text-white rounded-[20px] rounded-tl-sm border border-white/5",
                 msg.type === 'action' && "font-bold bg-flow-green text-black border-none"
@@ -76,9 +79,12 @@ export default function Chat() {
               
               <span className={cn(
                 "text-[10px] text-white/20 mt-1 mx-2",
-                msg.isMe ? "text-right" : "text-left"
+               isMe ? "text-right" : "text-left"
               )}>
-                {msg.timestamp}
+                {new Date(msg.timestamp).toLocaleTimeString([], {
+  hour: '2-digit',
+  minute: '2-digit'
+})}
               </span>
             </motion.div>
           );
