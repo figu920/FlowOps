@@ -1,6 +1,5 @@
 // api/index.ts
 import express, { Request, Response, NextFunction } from "express";
-import { VercelRequest, VercelResponse } from "@vercel/node";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
@@ -49,25 +48,33 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- Bootstrap del sistema admin y registro de rutas ---
+// --- FUNCIÓN PRINCIPAL DE ARRANQUE ---
 (async () => {
+  // 1. Crear datos iniciales (Admin)
   await bootstrapSystemAdmin();
-  await registerRoutes(app); // Asegúrate que registerRoutes acepte solo `app: Express`
+
+  // 2. Registrar rutas (y obtener el servidor HTTP si existe)
+  // IMPORTANTE: registerRoutes suele devolver el servidor HTTP para websockets
+  const server = await registerRoutes(app);
+
+  // --- Error handler ---
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    res.status(status).json({ message });
+  });
+
+  // --- Servir frontend estático solo en producción ---
+  if (process.env.NODE_ENV === "production") {
+    serveStatic(app);
+  }
+
+  // 3. ARRANCAR EL SERVIDOR (CORREGIDO)
+  // Render nos da el puerto en process.env.PORT (usualmente 10000)
+  const PORT = process.env.PORT || 5000;
+  
+  // CORRECCIÓN: Como registerRoutes no devuelve nada, usamos 'app' directamente.
+  app.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`✅ Servidor escuchando en el puerto ${PORT}`);
+  });
 })();
-
-// --- Error handler ---
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  res.status(status).json({ message });
-});
-
-// --- Servir frontend estático solo en producción ---
-if (process.env.NODE_ENV === "production") {
-  serveStatic(app);
-}
-
-// --- Exportar handler para Vercel ---
-export default (req: VercelRequest, res: VercelResponse) => {
-  app(req as unknown as Request, res as unknown as Response);
-};
