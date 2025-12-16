@@ -9,6 +9,7 @@ import { serveStatic } from "./static";
 
 // Inicializa Express
 const app = express();
+app.set("trust proxy", 1);
 
 // --- Configuración de sesiones con PostgreSQL ---
 const PgStore = connectPgSimple(session);
