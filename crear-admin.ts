@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { db } from './server/db';
+import { db } from './api/db';
 import { users } from './shared/schema';
 import { hash } from 'bcrypt';
 
