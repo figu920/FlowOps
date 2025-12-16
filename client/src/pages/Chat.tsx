@@ -23,7 +23,6 @@ export default function Chat() {
   const [inputText, setInputText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll al fondo cuando llega un mensaje nuevo
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
@@ -42,13 +41,14 @@ export default function Chat() {
   };
 
   return (
-    // CAMBIO 1: Usamos h-[100dvh] para móviles y flex-col
-    <Layout title="Team Chat" className="flex flex-col h-[100dvh] overflow-hidden p-0">
+    // CAMBIO CLAVE 1: h-[calc(100dvh-4rem)]
+    // Esto resta la altura aproximada de la cabecera para que el fondo no se salga de la pantalla
+    <Layout title="Team Chat" className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden p-0 relative">
       
-      {/* Messages Area - Este es el que hace scroll */}
+      {/* Messages Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 pt-24 pb-4 space-y-6 w-full"
+        className="flex-1 overflow-y-auto px-4 pt-20 pb-4 space-y-6 w-full"
       >
         {chat.map((msg, i) => {
           const isMe = msg.sender === currentUser?.name;
@@ -92,8 +92,9 @@ export default function Chat() {
         })}
       </div>
 
-      {/* Input Area - CAMBIO 2: Añadido 'shrink-0' para que NO se encoja nunca */}
-      <div className="shrink-0 bg-[#161618] border-t border-white/10 pb-6 pt-3 px-4 w-full z-20">
+      {/* Input Area */}
+      {/* CAMBIO CLAVE 2: shrink-0 y z-50 para asegurar que esté siempre visible encima de todo */}
+      <div className="shrink-0 bg-[#161618] border-t border-white/10 pb-6 pt-3 px-4 w-full z-50">
         
         {/* Quick Actions */}
         <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar mask-fade-right">
