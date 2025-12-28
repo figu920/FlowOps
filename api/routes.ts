@@ -418,13 +418,22 @@ export async function registerRoutes(app: Express): Promise<void> {
   // ==================== WEEKLY TASKS ====================
   app.get("/api/tasks", async (req: Request, res: Response) => {
     if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    
     let tasks;
     if (isSystemAdminUser(req.session.user)) {
       tasks = await storage.getAllWeeklyTasks();
     } else {
       tasks = await storage.getWeeklyTasksByEstablishment(req.session.user.establishment);
     }
-    res.json(tasks);
+
+    // --- NUEVO CÓDIGO: BUSCAMOS EL HISTORIAL PARA CADA TAREA ---
+    const tasksWithHistory = await Promise.all(tasks.map(async (task) => {
+      // Usamos la función que ya existe en tu storage para buscar completados
+      const history = await storage.getTaskCompletions(task.id);
+      return { ...task, history }; // Devolvemos la tarea + su historial
+    }));
+
+    res.json(tasksWithHistory);
   });
   
   app.post("/api/tasks", async (req: Request, res: Response) => {
