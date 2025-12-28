@@ -65,8 +65,34 @@ export default function Tasks() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // 1. Crear un Canvas (lienzo invisible)
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800; // Ancho máximo permitido
+          const scaleSize = MAX_WIDTH / img.width;
+          
+          // 2. Calcular nuevas dimensiones
+          if (scaleSize < 1) {
+              canvas.width = MAX_WIDTH;
+              canvas.height = img.height * scaleSize;
+          } else {
+              canvas.width = img.width;
+              canvas.height = img.height;
+          }
+
+          // 3. Dibujar la imagen redimensionada en el canvas
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          // 4. Convertir a JPEG comprimido (calidad 0.7)
+          // Esto reduce una foto de 5MB a unos 100KB
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          
+          setPhotoPreview(compressedBase64);
+        };
+        img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
