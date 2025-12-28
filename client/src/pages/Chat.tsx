@@ -43,7 +43,7 @@ export default function Chat() {
   return (
     // CAMBIO CLAVE 1: h-[calc(100dvh-4rem)]
     // Esto resta la altura aproximada de la cabecera para que el fondo no se salga de la pantalla
-    <Layout title="Team Chat" className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden p-0 relative">
+    <Layout title="Team Chat" className="flex flex-col h-[calc(100dvh-9rem)] overflow-hidden p-0 relative">
       
       {/* Messages Area */}
       <div 
