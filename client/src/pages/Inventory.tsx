@@ -91,13 +91,15 @@ const { data: rawInventory = [] as Inventory[] } = useInventory();
     }
   };
 
-  const openAddItemModal = () => {
-    setIsChoiceOpen(false);
-    setNewItemCategory("");
-    setNewItemEmoji("📦");
-    setNewItemName("");
-    setIsAddingItem(true);
-  };
+  // REEMPLAZA ESTA FUNCIÓN
+const openAddItemModal = () => {
+  setIsChoiceOpen(false);
+  // CAMBIO AQUÍ: Si hay currentFolder, úsala. Si no, vacío.
+  setNewItemCategory(currentFolder || ""); 
+  setNewItemEmoji("📦");
+  setNewItemName("");
+  setIsAddingItem(true);
+};
 
   const openAddFolderModal = () => {
     setIsChoiceOpen(false);
@@ -105,17 +107,19 @@ const { data: rawInventory = [] as Inventory[] } = useInventory();
     setIsAddingFolder(true);
   };
 
-  const handleAddItem = () => {
-    if (newItemName.trim()) {
-      createMutation.mutate({
-        name: newItemName,
-        emoji: newItemEmoji,
-        category: newItemCategory || undefined,
-        status: 'OK'
-      });
-      setIsAddingItem(false);
-    }
-  };
+  // REEMPLAZA ESTA FUNCIÓN
+const handleAddItem = () => {
+  if (newItemName.trim()) {
+    createMutation.mutate({
+      name: newItemName,
+      emoji: newItemEmoji,
+      // CAMBIO AQUÍ: Añade currentFolder como respaldo
+      category: newItemCategory || currentFolder || undefined,
+      status: 'OK'
+    });
+    setIsAddingItem(false);
+  }
+};
 
   const handleCreateFolder = () => {
     if (newFolderName.trim()) {
