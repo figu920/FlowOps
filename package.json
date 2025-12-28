@@ -6,7 +6,7 @@
   "scripts": {
     "dev:client": "vite dev --port 5000",
     "dev": "tsx api/index.ts",
-    "build": "tsx script/build.ts",
+    "build": "vite build && esbuild api/index.ts --bundle --platform=node --packages=external --outfile=dist/index.cjs",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "echo 'Chequeo desactivado para Render'",
     "db:push": "drizzle-kit push"
