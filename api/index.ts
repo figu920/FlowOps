@@ -34,14 +34,16 @@ app.use(
 );
 
 // --- Middleware para parsear JSON y URL-encoded ---
+// Aumentamos el limite a 10mb para permitir subida de fotos
 app.use(
   express.json({
+    limit: "10mb", // <--- ESTO ES LO QUE FALTABA
     verify: (req, _res, buf) => {
       (req as any).rawBody = buf;
     },
   })
 );
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" })); // <--- Y ESTO TAMBIEN
 
 // --- Logging simple de requests ---
 app.use((req, res, next) => {
