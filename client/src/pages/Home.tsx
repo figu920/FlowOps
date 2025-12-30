@@ -74,27 +74,12 @@ const EmployeesLogo = () => (
   </div>
 );
 
-{/* === SALES CARD === */}
-        <Link href="/sales">
-          <div className="bg-card hover:bg-white/5 cursor-pointer rounded-[32px] p-6 border border-white/[0.04] flex flex-col items-start gap-4 transition-all group relative overflow-hidden h-full">
-            
-            {/* Pequeño brillo decorativo en la esquina (opcional, le da el toque premium) */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#00E676]/10 blur-[40px] rounded-full -mr-10 -mt-10" />
-
-            {/* Contenedor del Icono */}
-            <div className="w-14 h-14 rounded-full bg-[#00E676]/10 flex items-center justify-center text-[#00E676] group-hover:scale-110 transition-transform">
-              <TrendingUp className="w-7 h-7" strokeWidth={2.5} />
-            </div>
-
-            {/* Textos */}
-            <div className="mt-2">
-              <h3 className="font-bold text-xl text-white mb-0.5">Sales Register</h3>
-              <p className="text-sm text-muted-foreground font-medium">Tap to view</p>
-            </div>
-          </div>
-        </Link>
-
-// --------------------------------------------------------
+// 9. SALES (Verde Neón / Dinero)
+const SalesLogo = () => (
+  <div className="w-14 h-14 rounded-full bg-[#00E676] flex items-center justify-center shadow-lg shadow-green-500/20">
+    <TrendingUp className="w-7 h-7 text-black" strokeWidth={2.5} />
+  </div>
+);
 
 export default function Home() {
   const { currentUser } = useStore();
@@ -151,6 +136,12 @@ export default function Home() {
       path: '/menu',
       customIcon: <MenuLogo />,
       glowColor: 'bg-[#2DD4BF]' // Teal glow
+    },
+    {
+      title: 'Sales Register',
+      path: '/sales',
+      customIcon: <SalesLogo />, // Usamos el logo que creamos arriba
+      glowColor: 'bg-[#00E676]' // El mismo verde neón para el brillo
     },
     { 
       title: 'Chat', 
