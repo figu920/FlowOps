@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore, type MenuItem, type MeasurementUnit } from '@/lib/store';
-import { useMenu, useCreateMenuItem, useUpdateMenuItem, useDeleteMenuItem, useAddIngredient, useUpdateIngredient, useDeleteIngredient } from '@/lib/hooks';
+// 1. AÑADIMOS useInventory AQUÍ 👇
+import { useMenu, useCreateMenuItem, useUpdateMenuItem, useDeleteMenuItem, useAddIngredient, useUpdateIngredient, useDeleteIngredient, useInventory } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, ChevronDown, Utensils, Edit2 } from 'lucide-react';
@@ -14,6 +15,10 @@ import { Textarea } from "@/components/ui/textarea";
 export default function Menu() {
   const { currentUser } = useStore();
   const { data: menu = [] } = useMenu();
+  
+  // 2. TRAEMOS EL INVENTARIO 👇
+  const { data: inventory = [] } = useInventory();
+
   const createMenuItemMutation = useCreateMenuItem();
   const updateMenuItemMutation = useUpdateMenuItem();
   const deleteMenuItemMutation = useDeleteMenuItem();
@@ -32,6 +37,9 @@ export default function Menu() {
 
   const [addingIngredientTo, setAddingIngredientTo] = useState<string | null>(null);
   const [editingIngredient, setEditingIngredient] = useState<{menuId: string, ingId: string} | null>(null);
+  
+  // 3. NUEVO ESTADO PARA EL LINK CON INVENTARIO 👇
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
   
   const [ingName, setIngName] = useState("");
   const [ingQty, setIngQty] = useState("");
@@ -85,6 +93,7 @@ export default function Menu() {
     setIngQty("");
     setIngUnit("grams");
     setIngNotes("");
+    setSelectedInventoryId(null); // Reseteamos selección
   };
 
   const openEditIngredient = (menuId: string, ing: any) => {
@@ -93,35 +102,37 @@ export default function Menu() {
     setIngQty(ing.quantity.toString());
     setIngUnit(ing.unit);
     setIngNotes(ing.notes || "");
+    // Cargamos el link si ya existe
+    setSelectedInventoryId(ing.inventoryItemId || null);
   };
 
+  // 4. LÓGICA DE GUARDADO ACTUALIZADA 👇
   const handleSaveIngredient = () => {
     const quantity = parseFloat(ingQty);
     if (!ingName || isNaN(quantity)) return;
 
+    const ingredientData = {
+      name: ingName,
+      quantity,
+      unit: ingUnit,
+      notes: ingNotes || undefined,
+      inventoryItemId: selectedInventoryId || undefined, // <--- ¡AQUÍ ESTÁ EL CEREBRO!
+    };
+
     if (editingIngredient) {
       updateIngredientMutation.mutate({
         id: editingIngredient.ingId,
-        data: {
-          name: ingName,
-          quantity,
-          unit: ingUnit,
-          notes: ingNotes || undefined
-        }
+        data: ingredientData
       });
       setEditingIngredient(null);
     } else if (addingIngredientTo) {
       addIngredientMutation.mutate({
         id: addingIngredientTo,
-        data: {
-          name: ingName,
-          quantity,
-          unit: ingUnit,
-          notes: ingNotes || undefined
-        }
+        data: ingredientData
       });
       setAddingIngredientTo(null);
     }
+    setSelectedInventoryId(null);
   };
 
   const handleDeleteIngredient = () => {
@@ -322,22 +333,51 @@ export default function Menu() {
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Ingredient Dialog */}
+      {/* 5. DIÁLOGO DEL INGREDIENTE ACTUALIZADO 👇 */}
       <Dialog open={!!addingIngredientTo || !!editingIngredient} onOpenChange={() => { setAddingIngredientTo(null); setEditingIngredient(null); }}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            
+            {/* --- SELECCIONAR DEL INVENTARIO (CEREBRO CONECTADO) --- */}
             <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Ingredient Name</label>
-              <Input 
-                value={ingName}
-                onChange={(e) => setIngName(e.target.value)}
-                placeholder="e.g. Beef Patty"
-                className="bg-black/20 border-white/10"
-              />
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Select from Inventory</label>
+              <select
+                className="w-full h-10 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-ring"
+                onChange={(e) => {
+                  const itemId = e.target.value;
+                  const item = inventory.find((i: any) => i.id === itemId);
+                  if (item) {
+                    // AUTO-COMPLETAR: Rellenamos nombre y unidad solos
+                    setIngName(item.name);
+                    setSelectedInventoryId(item.id);
+                    setIngUnit(item.unit as any); // Usamos la unidad del inventario
+                  }
+                }}
+                value={selectedInventoryId || ""}
+              >
+                <option value="">-- Select an item or type below --</option>
+                {inventory.map((item: any) => (
+                  <option key={item.id} value={item.id}>
+                    {item.emoji} {item.name} ({item.unit})
+                  </option>
+                ))}
+              </select>
+              
+              {/* Opción de escribir nombre manual si no está en inventario */}
+              <div className="mt-2">
+                <Input 
+                  value={ingName}
+                  onChange={(e) => setIngName(e.target.value)}
+                  placeholder="Or type name manually..."
+                  className="bg-black/20 border-white/10 text-xs h-8"
+                />
+              </div>
             </div>
+            {/* -------------------------------------------------------- */}
+
             <div className="grid grid-cols-2 gap-3">
                <div>
                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Quantity</label>
@@ -357,7 +397,9 @@ export default function Menu() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
                     <SelectItem value="grams">Grams</SelectItem>
+                    <SelectItem value="kg">Kilograms (kg)</SelectItem>
                     <SelectItem value="oz">Ounces (oz)</SelectItem>
+                    <SelectItem value="lb">Pounds (lb)</SelectItem>
                     <SelectItem value="cups">Cups</SelectItem>
                     <SelectItem value="bowls">Bowls</SelectItem>
                     <SelectItem value="tablespoons">Tablespoons</SelectItem>
