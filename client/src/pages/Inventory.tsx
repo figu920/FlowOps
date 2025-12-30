@@ -5,9 +5,9 @@ import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventor
 import type { Inventory as InventoryType } from '@shared/schema';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Camera, Folder, ChevronLeft, Package, FolderPlus } from 'lucide-react';
+// 1. AÑADIMOS Edit2 (El lápiz de tu foto) 👇
+import { Plus, Trash2, Camera, Folder, ChevronLeft, Package, FolderPlus, Edit2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,10 +19,7 @@ import {
 
 export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor?: string }) {
   const { currentUser } = useStore();
-
-  // FIX 1: default array vacío
-const { data: rawInventory = [] as InventoryType[] } = useInventory();
-
+  const { data: rawInventory = [] as InventoryType[] } = useInventory();
 
   // Folders logic
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
@@ -33,7 +30,6 @@ const { data: rawInventory = [] as InventoryType[] } = useInventory();
 
   const folders = useMemo(() => {
     const categories = new Set(allItems.map(i => i.category).filter(Boolean));
-    // FIX 2: array de strings
     return Array.from(categories) as string[];
   }, [allItems]);
 
@@ -48,13 +44,15 @@ const { data: rawInventory = [] as InventoryType[] } = useInventory();
   const createMutation = useCreateInventory();
   const deleteMutation = useDeleteInventory();
 
-  // FIX 3: missing state names
   const [lowCommentItem, setLowCommentItem] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
 
   const [isChoiceOpen, setIsChoiceOpen] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
+  
+  // 2. ESTADO PARA SABER SI ESTAMOS EDITANDO 👇
+  const [editingItem, setEditingItem] = useState<InventoryType | null>(null);
 
   const [newItemName, setNewItemName] = useState("");
   const [newItemEmoji, setNewItemEmoji] = useState("📦");
@@ -65,19 +63,10 @@ const { data: rawInventory = [] as InventoryType[] } = useInventory();
   const [newItemCost, setNewItemCost] = useState("");
 
   const isAdmin = currentUser?.isSystemAdmin === true;
-
-  // FIX 4: operadores OR correctos (||)
-  const canEdit =
-    currentUser?.role === 'manager' ||
-    currentUser?.role === 'lead' ||
-    isAdmin;
-
-  const canDelete =
-    currentUser?.role === 'manager' ||
-    isAdmin;
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
+  const canDelete = currentUser?.role === 'manager' || isAdmin;
 
   // Handlers
-
   const handleStatusChange = (id: string, newStatus: 'OK' | 'LOW' | 'OUT') => {
     if (newStatus === 'LOW') {
       setLowCommentItem(id);
@@ -94,15 +83,29 @@ const { data: rawInventory = [] as InventoryType[] } = useInventory();
     }
   };
 
-  // REEMPLAZA ESTA FUNCIÓN
-const openAddItemModal = () => {
-  setIsChoiceOpen(false);
-  // CAMBIO AQUÍ: Si hay currentFolder, úsala. Si no, vacío.
-  setNewItemCategory(currentFolder || ""); 
-  setNewItemEmoji("📦");
-  setNewItemName("");
-  setIsAddingItem(true);
-};
+  const openAddItemModal = () => {
+    setIsChoiceOpen(false);
+    setEditingItem(null); // Reseteamos: es modo crear
+    setNewItemCategory(currentFolder || ""); 
+    setNewItemEmoji("📦");
+    setNewItemName("");
+    setNewItemQty("");
+    setNewItemCost("");
+    setNewItemUnit("units");
+    setIsAddingItem(true);
+  };
+
+  // 3. FUNCIÓN PARA ABRIR EN MODO EDICIÓN (CARGAR DATOS) 👇
+  const openEditItemModal = (item: InventoryType) => {
+    setEditingItem(item);
+    setNewItemName(item.name);
+    setNewItemEmoji(item.emoji);
+    setNewItemCategory(item.category || "");
+    setNewItemQty(item.quantity?.toString() || "0");
+    setNewItemUnit(item.unit || "units");
+    setNewItemCost(item.costPerUnit?.toString() || "0");
+    setIsAddingItem(true); // Reutilizamos el modal de añadir
+  };
 
   const openAddFolderModal = () => {
     setIsChoiceOpen(false);
@@ -110,23 +113,36 @@ const openAddItemModal = () => {
     setIsAddingFolder(true);
   };
 
-  // REEMPLAZA ESTA FUNCIÓN
-const handleAddItem = () => {
+  // 4. FUNCIÓN MAESTRA DE GUARDAR (CREAR O EDITAR) 👇
+  const handleSaveItem = () => {
     if (newItemName.trim()) {
-      createMutation.mutate({
+      const itemData = {
         name: newItemName,
         emoji: newItemEmoji,
         category: newItemCategory || currentFolder || undefined,
-        status: 'OK',
-        // --- AÑADE ESTO ---
-        quantity: parseFloat(newItemQty) || 0, // Convierte texto a número
+        quantity: parseFloat(newItemQty) || 0,
         unit: newItemUnit,
         costPerUnit: parseFloat(newItemCost) || 0,
-        // ------------------
-      });
+      };
+
+      if (editingItem) {
+        // MODO ACTUALIZAR
+        updateMutation.mutate({
+          id: editingItem.id,
+          updates: itemData
+        });
+      } else {
+        // MODO CREAR
+        createMutation.mutate({
+          ...itemData,
+          status: 'OK',
+        });
+      }
+
       setIsAddingItem(false);
+      setEditingItem(null);
       
-      // Limpiamos los campos
+      // Limpiamos formulario
       setNewItemName("");
       setNewItemQty("");
       setNewItemCost("");
@@ -137,12 +153,8 @@ const handleAddItem = () => {
     if (newFolderName.trim()) {
       setCurrentFolder(newFolderName);
       setIsAddingFolder(false);
-
       setTimeout(() => {
-        setNewItemCategory(newFolderName);
-        setNewItemEmoji("📦");
-        setNewItemName("");
-        setIsAddingItem(true);
+        openAddItemModal();
       }, 300);
     }
   };
@@ -158,11 +170,7 @@ const handleAddItem = () => {
               <motion.button
                 whileTap={{ scale: 0.9 }}
                className="w-9 h-9 rounded-full text-black flex items-center justify-center shadow-lg"
-               style={{ 
-  backgroundColor: categoryColor, 
-  // En web usamos boxShadow. Añadimos '80' al final para darle transparencia al brillo
-  boxShadow: `0 4px 15px ${categoryColor}80` 
-}}
+               style={{ backgroundColor: categoryColor, boxShadow: `0 4px 15px ${categoryColor}80` }}
               >
                 <Plus className="w-5 h-5" strokeWidth={3} />
               </motion.button>
@@ -198,7 +206,6 @@ const handleAddItem = () => {
       )}
 
       <div className="space-y-3">
-
         {/* FOLDERS */}
         {!currentFolder && folders.length > 0 && (
           <div className="grid grid-cols-2 gap-3 mb-6">
@@ -214,9 +221,7 @@ const handleAddItem = () => {
                 <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
                   <Folder className="w-6 h-6" />
                 </div>
-
                 <span className="font-bold text-white truncate">{folderName}</span>
-
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-full">
                   {rawInventory.filter((i: InventoryType) => i.category === folderName).length}
                 </span>
@@ -236,7 +241,6 @@ const handleAddItem = () => {
               <p className="text-xs mt-1">Añade un producto aquí.</p>
             </motion.div>
           ) : (
-
             displayedItems.map((item, idx) => (
               <motion.div
                 key={item.id}
@@ -247,14 +251,25 @@ const handleAddItem = () => {
                 transition={{ delay: idx * 0.03 }}
                 className="bg-card rounded-[20px] p-5 border border-white/[0.04] shadow-sm relative group"
               >
-                {canDelete && (
-                  <button
-                    onClick={() => deleteMutation.mutate(item.id)}
-                    className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                {/* 5. AQUÍ ESTÁ EL LÁPIZ Y LA PAPELERA 👇 */}
+                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {canEdit && (
+                      <button
+                        onClick={() => openEditItemModal(item)}
+                        className="p-2 text-muted-foreground hover:text-white bg-black/20 hover:bg-black/40 rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => deleteMutation.mutate(item.id)}
+                        className="p-2 text-muted-foreground hover:text-flow-red bg-black/20 hover:bg-black/40 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                </div>
 
                 <div className="flex items-center gap-4 mb-5">
                   <div className="text-4xl bg-white/5 w-16 h-16 flex items-center justify-center rounded-2xl border border-white/5">
@@ -270,9 +285,7 @@ const handleAddItem = () => {
                       </span>
                     )}
 
-                    <p className="text-xs text-muted-foreground font-medium mt-1 truncate">
-                      Last: {item.updatedBy}
-                      {/* VISUALIZAR CANTIDAD Y COSTE */}
+                    {/* DATOS MATEMÁTICOS */}
                     <div className="flex gap-2 mt-2">
                       <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-white font-bold border border-white/5">
                         📊 {item.quantity} {item.unit}
@@ -283,42 +296,26 @@ const handleAddItem = () => {
                         </span>
                       )}
                     </div>
-                    </p>
                   </div>
                 </div>
 
-                {/* FIX 5: array de status */}
                 <div className="grid grid-cols-3 gap-2 bg-black/20 p-1.5 rounded-xl">
                   {(['OK', 'LOW', 'OUT'] as const).map((status) => {
                     const isActive = item.status === status;
-
                     let activeClass = "";
                     let textClass = "text-muted-foreground";
 
                     if (isActive) {
-                      if (status === "OK") {
-                        activeClass = "bg-flow-green";
-                        textClass = "text-black font-bold";
-                      }
-                      if (status === "LOW") {
-                        activeClass = "bg-flow-yellow";
-                        textClass = "text-black font-bold";
-                      }
-                      if (status === "OUT") {
-                        activeClass = "bg-flow-red";
-                        textClass = "text-white font-bold";
-                      }
+                      if (status === "OK") { activeClass = "bg-flow-green"; textClass = "text-black font-bold"; }
+                      if (status === "LOW") { activeClass = "bg-flow-yellow"; textClass = "text-black font-bold"; }
+                      if (status === "OUT") { activeClass = "bg-flow-red"; textClass = "text-white font-bold"; }
                     }
 
                     return (
                       <button
                         key={status}
                         onClick={() => handleStatusChange(item.id, status)}
-                        className={cn(
-                          "py-2.5 rounded-lg text-sm font-medium transition-all",
-                          isActive ? activeClass : "hover:bg-white/5",
-                          textClass
-                        )}
+                        className={cn("py-2.5 rounded-lg text-sm font-medium transition-all", isActive ? activeClass : "hover:bg-white/5", textClass)}
                       >
                         {status}
                       </button>
@@ -333,7 +330,6 @@ const handleAddItem = () => {
                 )}
               </motion.div>
             ))
-
           )}
         </AnimatePresence>
       </div>
@@ -341,52 +337,26 @@ const handleAddItem = () => {
       {/* MODAL LOW COMMENT */}
       <Dialog open={!!lowCommentItem} onOpenChange={(open) => !open && setLowCommentItem(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white p-6 rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Low Stock Alert</DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>Low Stock Alert</DialogTitle></DialogHeader>
           <div className="py-4">
             <label className="text-sm text-muted-foreground mb-2 block">How much is left approx?</label>
-            <Input
-              autoFocus
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="e.g., 15% left, almost empty..."
-              className="bg-black/20 border-white/10"
-            />
+            <Input autoFocus value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="e.g., 15% left..." className="bg-black/20 border-white/10"/>
           </div>
-
-          <DialogFooter>
-            <Button onClick={submitLowComment} className="w-full bg-flow-yellow text-black font-bold hover:bg-flow-yellow/90">Save Status</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={submitLowComment} className="w-full bg-flow-yellow text-black font-bold hover:bg-flow-yellow/90">Save Status</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* MODAL CHOICE */}
       <Dialog open={isChoiceOpen} onOpenChange={setIsChoiceOpen}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white p-6 rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Añadir a Inventario</DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>Añadir a Inventario</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
-            <button
-              onClick={openAddFolderModal}
-              className="flex flex-col items-center gap-3 p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5"
-            >
-              <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                <FolderPlus className="w-6 h-6" />
-              </div>
+            <button onClick={openAddFolderModal} className="flex flex-col items-center gap-3 p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5">
+              <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center"><FolderPlus className="w-6 h-6" /></div>
               <span className="text-sm font-bold">Nueva Carpeta</span>
             </button>
-
-            <button
-              onClick={openAddItemModal}
-              className="flex flex-col items-center gap-3 p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5"
-            >
-              <div className="w-12 h-12 rounded-full bg-flow-green/20 text-flow-green flex items-center justify-center">
-                <Package className="w-6 h-6" />
-              </div>
+            <button onClick={openAddItemModal} className="flex flex-col items-center gap-3 p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5">
+              <div className="w-12 h-12 rounded-full bg-flow-green/20 text-flow-green flex items-center justify-center"><Package className="w-6 h-6" /></div>
               <span className="text-sm font-bold">Nuevo Producto</span>
             </button>
           </div>
@@ -396,96 +366,55 @@ const handleAddItem = () => {
       {/* MODAL CREATE FOLDER */}
       <Dialog open={isAddingFolder} onOpenChange={setIsAddingFolder}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white p-6 rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>New Folder Group</DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>New Folder Group</DialogTitle></DialogHeader>
           <div className="py-4 space-y-4">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center">
-                <Folder className="w-8 h-8 text-blue-400" />
-              </div>
-            </div>
-
+            <div className="flex justify-center mb-4"><div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center"><Folder className="w-8 h-8 text-blue-400" /></div></div>
             <div>
               <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Folder Name</label>
-              <Input
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="e.g. Dairy, Meats, Dry Goods..."
-                className="bg-black/20 border-white/10"
-              />
+              <Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Dairy..." className="bg-black/20 border-white/10"/>
             </div>
           </div>
-
-          <DialogFooter>
-            <Button onClick={handleCreateFolder} className="w-full bg-blue-500 text-white font-bold hover:bg-blue-600">
-              Create & Enter
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={handleCreateFolder} className="w-full bg-blue-500 text-white font-bold hover:bg-blue-600">Create & Enter</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL ADD ITEM */}
+      {/* MODAL ADD/EDIT ITEM */}
       <Dialog open={isAddingItem} onOpenChange={setIsAddingItem}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white p-6 rounded-2xl">
           <DialogHeader>
-            <DialogTitle>{currentFolder ? `Add to ${currentFolder}` : "Add Item"}</DialogTitle>
+            <DialogTitle>
+                {editingItem ? `Edit ${editingItem.name}` : (currentFolder ? `Add to ${currentFolder}` : "Add Item")}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="flex justify-center">
               <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 cursor-pointer hover:bg-white/10">
-                <Camera className="w-8 h-8 text-muted-foreground" />
+                <div className="text-4xl">{newItemEmoji}</div>
               </div>
             </div>
 
             <div>
               <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Item Name</label>
-              <Input
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                placeholder="e.g. Avocado"
-                className="bg-black/20 border-white/10"
-              />
+              <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="e.g. Avocado" className="bg-black/20 border-white/10"/>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Emoji</label>
-                <Input
-                  value={newItemEmoji}
-                  onChange={(e) => setNewItemEmoji(e.target.value)}
-                  placeholder="🥑"
-                  className="bg-black/20 border-white/10 text-center"
-                />
+                <Input value={newItemEmoji} onChange={(e) => setNewItemEmoji(e.target.value)} placeholder="🥑" className="bg-black/20 border-white/10 text-center"/>
               </div>
-
               <div>
                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category</label>
-                <Input
-                  value={newItemCategory}
-                  onChange={(e) => setNewItemCategory(e.target.value)}
-                  placeholder="Produce"
-                  className="bg-black/20 border-white/10"
-                  disabled={!!currentFolder}
-                />
+                <Input value={newItemCategory} onChange={(e) => setNewItemCategory(e.target.value)} placeholder="Produce" className="bg-black/20 border-white/10" disabled={!!currentFolder}/>
               </div>
             </div>
-          </div>
 
-          {/* === NUEVOS CAMPOS: CANTIDAD, UNIDAD Y COSTE (VERSIÓN USA 🇺🇸) === */}
+            {/* CAMPOS DE CANTIDAD Y PRECIO */}
             <div className="grid grid-cols-3 gap-3 mt-4">
               <div>
                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Quantity</label>
-                <Input
-                  type="number"
-                  value={newItemQty}
-                  onChange={(e) => setNewItemQty(e.target.value)}
-                  placeholder="0"
-                  className="bg-black/20 border-white/10"
-                />
+                <Input type="number" value={newItemQty} onChange={(e) => setNewItemQty(e.target.value)} placeholder="0" className="bg-black/20 border-white/10"/>
               </div>
               
               <div>
@@ -507,27 +436,18 @@ const handleAddItem = () => {
 
               <div>
                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Cost ($)</label>
-                <Input
-                  type="number"
-                  value={newItemCost}
-                  onChange={(e) => setNewItemCost(e.target.value)}
-                  placeholder="0.00"
-                  className="bg-black/20 border-white/10"
-                />
+                <Input type="number" value={newItemCost} onChange={(e) => setNewItemCost(e.target.value)} placeholder="0.00" className="bg-black/20 border-white/10"/>
               </div>
             </div>
-            {/* ============================================== */}
+          </div>
 
           <DialogFooter>
-            <Button onClick={handleAddItem} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">
-              Save Item
+            <Button onClick={handleSaveItem} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">
+              {editingItem ? 'Update Stock' : 'Save Item'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </Layout>
   );
 }
-
- 
