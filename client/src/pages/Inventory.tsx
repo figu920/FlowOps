@@ -279,7 +279,7 @@ const handleAddItem = () => {
                       </span>
                       {item.costPerUnit > 0 && (
                         <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-flow-green font-bold border border-white/5">
-                          💰 {item.costPerUnit} €
+                          💰 {item.costPerUnit} $
                         </span>
                       )}
                     </div>
@@ -475,7 +475,7 @@ const handleAddItem = () => {
             </div>
           </div>
 
-          {/* --- BLOQUE NUEVO: CANTIDAD Y PRECIO --- */}
+          {/* === NUEVOS CAMPOS: CANTIDAD, UNIDAD Y COSTE (VERSIÓN USA 🇺🇸) === */}
             <div className="grid grid-cols-3 gap-3 mt-4">
               <div>
                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Quantity</label>
@@ -495,17 +495,18 @@ const handleAddItem = () => {
                   value={newItemUnit}
                   onChange={(e) => setNewItemUnit(e.target.value)}
                 >
-                  <option value="units">Units</option>
-                  <option value="kg">kg</option>
-                  <option value="g">grams</option>
-                  <option value="L">Litros</option>
-                  <option value="oz">oz</option>
-                  <option value="lb">lbs</option>
+                  <option value="units">Units (ea)</option>
+                  <option value="lb">Pounds (lb)</option>
+                  <option value="oz">Ounces (oz)</option>
+                  <option value="gal">Gallons (gal)</option>
+                  <option value="kg">Kilograms (kg)</option>
+                  <option value="g">Grams (g)</option>
+                  <option value="L">Liters (L)</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Cost (€)</label>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Cost ($)</label>
                 <Input
                   type="number"
                   value={newItemCost}
@@ -515,6 +516,7 @@ const handleAddItem = () => {
                 />
               </div>
             </div>
+            {/* ============================================== */}
 
           <DialogFooter>
             <Button onClick={handleAddItem} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">

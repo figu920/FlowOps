@@ -223,7 +223,6 @@ export type Ingredient = typeof ingredients.$inferSelect;
 
 
 
-
 // ============ NOTIFICATIONS ============
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
