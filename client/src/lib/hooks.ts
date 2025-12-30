@@ -419,3 +419,34 @@ export function useCreateUser() {
     },
   });
 }
+
+export function useSales() {
+  return useQuery({
+    queryKey: ['sales'],
+    queryFn: async () => {
+      const res = await fetch('/api/sales');
+      if (!res.ok) throw new Error('Failed to fetch sales');
+      return res.json();
+    }
+  });
+}
+
+export function useCreateSale() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (saleData: any) => {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saleData)
+      });
+      if (!res.ok) throw new Error('Failed to create sale');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      // ¡Importante! Refrescamos el inventario para ver que bajó el stock
+      queryClient.invalidateQueries({ queryKey: ['inventory'] }); 
+    },
+  });
+}

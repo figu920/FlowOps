@@ -16,6 +16,7 @@ import Login from "@/pages/Login";
 import Employees from "@/pages/Employees";
 import Menu from "@/pages/Menu";
 import NotFound from "@/pages/not-found";
+import Sales from "@/pages/Sales";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
   const { currentUser } = useStore();
@@ -88,6 +89,11 @@ function Router() {
           ? <PrivateRoute component={Employees} categoryColor="#E91E63" /> 
            : <NotFound />
          }
+      </Route>
+     
+      {/* 9. SALES (Registro de Ventas) */}
+      <Route path="/sales">
+         {() => <PrivateRoute component={Sales} categoryColor="#00E676" />}
       </Route>
       
       <Route component={NotFound} />

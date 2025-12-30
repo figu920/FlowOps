@@ -11,11 +11,13 @@ import {
   insertChatMessageSchema,
   insertTimelineEventSchema,
   insertMenuItemSchema,
-  insertIngredientSchema
+  insertIngredientSchema,
+  sales,              
+  insertSaleSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { users, inventory, equipment, checklistItems, weeklyTasks, taskCompletions, chatMessages, timelineEvents, menuItems, ingredients, notifications } from "@shared/schema";
 
 const SALT_ROUNDS = 10;
@@ -821,6 +823,58 @@ export async function registerRoutes(app: Express): Promise<void> {
     } catch (error) {
       console.error("DB status error:", error);
       res.status(500).json({ message: "Failed to get database status" });
+    }
+  });
+ 
+ 
+  // ==================== SALES & STOCK DEDUCTION ====================
+  app.get("/api/sales", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    // Historial de ventas (últimas 50)
+    const salesHistory = await db.select().from(sales).orderBy(sql`${sales.date} DESC`).limit(50);
+    res.json(salesHistory);
+  });
+
+  app.post("/api/sales", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      // 1. Guardar la venta
+      const saleData = insertSaleSchema.parse({
+        ...req.body,
+        establishment: req.session.user.establishment
+      });
+      
+      const [newSale] = await db.insert(sales).values(saleData).returning();
+
+      // 2. 🧙‍♂️ MAGIA: Descontar ingredientes del Inventario
+      if (saleData.menuItemId) {
+        // Buscamos la receta del plato vendido
+        const recipe = await db.select()
+          .from(ingredients)
+          .where(eq(ingredients.menuItemId, saleData.menuItemId));
+
+        // Recorremos cada ingrediente y restamos
+        for (const ing of recipe) {
+          if (ing.inventoryItemId) {
+            // Cantidad a restar = (Lo que lleva el plato * Platos vendidos)
+            const amountUsed = ing.quantity * saleData.quantitySold;
+
+            // Ejecutamos la resta directa en base de datos
+            await db.execute(
+              sql`UPDATE inventory 
+                  SET quantity = quantity - ${amountUsed}, 
+                      last_updated = NOW() 
+                  WHERE id = ${ing.inventoryItemId}`
+            );
+          }
+        }
+      }
+
+      res.status(201).json(newSale);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to record sale" });
     }
   });
 }

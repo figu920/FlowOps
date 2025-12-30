@@ -1,3 +1,4 @@
+import { TrendingUp } from "lucide-react";
 import { Link } from 'wouter';
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
@@ -72,6 +73,26 @@ const EmployeesLogo = () => (
     <Users className="w-7 h-7 text-black" strokeWidth={2.5} />
   </div>
 );
+
+{/* === SALES CARD === */}
+        <Link href="/sales">
+          <div className="bg-card hover:bg-white/5 cursor-pointer rounded-[32px] p-6 border border-white/[0.04] flex flex-col items-start gap-4 transition-all group relative overflow-hidden h-full">
+            
+            {/* Pequeño brillo decorativo en la esquina (opcional, le da el toque premium) */}
+            <div className="absolute top-0 right-0 w-24 h-24 bg-[#00E676]/10 blur-[40px] rounded-full -mr-10 -mt-10" />
+
+            {/* Contenedor del Icono */}
+            <div className="w-14 h-14 rounded-full bg-[#00E676]/10 flex items-center justify-center text-[#00E676] group-hover:scale-110 transition-transform">
+              <TrendingUp className="w-7 h-7" strokeWidth={2.5} />
+            </div>
+
+            {/* Textos */}
+            <div className="mt-2">
+              <h3 className="font-bold text-xl text-white mb-0.5">Sales Register</h3>
+              <p className="text-sm text-muted-foreground font-medium">Tap to view</p>
+            </div>
+          </div>
+        </Link>
 
 // --------------------------------------------------------
 
