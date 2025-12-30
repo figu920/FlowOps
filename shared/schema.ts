@@ -214,6 +214,15 @@ export const ingredients = pgTable("ingredients", {
   notes: text("notes"),
 });
 
+export const insertIngredientSchema = createInsertSchema(ingredients).omit({
+  id: true,
+});
+
+export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
+export type Ingredient = typeof ingredients.$inferSelect;
+
+
+
 
 // ============ NOTIFICATIONS ============
 export const notifications = pgTable("notifications", {
