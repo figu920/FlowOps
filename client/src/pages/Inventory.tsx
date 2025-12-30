@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventory } from '@/lib/hooks';
-import type { Inventory } from '@shared/schema';
+import type { Inventory as InventoryType } from '@shared/schema';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Camera, Folder, ChevronLeft, Package, FolderPlus } from 'lucide-react';
@@ -21,7 +21,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const { currentUser } = useStore();
 
   // FIX 1: default array vacío
-const { data: rawInventory = [] as Inventory[] } = useInventory();
+const { data: rawInventory = [] as InventoryType[] } = useInventory();
 
 
   // Folders logic
@@ -60,6 +60,9 @@ const { data: rawInventory = [] as Inventory[] } = useInventory();
   const [newItemEmoji, setNewItemEmoji] = useState("📦");
   const [newItemCategory, setNewItemCategory] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
+  const [newItemQty, setNewItemQty] = useState("");
+  const [newItemUnit, setNewItemUnit] = useState("units");
+  const [newItemCost, setNewItemCost] = useState("");
 
   const isAdmin = currentUser?.isSystemAdmin === true;
 
@@ -109,17 +112,26 @@ const openAddItemModal = () => {
 
   // REEMPLAZA ESTA FUNCIÓN
 const handleAddItem = () => {
-  if (newItemName.trim()) {
-    createMutation.mutate({
-      name: newItemName,
-      emoji: newItemEmoji,
-      // CAMBIO AQUÍ: Añade currentFolder como respaldo
-      category: newItemCategory || currentFolder || undefined,
-      status: 'OK'
-    });
-    setIsAddingItem(false);
-  }
-};
+    if (newItemName.trim()) {
+      createMutation.mutate({
+        name: newItemName,
+        emoji: newItemEmoji,
+        category: newItemCategory || currentFolder || undefined,
+        status: 'OK',
+        // --- AÑADE ESTO ---
+        quantity: parseFloat(newItemQty) || 0, // Convierte texto a número
+        unit: newItemUnit,
+        costPerUnit: parseFloat(newItemCost) || 0,
+        // ------------------
+      });
+      setIsAddingItem(false);
+      
+      // Limpiamos los campos
+      setNewItemName("");
+      setNewItemQty("");
+      setNewItemCost("");
+    }
+  };
 
   const handleCreateFolder = () => {
     if (newFolderName.trim()) {
@@ -206,7 +218,7 @@ const handleAddItem = () => {
                 <span className="font-bold text-white truncate">{folderName}</span>
 
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-full">
-                  {rawInventory.filter((i: Inventory) => i.category === folderName).length} Items
+                  {rawInventory.filter((i: InventoryType) => i.category === folderName).length}
                 </span>
               </motion.div>
             ))}
@@ -260,6 +272,17 @@ const handleAddItem = () => {
 
                     <p className="text-xs text-muted-foreground font-medium mt-1 truncate">
                       Last: {item.updatedBy}
+                      {/* VISUALIZAR CANTIDAD Y COSTE */}
+                    <div className="flex gap-2 mt-2">
+                      <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-white font-bold border border-white/5">
+                        📊 {item.quantity} {item.unit}
+                      </span>
+                      {item.costPerUnit > 0 && (
+                        <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-flow-green font-bold border border-white/5">
+                          💰 {item.costPerUnit} €
+                        </span>
+                      )}
+                    </div>
                     </p>
                   </div>
                 </div>
@@ -451,6 +474,47 @@ const handleAddItem = () => {
               </div>
             </div>
           </div>
+
+          {/* --- BLOQUE NUEVO: CANTIDAD Y PRECIO --- */}
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Quantity</label>
+                <Input
+                  type="number"
+                  value={newItemQty}
+                  onChange={(e) => setNewItemQty(e.target.value)}
+                  placeholder="0"
+                  className="bg-black/20 border-white/10"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Unit</label>
+                <select 
+                  className="w-full h-10 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  value={newItemUnit}
+                  onChange={(e) => setNewItemUnit(e.target.value)}
+                >
+                  <option value="units">Units</option>
+                  <option value="kg">kg</option>
+                  <option value="g">grams</option>
+                  <option value="L">Litros</option>
+                  <option value="oz">oz</option>
+                  <option value="lb">lbs</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Cost (€)</label>
+                <Input
+                  type="number"
+                  value={newItemCost}
+                  onChange={(e) => setNewItemCost(e.target.value)}
+                  placeholder="0.00"
+                  className="bg-black/20 border-white/10"
+                />
+              </div>
+            </div>
 
           <DialogFooter>
             <Button onClick={handleAddItem} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">

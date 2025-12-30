@@ -30,7 +30,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-//... deja el insertUserSchema y el resto igual...
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -40,13 +39,24 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-// ============ INVENTORY ============
+
+// ============ INVENTORY (ACTUALIZADO) ============
+// Cambiamos la 'I' mayúscula por 'i' minúscula
 export const inventory = pgTable("inventory", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   emoji: text("emoji").notNull(),
   name: text("name").notNull(),
   category: text("category"),
-  status: text("status").notNull().default('OK'), // 'OK' | 'LOW' | 'OUT'
+  
+  // Mantenemos status para compatibilidad visual
+  status: text("status").notNull().default('OK'), 
+  
+  // --- NUEVOS CAMPOS PARA EL CÁLCULO DE MERMAS ---
+  quantity: real("quantity").default(0),      // Ej: 5.5
+  unit: text("unit").default('units'),        // Ej: 'kg', 'L', 'box'
+  costPerUnit: real("cost_per_unit"),         // Ej: 10.50 (Coste por kg/unidad)
+  // ------------------------------------------------
+  
   establishment: text("establishment").notNull(),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   updatedBy: text("updated_by").notNull(),
@@ -60,6 +70,7 @@ export const insertInventorySchema = createInsertSchema(inventory).omit({
 
 export type InsertInventory = z.infer<typeof insertInventorySchema>;
 export type Inventory = typeof inventory.$inferSelect;
+
 
 // ============ EQUIPMENT ============
 export const equipment = pgTable("equipment", {
@@ -188,22 +199,21 @@ export const insertMenuItemSchema = createInsertSchema(menuItems).omit({
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type MenuItem = typeof menuItems.$inferSelect;
 
-// ============ INGREDIENTS ============
+// ============ INGREDIENTS (ACTUALIZADO) ============
 export const ingredients = pgTable("ingredients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   menuItemId: varchar("menu_item_id").notNull().references(() => menuItems.id, { onDelete: 'cascade' }),
+  
+  // --- NUEVO CAMPO: EL LINK AL INVENTARIO ---
+  inventoryItemId: varchar("inventory_item_id").references(() => inventory.id), 
+  // ------------------------------------------
+
   name: text("name").notNull(),
   quantity: real("quantity").notNull(),
-  unit: text("unit").notNull(), // 'grams' | 'oz' | 'cups' | 'bowls' | 'tablespoons' | 'pieces'
+  unit: text("unit").notNull(), 
   notes: text("notes"),
 });
 
-export const insertIngredientSchema = createInsertSchema(ingredients).omit({
-  id: true,
-});
-
-export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
-export type Ingredient = typeof ingredients.$inferSelect;
 
 // ============ NOTIFICATIONS ============
 export const notifications = pgTable("notifications", {
@@ -229,3 +239,20 @@ export const session = pgTable("session", {
   sess: json("sess").notNull(),
   expire: timestamp("expire").notNull(),
 });
+
+// ============ SALES (NUEVA TABLA) ============
+export const sales = pgTable("sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  menuItemId: varchar("menu_item_id").references(() => menuItems.id),
+  quantitySold: integer("quantity_sold").notNull(), // Ej: 3
+  date: timestamp("date").defaultNow().notNull(),
+  establishment: text("establishment").notNull(), // Importante para filtrar por local
+});
+
+export const insertSaleSchema = createInsertSchema(sales).omit({
+  id: true,
+  date: true,
+});
+
+export type InsertSale = z.infer<typeof insertSaleSchema>;
+export type Sale = typeof sales.$inferSelect;
