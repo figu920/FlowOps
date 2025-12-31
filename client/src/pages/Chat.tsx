@@ -23,34 +23,40 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
-// Tipo extendido para mensajes con adjuntos opcionales
+// --- TIPOS ---
 type Message = {
   id: string;
   text: string;
   sender: string;
   timestamp: Date;
   isCurrentUser: boolean;
-  // Simulamos datos de archivo adjunto
   attachment?: {
     type: 'image' | 'file';
     name: string;
-    url?: string; // En una app real, aquí iría la URL del archivo subido
+    url?: string;
   };
 };
+
+// --- OPCIONES RÁPIDAS (RESTAURADAS) ---
+const QUICK_REPLIES = [
+  "Inventory arrived 📦",
+  "Need help front 🆘",
+  "Backup needed 🏃",
+  "Break time ☕",
+  "All clear ✅"
+];
 
 export default function Chat() {
   const { currentUser } = useStore();
   const { toast } = useToast();
   const [newMessage, setNewMessage] = useState('');
-  // Estado para el archivo seleccionado temporalmente
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Refs para los inputs ocultos
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // MOCK MESSAGES (Datos de prueba)
+  // MOCK MESSAGES
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -66,14 +72,7 @@ export default function Chat() {
       timestamp: new Date(Date.now() - 1800000),
       isCurrentUser: false,
     },
-    {
-      id: '3',
-      text: "Great. Don't forget to check the ice machine filters.",
-      sender: 'You',
-      timestamp: new Date(Date.now() - 900000),
-      isCurrentUser: true,
-    },
-    // Ejemplo de mensaje con imagen adjunta (simulado)
+    // Ejemplo de mensaje con imagen
     {
       id: '4',
       text: "Aquí está la foto del nuevo montaje de mesas.",
@@ -83,13 +82,12 @@ export default function Chat() {
       attachment: {
         type: 'image',
         name: 'setup_photo.jpg',
-        // Usamos una imagen de placeholder
         url: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3' 
       }
     },
   ]);
 
-  // Auto-scroll al fondo al llegar mensajes nuevos
+  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -107,31 +105,26 @@ export default function Chat() {
       isCurrentUser: true,
     };
 
-    // Si hay archivo seleccionado, lo añadimos al mensaje (Simulación)
     if (selectedFile) {
         const isImage = selectedFile.type.startsWith('image/');
         newMsg.attachment = {
             type: isImage ? 'image' : 'file',
             name: selectedFile.name,
-            // NOTA PARA TFG: En una app real, aquí primero subirías el archivo 
-            // a tu servidor (ej: /api/upload) y obtendrías una URL real.
-            // Para la demo, creamos una URL local temporal.
             url: isImage ? URL.createObjectURL(selectedFile) : undefined
         };
-        
-        toast({
-            title: isImage ? "Photo sent" : "File sent",
-            description: `Attached: ${selectedFile.name}`,
-        });
     }
 
     setMessages([...messages, newMsg]);
     setNewMessage('');
-    setSelectedFile(null); // Limpiamos el archivo seleccionado
-    
-    // Resetear los inputs file por si se quiere seleccionar el mismo archivo otra vez
+    setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
+  };
+
+  const handleQuickReply = (text: string) => {
+    setNewMessage(text);
+    // Opcional: Si quieres que se envíe directo, descomenta la línea de abajo
+    // handleSend();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -141,11 +134,9 @@ export default function Chat() {
     }
   };
 
-  // Manejador cuando se selecciona un archivo de los inputs ocultos
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-        // Aquí podrías validar tamaño (ej: > 5MB error)
         if (file.size > 5 * 1024 * 1024) {
             toast({ title: "Error", description: "File too large (Max 5MB)", variant: "destructive" });
             return;
@@ -158,10 +149,8 @@ export default function Chat() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Helper para renderizar adjuntos en el chat
   const renderAttachment = (msg: Message) => {
     if (!msg.attachment) return null;
-
     if (msg.attachment.type === 'image' && msg.attachment.url) {
         return (
             <div className="mt-2 mb-1 rounded-lg overflow-hidden border border-white/10 max-w-[250px]">
@@ -169,7 +158,6 @@ export default function Chat() {
             </div>
         );
     }
-    
     return (
         <div className="flex items-center gap-2 mt-2 mb-1 bg-black/20 p-2 rounded-lg border border-white/10 max-w-[250px]">
             <FileText className="w-5 h-5 text-flow-green" />
@@ -180,10 +168,10 @@ export default function Chat() {
 
   return (
     <Layout title="Team Chat" showBack>
-      <div className="flex flex-col h-[calc(100vh-180px)]">
+      <div className="flex flex-col h-[calc(100vh-180px)] relative">
         
         {/* === MESSAGES AREA === */}
-        <ScrollArea className="flex-1 pr-4 -mr-4">
+        <ScrollArea className="flex-1 pr-4 -mr-4 pb-2">
           <div className="space-y-6 py-4">
             {messages.map((msg) => (
               <motion.div
@@ -211,7 +199,6 @@ export default function Chat() {
                         : 'bg-[#1C1C1E] text-white border-white/10 rounded-bl-sm'
                     }`}
                   >
-                    {/* Renderizar texto y/o adjunto */}
                     {msg.text && <p>{msg.text}</p>}
                     {renderAttachment(msg)}
                   </div>
@@ -226,110 +213,97 @@ export default function Chat() {
           </div>
         </ScrollArea>
 
-        {/* === INPUT AREA === */}
-        <div className="mt-4 bg-black/40 p-2 pl-1 rounded-[24px] border border-white/10 relative flex flex-col gap-2">
+        {/* === BOTTOM AREA === */}
+        <div className="mt-auto">
             
-            {/* VISTA PREVIA DE ARCHIVO SELECCIONADO (Si existe) */}
+            {/* 1. VISTA PREVIA DE ARCHIVO (Si hay uno seleccionado) */}
             <AnimatePresence>
                 {selectedFile && (
                     <motion.div 
                         initial={{ opacity: 0, y: 10, height: 0 }}
                         animate={{ opacity: 1, y: 0, height: 'auto' }}
                         exit={{ opacity: 0, y: 10, height: 0 }}
-                        className="px-3 pt-2 flex items-center justify-between bg-white/5 rounded-t-xl mx-1"
+                        className="px-4 py-2 flex items-center justify-between bg-white/5 rounded-t-xl mx-2 border-t border-x border-white/10"
                     >
                         <div className="flex items-center gap-2 text-xs text-white overflow-hidden">
                             {selectedFile.type.startsWith('image/') ? <ImageIcon className="w-4 h-4 text-flow-green" /> : <FileText className="w-4 h-4 text-blue-400" />}
                             <span className="truncate max-w-[200px]">{selectedFile.name}</span>
                         </div>
-                        <button 
-                            onClick={() => setSelectedFile(null)}
-                            className="text-muted-foreground hover:text-white bg-white/10 hover:bg-red-500/20 rounded-full p-1 transition-colors"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
+                        <button onClick={() => setSelectedFile(null)} className="text-muted-foreground hover:text-white bg-white/10 rounded-full p-1"><X className="w-3 h-3" /></button>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* INPUTS Y BOTONES */}
-            <div className="flex items-center gap-2 w-full">
-                {/* BOTÓN + CON MENÚ DESPLEGABLE */}
+            {/* 2. OPCIONES RÁPIDAS (Restauradas) */}
+            {!selectedFile && (
+                <div className="flex gap-2 overflow-x-auto pb-3 px-1 no-scrollbar mask-fade-right">
+                    {QUICK_REPLIES.map((reply, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => handleQuickReply(reply)}
+                            className="whitespace-nowrap bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-4 py-2 text-xs font-medium text-white transition-colors flex-shrink-0"
+                        >
+                            {reply}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* 3. INPUT BAR (Con el estilo original + funcionalidad nueva) */}
+            <div className="bg-black/40 p-2 pl-2 rounded-[32px] border border-white/10 flex items-center gap-2">
+                
+                {/* BOTÓN + (Desplegable) */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="text-muted-foreground hover:text-flow-green hover:bg-white/5 rounded-full h-10 w-10 shrink-0 transition-colors"
+                            className="bg-white/10 text-white hover:bg-white/20 rounded-full h-10 w-10 shrink-0 transition-colors"
                         >
                             <Plus className="w-5 h-5" />
                         </Button>
                     </DropdownMenuTrigger>
-                    {/* Menú oscuro estilo iOS */}
-                    <DropdownMenuContent align="start" className="bg-[#1C1C1E] border-white/10 text-white min-w-[180px] p-1.5 mb-2">
-                        <DropdownMenuItem 
-                            // Al hacer click, simulamos un click en el input oculto de cámara
-                            onClick={() => cameraInputRef.current?.click()} 
-                            className="focus:bg-white/10 rounded-lg gap-3 py-2.5 cursor-pointer"
-                        >
-                            <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                                <Camera className="w-5 h-5" />
-                            </div>
+                    <DropdownMenuContent align="start" className="bg-[#1C1C1E] border-white/10 text-white min-w-[180px] p-1.5 mb-2 ml-4">
+                        <DropdownMenuItem onClick={() => cameraInputRef.current?.click()} className="focus:bg-white/10 rounded-lg gap-3 py-2.5 cursor-pointer">
+                            <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center"><Camera className="w-5 h-5" /></div>
                             <span className="font-medium">Take Photo</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                            // Al hacer click, simulamos un click en el input oculto de archivos
-                            onClick={() => fileInputRef.current?.click()}
-                            className="focus:bg-white/10 rounded-lg gap-3 py-2.5 cursor-pointer mt-1"
-                        >
-                            <div className="w-8 h-8 rounded-full bg-flow-green/20 text-flow-green flex items-center justify-center">
-                                <Paperclip className="w-5 h-5 rotate-45" />
-                            </div>
+                        <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="focus:bg-white/10 rounded-lg gap-3 py-2.5 cursor-pointer mt-1">
+                            <div className="w-8 h-8 rounded-full bg-flow-green/20 text-flow-green flex items-center justify-center"><Paperclip className="w-5 h-5 rotate-45" /></div>
                             <span className="font-medium">Attach File</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* INPUTS OCULTOS (La magia para que funcione nativo) */}
-                {/* Input para archivos generales */}
-                <input 
-                    type="file" 
-                    hidden 
-                    ref={fileInputRef} 
-                    onChange={handleFileSelect} 
-                />
-                {/* Input específico para cámara en móviles (capture="environment") */}
-                <input 
-                    type="file" 
-                    hidden 
-                    accept="image/*" 
-                    capture="environment"
-                    ref={cameraInputRef} 
-                    onChange={handleFileSelect} 
-                />
+                {/* INPUTS OCULTOS */}
+                <input type="file" hidden ref={fileInputRef} onChange={handleFileSelect} />
+                <input type="file" hidden accept="image/*" capture="environment" ref={cameraInputRef} onChange={handleFileSelect} />
 
+                {/* CAMPO DE TEXTO */}
                 <Input
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={handleKeyPress}
-                    placeholder="Type a message..."
+                    placeholder={`Message as ${currentUser?.name.split(' ')[0]}...`}
                     className="bg-transparent border-none focus-visible:ring-0 text-white h-10 px-2 flex-1 placeholder:text-muted-foreground"
                 />
                 
+                {/* BOTÓN ENVIAR (Estilo Flecha Original) */}
                 <Button 
                     onClick={handleSend} 
                     size="icon" 
-                    className={`rounded-full h-10 w-10 shrink-0 transition-all duration-300 ${
+                    className={`rounded-full h-10 w-10 shrink-0 transition-all ${
                         newMessage.trim() || selectedFile
-                            ? 'bg-flow-green text-black hover:bg-flow-green/90 rotate-0 scale-100' 
-                            : 'bg-white/10 text-muted-foreground hover:bg-white/20 -rotate-45 scale-90 opacity-50 pointer-events-none'
+                            ? 'bg-white/10 text-white hover:bg-white/20' 
+                            : 'bg-white/5 text-muted-foreground opacity-50'
                     }`}
                     disabled={!newMessage.trim() && !selectedFile}
                 >
-                    <Send className="w-4 h-4" strokeWidth={2.5} />
+                    <Send className="w-4 h-4" />
                 </Button>
             </div>
         </div>
+
       </div>
     </Layout>
   );
