@@ -341,40 +341,64 @@ export default function Menu() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             
-            {/* --- SELECCIONAR DEL INVENTARIO (CEREBRO CONECTADO) --- */}
+            {/* --- SELECCIONAR DEL INVENTARIO (ESTILO MODERNO UI ✨) --- */}
             <div>
               <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Select from Inventory</label>
-              <select
-                className="w-full h-10 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-ring"
-                onChange={(e) => {
-                  const itemId = e.target.value;
-                  const item = inventory.find((i: any) => i.id === itemId);
-                  if (item) {
-                    // AUTO-COMPLETAR: Rellenamos nombre y unidad solos
-                    setIngName(item.name);
-                    setSelectedInventoryId(item.id);
-                    setIngUnit(item.unit as any); // Usamos la unidad del inventario
+              
+              <Select
+                value={selectedInventoryId || "manual"}
+                onValueChange={(value) => {
+                  if (value === "manual") {
+                    // Si eligen escribir a mano, limpiamos la selección
+                    setSelectedInventoryId(null);
+                    setIngName(""); // Opcional: limpiar el nombre para escribir de cero
+                  } else {
+                    // Lógica de Cerebro: Rellenar datos automáticamente
+                    const item = inventory.find((i: any) => i.id === value);
+                    if (item) {
+                      setIngName(item.name);
+                      setSelectedInventoryId(item.id);
+                      setIngUnit(item.unit as any);
+                    }
                   }
                 }}
-                value={selectedInventoryId || ""}
               >
-                <option value="">-- Select an item or type below --</option>
-                {inventory.map((item: any) => (
-                  <option key={item.id} value={item.id}>
-                    {item.emoji} {item.name} ({item.unit})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full bg-black/20 border-white/10 text-white h-10">
+                  <SelectValue placeholder="-- Select an item --" />
+                </SelectTrigger>
+                
+                <SelectContent className="bg-[#1C1C1E] border-white/10 text-white max-h-[250px]">
+                  {/* Opción para volver al modo manual */}
+                  <SelectItem value="manual" className="text-muted-foreground italic focus:bg-white/5 cursor-pointer">
+                    -- Type name manually --
+                  </SelectItem>
+
+                  {/* Lista de productos del inventario */}
+                  {inventory.map((item: any) => (
+                    <SelectItem key={item.id} value={item.id} className="focus:bg-white/10 cursor-pointer py-2">
+                      <span className="mr-2">{item.emoji}</span>
+                      <span className="font-medium">{item.name}</span>
+                      <span className="ml-2 text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                        {item.unit}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               
-              {/* Opción de escribir nombre manual si no está en inventario */}
-              <div className="mt-2">
+              {/* Input manual (Se desactiva visualmente si has elegido un producto) */}
+              <motion.div 
+                className="mt-2"
+                animate={{ opacity: selectedInventoryId ? 0.5 : 1 }}
+              >
                 <Input 
                   value={ingName}
                   onChange={(e) => setIngName(e.target.value)}
                   placeholder="Or type name manually..."
-                  className="bg-black/20 border-white/10 text-xs h-8"
+                  className="bg-black/20 border-white/10 text-xs h-9"
+                  disabled={!!selectedInventoryId} // Bloqueamos escritura si hay link al inventario
                 />
-              </div>
+              </motion.div>
             </div>
             {/* -------------------------------------------------------- */}
 
