@@ -12,7 +12,7 @@ export default function Sales() {
   const createSaleMutation = useCreateSale();
   const { toast } = useToast();
 
-  // Guardamos las cantidades: { "ID_DEL_PLATO": 5 }
+  // Store quantities: { "DISH_ID": 5 }
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const updateQty = (id: string, delta: number) => {
@@ -28,14 +28,14 @@ export default function Sales() {
   };
 
   const handleSubmit = async () => {
-    // Filtramos solo los platos que tienen cantidad > 0
+    // Filter only items with quantity > 0
     const itemsSold = Object.entries(quantities).filter(([_, qty]) => qty > 0);
     
     if (itemsSold.length === 0) return;
 
     let successCount = 0;
     
-    // Enviamos las ventas una a una
+    // Send sales one by one
     for (const [menuId, qty] of itemsSold) {
       try {
         await createSaleMutation.mutateAsync({
@@ -48,24 +48,25 @@ export default function Sales() {
       }
     }
 
-    setQuantities({}); // Limpiamos formulario
+    setQuantities({}); // Reset form
     toast({
-      title: "Ventas Registradas",
-      description: `Se ha actualizado el stock de ${successCount} productos.`,
+      title: "Sales Recorded",
+      description: `Stock successfully deducted for ${successCount} items.`,
       variant: "default",
     });
   };
 
   return (
-    <Layout title="Registro Diario de Ventas">
+    <Layout title="Daily Sales Register">
       <div className="space-y-6 pb-24">
         
+        {/* Banner informativo en Inglés */}
         <div className="bg-flow-green/10 p-4 rounded-xl border border-flow-green/20 flex items-start gap-3">
           <TrendingUp className="w-6 h-6 text-flow-green mt-1" />
           <div>
-            <h3 className="font-bold text-white text-sm">Deducción Automática</h3>
+            <h3 className="font-bold text-white text-sm">Automated Stock Deduction</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Introduce lo vendido hoy. El sistema calculará los ingredientes y los restará del inventario automáticamente.
+              Enter items sold today. The system will automatically calculate ingredients used and deduct them from your Inventory.
             </p>
           </div>
         </div>
@@ -86,7 +87,7 @@ export default function Sales() {
                 </span>
               </div>
 
-              {/* CONTADOR */}
+              {/* Counter UI */}
               <div className="flex items-center gap-3 bg-black/40 p-1.5 rounded-xl border border-white/10">
                 <button 
                   onClick={() => updateQty(dish.id, -1)}
@@ -114,7 +115,7 @@ export default function Sales() {
         </div>
       </div>
 
-      {/* BOTÓN FLOTANTE DE GUARDAR */}
+      {/* Floating Save Button */}
       <div className="fixed bottom-6 left-0 right-0 px-6 z-50">
         <Button 
           onClick={handleSubmit}
@@ -122,11 +123,11 @@ export default function Sales() {
           disabled={createSaleMutation.isPending || Object.values(quantities).every(q => q === 0)}
         >
           {createSaleMutation.isPending ? (
-            "Procesando..."
+            "Processing..."
           ) : (
             <>
               <Save className="w-5 h-5" />
-              Guardar y Actualizar Stock
+              Save & Update Stock
             </>
           )}
         </Button>
