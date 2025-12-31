@@ -37,13 +37,16 @@ type Message = {
   };
 };
 
-// --- OPCIONES RÁPIDAS (RESTAURADAS) ---
+// --- OPCIONES RÁPIDAS (CHIPS) ---
 const QUICK_REPLIES = [
   "Inventory arrived 📦",
   "Need help front 🆘",
   "Backup needed 🏃",
   "Break time ☕",
-  "All clear ✅"
+  "All clear ✅",
+  "Kitchen is busy 🔥",
+  "Printer paper out 🖨️",
+  "Manager needed 👔"
 ];
 
 export default function Chat() {
@@ -56,38 +59,10 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // MOCK MESSAGES
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: "Hey team, how's the prep for the evening shift?",
-      sender: 'Sarah Wilson',
-      timestamp: new Date(Date.now() - 3600000),
-      isCurrentUser: false,
-    },
-    {
-      id: '2',
-      text: "All good! Just finished restocking the bar stations.",
-      sender: 'Mike Chen',
-      timestamp: new Date(Date.now() - 1800000),
-      isCurrentUser: false,
-    },
-    // Ejemplo de mensaje con imagen
-    {
-      id: '4',
-      text: "Aquí está la foto del nuevo montaje de mesas.",
-      sender: 'Mike Chen',
-      timestamp: new Date(Date.now() - 300000),
-      isCurrentUser: false,
-      attachment: {
-        type: 'image',
-        name: 'setup_photo.jpg',
-        url: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3' 
-      }
-    },
-  ]);
+  // --- ESTADO INICIAL VACÍO (SIN EJEMPLOS) ---
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  // Auto-scroll
+  // Auto-scroll al recibir mensajes
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -123,8 +98,6 @@ export default function Chat() {
 
   const handleQuickReply = (text: string) => {
     setNewMessage(text);
-    // Opcional: Si quieres que se envíe directo, descomenta la línea de abajo
-    // handleSend();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -172,45 +145,52 @@ export default function Chat() {
         
         {/* === MESSAGES AREA === */}
         <ScrollArea className="flex-1 pr-4 -mr-4 pb-2">
-          <div className="space-y-6 py-4">
-            {messages.map((msg) => (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex items-end gap-3 ${msg.isCurrentUser ? 'flex-row-reverse' : ''}`}
-              >
-                {!msg.isCurrentUser && (
-                  <Avatar className="w-8 h-8 border border-white/10">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender}`} />
-                    <AvatarFallback>{msg.sender[0]}</AvatarFallback>
-                  </Avatar>
-                )}
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30">
+                <Send className="w-12 h-12 mb-2" />
+                <p>No messages yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-6 py-4">
+                {messages.map((msg) => (
+                <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex items-end gap-3 ${msg.isCurrentUser ? 'flex-row-reverse' : ''}`}
+                >
+                    {!msg.isCurrentUser && (
+                    <Avatar className="w-8 h-8 border border-white/10">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender}`} />
+                        <AvatarFallback>{msg.sender[0]}</AvatarFallback>
+                    </Avatar>
+                    )}
 
-                <div className={`max-w-[75%] group ${msg.isCurrentUser ? 'items-end' : 'items-start'} flex flex-col`}>
-                  {!msg.isCurrentUser && (
-                    <span className="text-[10px] text-muted-foreground ml-1 mb-1 block">{msg.sender}</span>
-                  )}
-                  
-                  <div
-                    className={`p-3 rounded-2xl text-sm border ${
-                      msg.isCurrentUser
-                        ? 'bg-flow-green text-black border-flow-green rounded-br-sm'
-                        : 'bg-[#1C1C1E] text-white border-white/10 rounded-bl-sm'
-                    }`}
-                  >
-                    {msg.text && <p>{msg.text}</p>}
-                    {renderAttachment(msg)}
-                  </div>
-                  
-                  <span className="text-[9px] text-muted-foreground mx-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity block">
-                    {formatTime(msg.timestamp)}
-                  </span>
-                </div>
-              </motion.div>
-            ))}
-            <div ref={scrollRef} />
-          </div>
+                    <div className={`max-w-[75%] group ${msg.isCurrentUser ? 'items-end' : 'items-start'} flex flex-col`}>
+                    {!msg.isCurrentUser && (
+                        <span className="text-[10px] text-muted-foreground ml-1 mb-1 block">{msg.sender}</span>
+                    )}
+                    
+                    <div
+                        className={`p-3 rounded-2xl text-sm border ${
+                        msg.isCurrentUser
+                            ? 'bg-flow-green text-black border-flow-green rounded-br-sm'
+                            : 'bg-[#1C1C1E] text-white border-white/10 rounded-bl-sm'
+                        }`}
+                    >
+                        {msg.text && <p>{msg.text}</p>}
+                        {renderAttachment(msg)}
+                    </div>
+                    
+                    <span className="text-[9px] text-muted-foreground mx-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity block">
+                        {formatTime(msg.timestamp)}
+                    </span>
+                    </div>
+                </motion.div>
+                ))}
+                <div ref={scrollRef} />
+            </div>
+          )}
         </ScrollArea>
 
         {/* === BOTTOM AREA === */}
@@ -234,18 +214,20 @@ export default function Chat() {
                 )}
             </AnimatePresence>
 
-            {/* 2. OPCIONES RÁPIDAS (Restauradas) */}
+            {/* 2. OPCIONES RÁPIDAS (SCROLL ARREGLADO) */}
             {!selectedFile && (
-                <div className="flex gap-2 overflow-x-auto pb-3 px-1 no-scrollbar mask-fade-right">
-                    {QUICK_REPLIES.map((reply, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => handleQuickReply(reply)}
-                            className="whitespace-nowrap bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-4 py-2 text-xs font-medium text-white transition-colors flex-shrink-0"
-                        >
-                            {reply}
-                        </button>
-                    ))}
+                <div className="w-full overflow-x-auto pb-3 pt-1 no-scrollbar">
+                    <div className="flex gap-2 px-1 w-max">
+                        {QUICK_REPLIES.map((reply, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => handleQuickReply(reply)}
+                                className="whitespace-nowrap bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-4 py-2 text-xs font-medium text-white transition-colors active:scale-95"
+                            >
+                                {reply}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 
