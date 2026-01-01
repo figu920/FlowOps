@@ -5,8 +5,8 @@ import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventor
 import type { Inventory as InventoryType } from '@shared/schema';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-// 1. AÑADIMOS Edit2 (El lápiz de tu foto) 👇
-import { Plus, Trash2, Camera, Folder, ChevronLeft, Package, FolderPlus, Edit2 } from 'lucide-react';
+// 1. IMPORTAMOS Search y X 👇
+import { Plus, Trash2, Folder, ChevronLeft, Package, FolderPlus, Edit2, Search, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,8 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
 
   // Folders logic
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  // 2. ESTADO PARA LA BÚSQUEDA 👇
+  const [searchQuery, setSearchQuery] = useState("");
 
   const allItems = useMemo(() => {
     return [...rawInventory].sort((a, b) => a.name.localeCompare(b.name));
@@ -33,12 +35,25 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
     return Array.from(categories) as string[];
   }, [allItems]);
 
+  // 3. LÓGICA DE FILTRADO ACTUALIZADA (Carpeta + Búsqueda) 👇
   const displayedItems = useMemo(() => {
+    let items = [];
+    
+    // Primero filtramos por carpeta
     if (currentFolder) {
-      return allItems.filter(i => i.category === currentFolder);
+      items = allItems.filter(i => i.category === currentFolder);
+    } else {
+      items = allItems.filter(i => !i.category);
     }
-    return allItems.filter(i => !i.category);
-  }, [allItems, currentFolder]);
+
+    // Después filtramos por la búsqueda (si hay texto)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      items = items.filter(i => i.name.toLowerCase().includes(query));
+    }
+
+    return items;
+  }, [allItems, currentFolder, searchQuery]);
 
   const updateMutation = useUpdateInventory();
   const createMutation = useCreateInventory();
@@ -51,7 +66,6 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   
-  // 2. ESTADO PARA SABER SI ESTAMOS EDITANDO 👇
   const [editingItem, setEditingItem] = useState<InventoryType | null>(null);
 
   const [newItemName, setNewItemName] = useState("");
@@ -67,6 +81,11 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const canDelete = currentUser?.role === 'manager' || isAdmin;
 
   // Handlers
+  const handleBack = () => {
+    setCurrentFolder(null);
+    setSearchQuery(""); // Limpiamos la búsqueda al salir
+  };
+
   const handleStatusChange = (id: string, newStatus: 'OK' | 'LOW' | 'OUT') => {
     if (newStatus === 'LOW') {
       setLowCommentItem(id);
@@ -85,7 +104,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
 
   const openAddItemModal = () => {
     setIsChoiceOpen(false);
-    setEditingItem(null); // Reseteamos: es modo crear
+    setEditingItem(null);
     setNewItemCategory(currentFolder || ""); 
     setNewItemEmoji("📦");
     setNewItemName("");
@@ -95,7 +114,6 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
     setIsAddingItem(true);
   };
 
-  // 3. FUNCIÓN PARA ABRIR EN MODO EDICIÓN (CARGAR DATOS) 👇
   const openEditItemModal = (item: InventoryType) => {
     setEditingItem(item);
     setNewItemName(item.name);
@@ -104,7 +122,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
     setNewItemQty(item.quantity?.toString() || "0");
     setNewItemUnit(item.unit || "units");
     setNewItemCost(item.costPerUnit?.toString() || "0");
-    setIsAddingItem(true); // Reutilizamos el modal de añadir
+    setIsAddingItem(true);
   };
 
   const openAddFolderModal = () => {
@@ -113,7 +131,6 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
     setIsAddingFolder(true);
   };
 
-  // 4. FUNCIÓN MAESTRA DE GUARDAR (CREAR O EDITAR) 👇
   const handleSaveItem = () => {
     if (newItemName.trim()) {
       const itemData = {
@@ -126,13 +143,11 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
       };
 
       if (editingItem) {
-        // MODO ACTUALIZAR
         updateMutation.mutate({
           id: editingItem.id,
           updates: itemData
         });
       } else {
-        // MODO CREAR
         createMutation.mutate({
           ...itemData,
           status: 'OK',
@@ -141,8 +156,6 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
 
       setIsAddingItem(false);
       setEditingItem(null);
-      
-      // Limpiamos formulario
       setNewItemName("");
       setNewItemQty("");
       setNewItemCost("");
@@ -152,6 +165,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const handleCreateFolder = () => {
     if (newFolderName.trim()) {
       setCurrentFolder(newFolderName);
+      setSearchQuery(""); // Aseguramos limpieza
       setIsAddingFolder(false);
       setTimeout(() => {
         openAddItemModal();
@@ -193,20 +207,45 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
       }
     >
       {currentFolder && (
-        <motion.button
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          onClick={() => setCurrentFolder(null)}
-          className="flex items-center text-muted-foreground hover:text-white mb-4 text-sm font-medium transition-colors"
-          style={{ color: categoryColor }} 
-        >
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Back
-        </motion.button>
+        <>
+            <motion.button
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            onClick={handleBack}
+            className="flex items-center text-muted-foreground hover:text-white mb-4 text-sm font-medium transition-colors"
+            style={{ color: categoryColor }} 
+            >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back
+            </motion.button>
+
+            {/* 4. BARRA DE BÚSQUEDA DENTRO DE LA CARPETA 👇 */}
+            <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative mb-6"
+            >
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={`Search in ${currentFolder}...`}
+                    className="pl-9 pr-9 bg-black/20 border-white/10 h-10 text-white placeholder:text-muted-foreground/50 rounded-xl focus-visible:ring-1 focus-visible:ring-white/20"
+                />
+                {searchQuery && (
+                    <button 
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
+            </motion.div>
+        </>
       )}
 
       <div className="space-y-3">
-        {/* FOLDERS */}
+        {/* FOLDERS (Solo si no estamos en una carpeta) */}
         {!currentFolder && folders.length > 0 && (
           <div className="grid grid-cols-2 gap-3 mb-6">
             {folders.map((folderName, idx) => (
@@ -215,7 +254,10 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: idx * 0.05 }}
-                onClick={() => setCurrentFolder(folderName)}
+                onClick={() => {
+                    setCurrentFolder(folderName);
+                    setSearchQuery(""); // Limpiamos al entrar
+                }}
                 className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3"
               >
                 <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
@@ -234,11 +276,22 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
         <AnimatePresence mode="popLayout">
           {displayedItems.length === 0 && currentFolder ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12 text-muted-foreground">
-              <div className="w-16 h-16 bg-white/5 flex items-center justify-center mx-auto mb-4 rounded-full">
-                <Package className="w-8 h-8 opacity-20" />
-              </div>
-              <p>Carpeta vacía.</p>
-              <p className="text-xs mt-1">Añade un producto aquí.</p>
+              {searchQuery ? (
+                  // Mensaje si no hay resultados de búsqueda
+                  <>
+                    <Search className="w-12 h-12 opacity-20 mx-auto mb-3" />
+                    <p>No matching items found.</p>
+                  </>
+              ) : (
+                  // Mensaje si la carpeta está vacía
+                  <>
+                    <div className="w-16 h-16 bg-white/5 flex items-center justify-center mx-auto mb-4 rounded-full">
+                        <Package className="w-8 h-8 opacity-20" />
+                    </div>
+                    <p>Empty folder.</p>
+                    <p className="text-xs mt-1">Add an item here.</p>
+                  </>
+              )}
             </motion.div>
           ) : (
             displayedItems.map((item, idx) => (
@@ -251,7 +304,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 transition={{ delay: idx * 0.03 }}
                 className="bg-card rounded-[20px] p-5 border border-white/[0.04] shadow-sm relative group"
               >
-                {/* 5. AQUÍ ESTÁ EL LÁPIZ Y LA PAPELERA 👇 */}
+                {/* BOTONES DE ACCIÓN (EDITAR Y BORRAR) */}
                 <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     {canEdit && (
                       <button
