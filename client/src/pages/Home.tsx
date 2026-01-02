@@ -1,3 +1,4 @@
+import { CalendarClock } from "lucide-react"; 
 import { TrendingUp } from "lucide-react";
 import { Link } from 'wouter';
 import Layout from '@/components/Layout';
@@ -78,6 +79,13 @@ const EmployeesLogo = () => (
 const SalesLogo = () => (
   <div className="w-14 h-14 rounded-full bg-[#00E676] flex items-center justify-center shadow-lg shadow-green-500/20">
     <TrendingUp className="w-7 h-7 text-black" strokeWidth={2.5} />
+  </div>
+);
+
+// 10. OPERATIONS (Nuevo Super Botón)
+const ScheduleLogo = () => (
+  <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-lg shadow-blue-500/20">
+    <CalendarClock className="w-7 h-7 text-black" strokeWidth={2.5} />
   </div>
 );
 
