@@ -5,7 +5,7 @@ import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventor
 import type { Inventory as InventoryType } from '@shared/schema';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Folder, ChevronLeft, Package, FolderPlus, Edit2, Search, X, FolderOpen, Link as LinkIcon } from 'lucide-react';
+import { Plus, Trash2, Folder, ChevronLeft, Package, FolderPlus, Edit2, Search, X, FolderOpen, Link as LinkIcon, ImageOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,16 +16,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-
-// --- GENERADOR DE COLOR ---
-const stringToColor = (str: string) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const colors = ['#F87171', '#FB923C', '#FACC15', '#4ADE80', '#2DD4BF', '#38BDF8', '#818CF8', '#C084FC', '#F472B6', '#FB7185'];
-  return colors[Math.abs(hash) % colors.length];
-};
 
 // --- CEREBRO DE EMOJIS AUTOMÁTICOS 🧠 ---
 const getAutoEmoji = (name: string): string => {
@@ -76,6 +66,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const [folderNewName, setFolderNewName] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
   const [deletingFolder, setDeletingFolder] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false); // Estado para controlar errores de imagen
 
   // Formulario Item
   const [newItemName, setNewItemName] = useState("");
@@ -145,6 +136,8 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
       await updateMutation.mutateAsync({ id: item.id, updates: { category: item.category!.replace(oldPath, newPath) } });
     }
     setIsRenamingFolder(false);
+    setEditingFolder(null);
+    toast({ title: "Folder Renamed", description: `${items.length} items updated.` });
   };
 
   const performDeleteFolder = async () => {
@@ -153,13 +146,14 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
     const items = rawInventory.filter((i: InventoryType) => i.category && (i.category === path || i.category.startsWith(path + '/')));
     for (const item of items) await deleteMutation.mutateAsync(item.id);
     setDeletingFolder(null);
+    toast({ title: "Folder Deleted", description: `${items.length} items deleted.` });
   };
 
   const handleSaveItem = () => {
     if (newItemName.trim()) {
       const data = {
         name: newItemName,
-        emoji: newItemIcon, // Guardamos el Emoji o la URL aquí
+        emoji: newItemIcon, 
         category: currentPath || undefined,
         quantity: parseFloat(newItemQty) || 0,
         unit: newItemUnit,
@@ -169,6 +163,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
       else createMutation.mutate({ ...data, status: 'OK' });
       
       setIsAddingItem(false);
+      setImageError(false); // Resetear error de imagen al cerrar
     }
   };
 
@@ -206,16 +201,20 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
     }
   };
 
-  // --- HELPER PARA MOSTRAR ICONO O IMAGEN ---
-  const renderItemIcon = (iconStr: string, color: string) => {
-      // Si es una URL (empieza por http), mostramos IMAGEN
-      if (iconStr && (iconStr.startsWith('http') || iconStr.startsWith('data:image'))) {
+  // --- HELPER PARA MOSTRAR ICONO O IMAGEN (MEJORADO) ---
+  const renderItemIcon = (iconStr: string, isPreview = false) => {
+      const isUrl = iconStr && (iconStr.startsWith('http') || iconStr.startsWith('data:image'));
+
+      if (isUrl) {
+          if (isPreview && imageError) {
+              return <ImageOff className="w-8 h-8 text-muted-foreground opacity-50" />;
+          }
           return (
               <img 
                 src={iconStr} 
                 alt="icon" 
-                className="w-full h-full object-cover rounded-xl"
-                style={{ backgroundColor: `${color}10` }} 
+                className="w-full h-full object-cover"
+                onError={() => isPreview ? setImageError(true) : null} // Solo marcamos error en el preview
               />
           );
       }
@@ -235,7 +234,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
             </motion.button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-[#1C1C1E] border-white/10 text-white">
-            <DropdownMenuItem onClick={() => { setIsAddingItem(true); setEditingItem(null); setNewItemName(""); setNewItemQty(""); setNewItemCost(""); setNewItemIcon("📦"); }}>
+            <DropdownMenuItem onClick={() => { setIsAddingItem(true); setEditingItem(null); setNewItemName(""); setNewItemQty(""); setNewItemCost(""); setNewItemIcon("📦"); setImageError(false); }}>
               <Package className="w-4 h-4 mr-2 text-flow-green"/> New Product
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIsAddingFolder(true)}>
@@ -283,8 +282,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
 
         <AnimatePresence mode="popLayout">
           {itemsInCurrentPath.map((item: InventoryType, idx: number) => {
-            const itemColor = stringToColor(item.name);
-
+            // ✅ SIN COLORES DINÁMICOS
             return (
               <motion.div
                 key={item.id}
@@ -292,24 +290,18 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.03 }}
-                style={{ 
-                    borderColor: `${itemColor}40`, 
-                    backgroundColor: `${itemColor}05`
-                }}
-                className="rounded-[20px] p-5 border shadow-sm relative group overflow-hidden"
+                // ✅ Tarjeta neutra, sin bordes de color
+                className="rounded-[20px] p-5 border border-white/5 bg-card shadow-sm relative group overflow-hidden"
               >
                 <div className="absolute top-4 right-4 flex gap-2 z-10">
-                    {/* AQUÍ ESTABA EL ERROR: Añadido || "units" */}
-                    {canEdit && <button onClick={() => { setIsAddingItem(true); setEditingItem(item); setNewItemName(item.name); setNewItemIcon(item.emoji); setNewItemQty(String(item.quantity)); setNewItemUnit(item.unit || "units"); setNewItemCost(String(item.costPerUnit)); }} className="p-2 bg-black/20 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white"><Edit2 className="w-4 h-4"/></button>}
+                    {canEdit && <button onClick={() => { setIsAddingItem(true); setEditingItem(item); setNewItemName(item.name); setNewItemIcon(item.emoji); setNewItemQty(String(item.quantity)); setNewItemUnit(item.unit || "units"); setNewItemCost(String(item.costPerUnit)); setImageError(false); }} className="p-2 bg-black/20 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white"><Edit2 className="w-4 h-4"/></button>}
                     {canDelete && <button onClick={() => deleteMutation.mutate(item.id)} className="p-2 bg-black/20 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4"/></button>}
                 </div>
 
                 <div className="flex items-center gap-4 mb-5">
-                  <div 
-                    style={{ backgroundColor: `${itemColor}10`, borderColor: `${itemColor}20` }}
-                    className="w-16 h-16 flex items-center justify-center rounded-2xl border overflow-hidden shrink-0"
-                  >
-                    {renderItemIcon(item.emoji, itemColor)}
+                  {/* ✅ Icono neutro, sin fondo de color */}
+                  <div className="w-16 h-16 flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 overflow-hidden shrink-0">
+                    {renderItemIcon(item.emoji)}
                   </div>
                   
                   <div className="min-w-0">
@@ -360,7 +352,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
       <Dialog open={isRenamingFolder} onOpenChange={setIsRenamingFolder}><DialogContent className="bg-[#1C1C1E] border-white/10 text-white"><DialogHeader><DialogTitle>Rename Folder</DialogTitle></DialogHeader><Input autoFocus value={folderNewName} onChange={e=>setFolderNewName(e.target.value)} className="bg-black/20 border-white/10"/><DialogFooter><Button onClick={performRenameFolder} className="w-full bg-white text-black font-bold">Update</Button></DialogFooter></DialogContent></Dialog>
 
       {/* BORRAR CARPETA */}
-      <Dialog open={!!deletingFolder} onOpenChange={() => setDeletingFolder(null)}><DialogContent className="bg-[#1C1C1E] border-white/10 text-white"><DialogHeader><DialogTitle className="text-red-500">Delete Folder?</DialogTitle></DialogHeader><p className="text-center mb-4">This will delete all items inside.</p><DialogFooter><Button onClick={performDeleteFolder} className="w-full bg-red-500 text-white font-bold">Delete All</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!deletingFolder} onOpenChange={() => setDeletingFolder(null)}><DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 text-center"><DialogHeader><DialogTitle className="text-red-500">Delete Category?</DialogTitle></DialogHeader><p className="mb-4 text-sm text-muted-foreground">This will delete all items inside.</p><DialogFooter><Button onClick={performDeleteFolder} className="w-full bg-red-500 text-white font-bold">Delete All</Button></DialogFooter></DialogContent></Dialog>
 
       {/* CREAR / EDITAR ITEM */}
       <Dialog open={isAddingItem} onOpenChange={setIsAddingItem}>
@@ -373,7 +365,8 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
             {/* VISTA PREVIA DEL ICONO/IMAGEN */}
             <div className="flex justify-center">
               <div className="w-24 h-24 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 overflow-hidden relative">
-                {renderItemIcon(newItemIcon, '#ffffff')}
+                {/* Usamos el helper con isPreview=true para detectar errores */}
+                {renderItemIcon(newItemIcon, true)}
                 <div className="absolute bottom-0 w-full bg-black/60 text-[8px] text-center text-white py-1">PREVIEW</div>
               </div>
             </div>
@@ -397,7 +390,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 </label>
                 <Input 
                     value={newItemIcon} 
-                    onChange={(e) => setNewItemIcon(e.target.value)} 
+                    onChange={(e) => { setNewItemIcon(e.target.value); setImageError(false); }} // Reset error al cambiar URL
                     placeholder="🍔 or https://..." 
                     className="bg-black/20 border-white/10 text-center font-mono text-sm"
                 />
