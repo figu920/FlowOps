@@ -40,24 +40,24 @@ export default function Equipment() {
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
 
-  // --- LÓGICA DE AGRUPACIÓN ---
+  // --- LÓGICA DE AGRUPACIÓN (CORREGIDA) ---
   
-  // 1. CORRECCIÓN AQUÍ: Añadido "as string[]" para evitar errores de tipo unknown
+  // 1. Obtener carpetas únicas. EL FIX ESTÁ AQUÍ: "as string[]"
   const folders = useMemo(() => {
     const locations = new Set(equipmentList.map((item: any) => item.location || "General"));
     return Array.from(locations).sort() as string[]; 
   }, [equipmentList]);
 
-  // 2. Filtrar items según dónde estemos
+  // 2. Filtrar items
   const displayedItems = useMemo(() => {
     let items = equipmentList;
     
-    // Si hay búsqueda, buscamos globalmente
+    // Búsqueda global
     if (searchQuery.trim()) {
         return items.filter((i: any) => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
-    // Si estamos dentro de una carpeta
+    // Filtro por carpeta
     if (currentFolder) {
       return items.filter((i: any) => (i.location || "General") === currentFolder);
     }
@@ -128,7 +128,7 @@ export default function Equipment() {
      setIsCreatingFolder(false);
   };
 
-  // Contar alertas
+  // Contar alertas (Fix de tipo string)
   const getFolderAlerts = (folderName: string) => {
       return equipmentList.filter((i:any) => (i.location || "General") === folderName && i.status !== 'OPERATIONAL').length;
   };
@@ -180,7 +180,8 @@ export default function Equipment() {
       {/* VISTA 1: CARPETAS (RAÍZ) */}
       {!currentFolder && !searchQuery && (
           <div className="grid grid-cols-2 gap-4 pb-20">
-            {folders.map((folderName, idx) => {
+            {/* EL FIX: Añadimos (folderName: string) explícitamente */}
+            {folders.map((folderName: string, idx: number) => {
               const alertCount = getFolderAlerts(folderName);
               const itemCount = equipmentList.filter((i:any) => (i.location || "General") === folderName).length;
               
@@ -287,7 +288,7 @@ export default function Equipment() {
 
             {displayedItems.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground opacity-50">
-                    <p>No equipment in this area.</p>
+                    <p>No equipment here yet.</p>
                 </div>
             )}
         </div>
