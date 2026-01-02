@@ -3,17 +3,19 @@ import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { 
   useChecklists, useUpdateChecklist, 
-  useTasks, useCompleteTask, useCreateTask, useDeleteTask 
+  useTasks, useCompleteTask, useCreateTask, useDeleteTask, useUpdateTask, useUsers 
 } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, Calendar as CalendarIcon, Plus, Trash2, Camera, 
-  ChevronLeft, ChevronRight, X, Search, FolderPlus, Folder, ChevronDown, ChevronUp
+  ChevronLeft, ChevronRight, X, Search, FolderPlus, Folder, 
+  ChevronDown, ChevronUp, Edit2, UserCircle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
   startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, 
@@ -31,31 +33,38 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const { data: shiftList = [] } = useChecklists("shift"); 
   const { data: closingList = [] } = useChecklists("closing");
   const { data: tasks = [] } = useTasks();
+  const { data: users = [] } = useUsers(); // ✅ CARGAMOS USUARIOS
 
   const updateChecklistMutation = useUpdateChecklist();
+  const updateTaskMutation = useUpdateTask(); 
   const completeTaskMutation = useCompleteTask();
   const createTaskMutation = useCreateTask();
   const deleteTaskMutation = useDeleteTask();
   
-  // --- MODALES Y ACCIONES ---
+  // --- ESTADOS DE UI ---
+  const [viewingDay, setViewingDay] = useState<Date | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
+
+  // --- MODALES (CREAR) ---
   const [isAddingTask, setIsAddingTask] = useState<{date: Date, category: string} | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
-  
-  // Estados para Carpetas
+  const [newTaskAssignee, setNewTaskAssignee] = useState(""); // ✅ Estado para asignar usuario
+
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [customFolders, setCustomFolders] = useState<string[]>([]);
   
-  // Control de carpetas abiertas (Accordion)
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
-
-  const [viewingDay, setViewingDay] = useState<Date | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  // FOTOS
+  // --- MODALES (FOTOS) ---
   const [verifyingTask, setVerifyingTask] = useState<{id: string, type: 'task'|'checklist'} | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- MODALES (EDITAR/BORRAR) ---
+  const [editingTask, setEditingTask] = useState<{id: string, text: string, assignedTo: string} | null>(null);
+  const [folderToRename, setFolderToRename] = useState<string | null>(null);
+  const [renameFolderInput, setRenameFolderInput] = useState("");
+  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
 
@@ -68,13 +77,39 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
     return eachDayOfInterval({ start: startDate, end: endDate });
   }, [currentMonth]);
 
-  // --- HANDLERS ---
+  // --- HANDLERS CARPETAS ---
 
   const handleCreateFolder = () => {
       if (newFolderName.trim()) {
-          setCustomFolders([...customFolders, newFolderName.trim()]);
+          setCustomFolders(prev => [...prev, newFolderName.trim()]);
           setNewFolderName("");
           setIsCreatingFolder(false);
+      }
+  };
+
+  const handleRenameFolder = async () => {
+      if (folderToRename && renameFolderInput.trim() && folderToRename !== renameFolderInput) {
+          // 1. Actualizar lista local de carpetas
+          setCustomFolders(prev => prev.map(f => f === folderToRename ? renameFolderInput.trim() : f));
+          
+          // 2. Actualizar etiquetas en las notas de las tareas
+          const dateStr = viewingDay ? format(viewingDay, 'yyyy-MM-dd') : "";
+          const tasksToUpdate = tasks.filter((t: any) => t.notes?.includes(`CAT:${folderToRename}`) && t.notes?.includes(`DATE:${dateStr}`));
+          
+          for (const task of tasksToUpdate) {
+              const newNote = task.notes.replace(`CAT:${folderToRename}`, `CAT:${renameFolderInput.trim()}`);
+              await updateTaskMutation.mutateAsync({ id: task.id, updates: { notes: newNote } });
+          }
+
+          setFolderToRename(null);
+          setRenameFolderInput("");
+      }
+  };
+
+  const handleDeleteFolder = () => {
+      if (folderToDelete) {
+          setCustomFolders(prev => prev.filter(f => f !== folderToDelete));
+          setFolderToDelete(null);
       }
   };
 
@@ -82,24 +117,36 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       setOpenFolders(prev => ({ ...prev, [folderName]: !prev[folderName] }));
   };
 
+  // --- HANDLERS TAREAS ---
+
   const handleAddTask = () => {
     if (newTaskText && isAddingTask) {
       const dateTag = format(isAddingTask.date, 'yyyy-MM-dd');
       const noteTag = `DATE:${dateTag}|CAT:${isAddingTask.category}`; 
-      
-      createTaskMutation.mutate({
-        text: newTaskText,
-        assignedTo: 'Team',
-        notes: noteTag, 
-        completed: false
+      createTaskMutation.mutate({ 
+          text: newTaskText, 
+          assignedTo: newTaskAssignee || 'Team', // ✅ Guardamos el trabajador asignado
+          notes: noteTag, 
+          completed: false 
       });
-      
       setNewTaskText("");
+      setNewTaskAssignee("");
       setIsAddingTask(null);
-      
-      // Abrir la carpeta automáticamente al añadir tarea
       setOpenFolders(prev => ({ ...prev, [isAddingTask.category]: true }));
     }
+  };
+
+  const handleEditTask = () => {
+      if (editingTask && editingTask.text.trim()) {
+          updateTaskMutation.mutate({ 
+              id: editingTask.id, 
+              updates: { 
+                  text: editingTask.text,
+                  assignedTo: editingTask.assignedTo // ✅ Actualizamos trabajador
+              } 
+          });
+          setEditingTask(null);
+      }
   };
 
   const handleDeleteTask = (id: string, e: React.MouseEvent) => {
@@ -111,6 +158,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       updateChecklistMutation.mutate({ id, updates: { completed: !currentStatus } });
   };
 
+  // --- FOTOS ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -132,6 +180,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
     }
   };
 
+  // --- HELPERS ---
   const getTaskCategory = (notes: string) => {
     const match = notes?.match(/CAT:([^|]+)/);
     return match ? match[1] : 'General';
@@ -217,7 +266,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       </div>
 
       {/* MODAL: DETALLES DEL DÍA */}
-      <Dialog open={!!viewingDay && !isAddingTask && !verifyingTask && !isCreatingFolder} onOpenChange={(open) => !open && setViewingDay(null)}>
+      <Dialog open={!!viewingDay && !isAddingTask && !verifyingTask && !isCreatingFolder && !editingTask && !folderToRename && !folderToDelete} onOpenChange={(open) => !open && setViewingDay(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
             
             <div className="p-6 pb-4 border-b border-white/5 bg-black/20">
@@ -226,7 +275,6 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                         <h3 className="text-xl font-bold text-white">{viewingDay && format(viewingDay, 'EEEE, MMM do')}</h3>
                         <p className="text-xs text-muted-foreground">Daily Operations Hub</p>
                     </div>
-                    {/* Botón New Folder con color de categoría */}
                     {canEdit && (
                         <Button 
                             size="sm" 
@@ -265,13 +313,14 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                 const folderTasks = filteredTasks.filter(t => t.category === folderName);
                                 if (searchQuery && folderTasks.length === 0) return null;
                                 const isOpen = openFolders[folderName];
+                                const isSystemFolder = ["Opening", "Shift", "Closing"].includes(folderName);
 
                                 return (
                                     <div key={folderName} className="rounded-2xl overflow-hidden border border-white/5 bg-card">
-                                        {/* CABECERA DE CARPETA (Clickable) */}
+                                        {/* CABECERA DE CARPETA */}
                                         <div 
                                             onClick={() => toggleFolder(folderName)}
-                                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+                                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors group"
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
@@ -282,12 +331,32 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                     <span className="text-[10px] text-muted-foreground">{folderTasks.length} tasks</span>
                                                 </div>
                                             </div>
-                                            <div className="bg-white/5 p-1 rounded-full">
-                                                {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                            
+                                            <div className="flex items-center gap-1">
+                                                {/* ACCIONES DE CARPETA (Editar/Borrar - Solo Custom) */}
+                                                {canEdit && !isSystemFolder && (
+                                                    <div className="flex items-center mr-2">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setFolderToRename(folderName); setRenameFolderInput(folderName); }}
+                                                            className="p-1.5 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white"
+                                                        >
+                                                            <Edit2 className="w-3 h-3" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setFolderToDelete(folderName); }}
+                                                            className="p-1.5 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                <div className="bg-white/5 p-1 rounded-full">
+                                                    {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* LISTA DE TAREAS (Colapsable) */}
+                                        {/* LISTA DE TAREAS */}
                                         <AnimatePresence>
                                             {isOpen && (
                                                 <motion.div
@@ -301,7 +370,8 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                     )}
                                                     
                                                     {folderTasks.map((t: any, i: number) => (
-                                                        <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                                                        <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors group/task">
+                                                            {/* Checkbox */}
                                                             <div 
                                                                 onClick={() => {
                                                                     if (t.type === 'checklist') handleToggleChecklist(t.id, t.completed);
@@ -317,22 +387,50 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                                 <Check className="w-4 h-4 stroke-[3]" />
                                                             </div>
 
-                                                            <span className={cn("flex-1 text-sm", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className={cn("text-sm block", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
+                                                                {/* Mostrar Empleado Asignado */}
+                                                                {t.assignedTo && (
+                                                                    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground/80">
+                                                                        <UserCircle className="w-3 h-3" />
+                                                                        {t.assignedTo}
+                                                                    </div>
+                                                                )}
+                                                            </div>
 
-                                                            <Button 
-                                                                size="icon" 
-                                                                variant="ghost" 
-                                                                onClick={() => setVerifyingTask({ id: t.id, type: t.type })}
-                                                                className={cn("h-8 w-8 rounded-full", t.completed ? "text-flow-green bg-flow-green/10" : "text-muted-foreground hover:bg-white/10 hover:text-white")}
-                                                            >
-                                                                <Camera className="w-4 h-4" />
-                                                            </Button>
-
-                                                            {t.type === 'task' && canEdit && (
-                                                                <Button size="icon" variant="ghost" onClick={(e) => handleDeleteTask(t.id, e)} className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full">
-                                                                    <Trash2 className="w-4 h-4" />
+                                                            {/* Botones de Acción Tarea */}
+                                                            <div className="flex items-center gap-1">
+                                                                <Button 
+                                                                    size="icon" 
+                                                                    variant="ghost" 
+                                                                    onClick={() => setVerifyingTask({ id: t.id, type: t.type })}
+                                                                    className={cn("h-8 w-8 rounded-full", t.completed ? "text-flow-green bg-flow-green/10" : "text-muted-foreground hover:bg-white/10 hover:text-white")}
+                                                                >
+                                                                    <Camera className="w-4 h-4" />
                                                                 </Button>
-                                                            )}
+
+                                                                {/* Editar y Borrar (Solo manuales) */}
+                                                                {t.type === 'task' && canEdit && (
+                                                                    <>
+                                                                        <Button 
+                                                                            size="icon" 
+                                                                            variant="ghost" 
+                                                                            onClick={() => setEditingTask({id: t.id, text: t.text, assignedTo: t.assignedTo})} 
+                                                                            className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10 rounded-full"
+                                                                        >
+                                                                            <Edit2 className="w-4 h-4" />
+                                                                        </Button>
+                                                                        <Button 
+                                                                            size="icon" 
+                                                                            variant="ghost" 
+                                                                            onClick={(e) => handleDeleteTask(t.id, e)} 
+                                                                            className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     ))}
 
@@ -361,34 +459,89 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: CREAR CARPETA NUEVA */}
+      {/* --- TODOS LOS MODALES --- */}
+
+      {/* 1. CREAR CARPETA */}
       <Dialog open={isCreatingFolder} onOpenChange={setIsCreatingFolder}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Create New Folder</DialogTitle></DialogHeader>
+          <div className="py-4"><Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Maintenance..." className="bg-black/20 border-white/10" /></div>
+          <DialogFooter><Button onClick={handleCreateFolder} className="w-full text-white font-bold" style={{ backgroundColor: categoryColor }}>Create Folder</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2. RENOMBRAR CARPETA */}
+      <Dialog open={!!folderToRename} onOpenChange={(open) => !open && setFolderToRename(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader><DialogTitle>Rename Folder</DialogTitle></DialogHeader>
           <div className="py-4">
-            <Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Maintenance, Events..." className="bg-black/20 border-white/10" />
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">New Name</label>
+              <Input autoFocus value={renameFolderInput} onChange={(e) => setRenameFolderInput(e.target.value)} className="bg-black/20 border-white/10" />
           </div>
-          <DialogFooter>
-              <Button onClick={handleCreateFolder} className="w-full text-white font-bold" style={{ backgroundColor: categoryColor }}>
-                  Create Folder
-              </Button>
+          <DialogFooter><Button onClick={handleRenameFolder} className="w-full bg-white text-black font-bold">Save Changes</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 3. BORRAR CARPETA */}
+      <Dialog open={!!folderToDelete} onOpenChange={(open) => !open && setFolderToDelete(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4"><Trash2 className="w-6 h-6" /></div>
+          <DialogTitle className="text-red-500 mb-2">Delete Folder?</DialogTitle>
+          <p className="text-sm text-muted-foreground mb-4">This will remove the folder "{folderToDelete}" from your view.</p>
+          <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setFolderToDelete(null)} className="flex-1">Cancel</Button>
+              <Button onClick={handleDeleteFolder} className="flex-1 bg-red-500 text-white font-bold hover:bg-red-600">Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: AÑADIR TAREA */}
+      {/* 4. EDITAR TAREA (CON ASIGNACIÓN) */}
+      <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-4">
+              <div>
+                  <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
+                  <Input autoFocus value={editingTask?.text || ""} onChange={(e) => setEditingTask(prev => prev ? {...prev, text: e.target.value} : null)} className="bg-black/20 border-white/10" />
+              </div>
+              <div>
+                  <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assign To</label>
+                  <Select value={editingTask?.assignedTo} onValueChange={(val) => setEditingTask(prev => prev ? {...prev, assignedTo: val} : null)}>
+                    <SelectTrigger className="bg-black/20 border-white/10"><SelectValue placeholder="Select employee..." /></SelectTrigger>
+                    <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
+                        {users.map((user: any) => (<SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+              </div>
+          </div>
+          <DialogFooter><Button onClick={handleEditTask} className="w-full bg-blue-500 text-white font-bold">Update Task</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 5. AÑADIR TAREA (CON ASIGNACIÓN) */}
       <Dialog open={!!isAddingTask} onOpenChange={() => setIsAddingTask(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Add to {isAddingTask?.category}</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
-            <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Task name..." className="bg-black/20 border-white/10" />
+          <div className="py-4 space-y-4">
+            <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
+                <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Task name..." className="bg-black/20 border-white/10" />
+            </div>
+            <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assign To</label>
+                <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                    <SelectTrigger className="bg-black/20 border-white/10"><SelectValue placeholder="Select employee..." /></SelectTrigger>
+                    <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
+                        {users.map((user: any) => (<SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>))}
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
           <DialogFooter><Button onClick={handleAddTask} className="w-full bg-flow-green text-black font-bold">Add Task</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: SUBIR FOTO */}
+      {/* 6. SUBIR FOTO */}
       <Dialog open={!!verifyingTask} onOpenChange={(open) => !open && setVerifyingTask(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Upload Photo Proof</DialogTitle></DialogHeader>
