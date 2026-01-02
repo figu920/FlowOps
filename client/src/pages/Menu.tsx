@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useStore, type MenuItem, type MeasurementUnit } from '@/lib/store';
-// 1. AÑADIMOS useInventory AQUÍ 👇
 import { useMenu, useCreateMenuItem, useUpdateMenuItem, useDeleteMenuItem, useAddIngredient, useUpdateIngredient, useDeleteIngredient, useInventory } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, ChevronDown, Utensils, Edit2 } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, Utensils, Edit2, Folder, ChevronLeft, FolderPlus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +14,27 @@ import { Textarea } from "@/components/ui/textarea";
 export default function Menu() {
   const { currentUser } = useStore();
   const { data: menu = [] } = useMenu();
-  
-  // 2. TRAEMOS EL INVENTARIO 👇
   const { data: inventory = [] } = useInventory();
 
+  // --- LÓGICA DE CARPETAS ---
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+
+  // 1. Obtener lista de carpetas (Categorías únicas)
+  const folders = useMemo(() => {
+    const categories = new Set(menu.map((item: any) => item.category).filter(Boolean));
+    return Array.from(categories).sort()as string[];
+  }, [menu]);
+
+  // 2. Filtrar items según si estamos en una carpeta o en la raíz
+  const displayedItems = useMemo(() => {
+    if (currentFolder) {
+      return menu.filter((item: any) => item.category === currentFolder);
+    }
+    // En la raíz, mostramos items que NO tengan categoría (huérfanos)
+    return menu.filter((item: any) => !item.category);
+  }, [menu, currentFolder]);
+
+  // --- MUTACIONES ---
   const createMenuItemMutation = useCreateMenuItem();
   const updateMenuItemMutation = useUpdateMenuItem();
   const deleteMenuItemMutation = useDeleteMenuItem();
@@ -26,10 +42,10 @@ export default function Menu() {
   const updateIngredientMutation = useUpdateIngredient();
   const deleteIngredientMutation = useDeleteIngredient();
   
-  // State for Add/Edit Dish
+  // Estados para añadir/editar
   const [isAddingDish, setIsAddingDish] = useState(false);
   const [newDishName, setNewDishName] = useState("");
-  const [newDishCategory, setNewDishCategory] = useState("");
+  const [newDishCategory, setNewDishCategory] = useState(""); // Esto define la carpeta
   
   const [editingDish, setEditingDish] = useState<string | null>(null);
   const [editDishName, setEditDishName] = useState("");
@@ -37,8 +53,6 @@ export default function Menu() {
 
   const [addingIngredientTo, setAddingIngredientTo] = useState<string | null>(null);
   const [editingIngredient, setEditingIngredient] = useState<{menuId: string, ingId: string} | null>(null);
-  
-  // 3. NUEVO ESTADO PARA EL LINK CON INVENTARIO 👇
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
   
   const [ingName, setIngName] = useState("");
@@ -51,10 +65,17 @@ export default function Menu() {
   const isAdmin = currentUser?.isSystemAdmin === true;
   const canManageMenu = currentUser?.role === 'manager' || isAdmin;
 
+  // --- HANDLERS ---
   const toggleExpand = (id: string) => {
-    setExpandedItems(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    setExpandedItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleOpenAddDish = () => {
+    // Si estamos dentro de una carpeta, pre-rellenamos la categoría
+    if (currentFolder) setNewDishCategory(currentFolder);
+    else setNewDishCategory("");
+    setNewDishName("");
+    setIsAddingDish(true);
   };
 
   const handleAddDish = () => {
@@ -65,7 +86,8 @@ export default function Menu() {
       });
       setIsAddingDish(false);
       setNewDishName("");
-      setNewDishCategory("");
+      // No reseteamos categoría si estamos dentro de una carpeta para facilitar añadir varios
+      if (!currentFolder) setNewDishCategory(""); 
     }
   };
 
@@ -82,54 +104,31 @@ export default function Menu() {
         updates: { name: editDishName, category: editDishCategory }
       });
       setEditingDish(null);
-      setEditDishName("");
-      setEditDishCategory("");
     }
   };
 
+  // Ingredientes logic
   const openAddIngredient = (menuId: string) => {
     setAddingIngredientTo(menuId);
-    setIngName("");
-    setIngQty("");
-    setIngUnit("grams");
-    setIngNotes("");
-    setSelectedInventoryId(null); // Reseteamos selección
+    setIngName(""); setIngQty(""); setIngUnit("grams"); setIngNotes(""); setSelectedInventoryId(null);
   };
 
   const openEditIngredient = (menuId: string, ing: any) => {
     setEditingIngredient({ menuId, ingId: ing.id });
-    setIngName(ing.name);
-    setIngQty(ing.quantity.toString());
-    setIngUnit(ing.unit);
-    setIngNotes(ing.notes || "");
-    // Cargamos el link si ya existe
+    setIngName(ing.name); setIngQty(ing.quantity.toString()); setIngUnit(ing.unit); setIngNotes(ing.notes || "");
     setSelectedInventoryId(ing.inventoryItemId || null);
   };
 
-  // 4. LÓGICA DE GUARDADO ACTUALIZADA 👇
   const handleSaveIngredient = () => {
     const quantity = parseFloat(ingQty);
     if (!ingName || isNaN(quantity)) return;
-
-    const ingredientData = {
-      name: ingName,
-      quantity,
-      unit: ingUnit,
-      notes: ingNotes || undefined,
-      inventoryItemId: selectedInventoryId || undefined, // <--- ¡AQUÍ ESTÁ EL CEREBRO!
-    };
+    const ingredientData = { name: ingName, quantity, unit: ingUnit, notes: ingNotes || undefined, inventoryItemId: selectedInventoryId || undefined };
 
     if (editingIngredient) {
-      updateIngredientMutation.mutate({
-        id: editingIngredient.ingId,
-        data: ingredientData
-      });
+      updateIngredientMutation.mutate({ id: editingIngredient.ingId, data: ingredientData });
       setEditingIngredient(null);
     } else if (addingIngredientTo) {
-      addIngredientMutation.mutate({
-        id: addingIngredientTo,
-        data: ingredientData
-      });
+      addIngredientMutation.mutate({ id: addingIngredientTo, data: ingredientData });
       setAddingIngredientTo(null);
     }
     setSelectedInventoryId(null);
@@ -144,12 +143,13 @@ export default function Menu() {
 
   return (
     <Layout 
-      title="Menu & Portion Sizes"
+      title={currentFolder ? currentFolder : "Menu & Portions"}
+      showBack={false} // Usamos nuestra propia navegación
       action={
         canManageMenu && (
           <motion.button
             whileTap={{ scale: 0.9 }}
-            onClick={() => setIsAddingDish(true)}
+            onClick={handleOpenAddDish}
             className="w-9 h-9 rounded-full bg-flow-green text-black flex items-center justify-center shadow-lg shadow-flow-green/20"
           >
             <Plus className="w-5 h-5" strokeWidth={3} />
@@ -157,8 +157,62 @@ export default function Menu() {
         )
       }
     >
+      {/* NAVEGACIÓN DE CARPETAS */}
+      <div className="mb-6">
+        {currentFolder ? (
+           <button 
+             onClick={() => setCurrentFolder(null)}
+             className="flex items-center text-muted-foreground hover:text-white text-sm font-medium transition-colors mb-4"
+           >
+             <ChevronLeft className="w-4 h-4 mr-1" />
+             Back to Categories
+           </button>
+        ) : (
+           <div className="flex items-center gap-2 mb-4 text-muted-foreground text-sm">
+              <Folder className="w-4 h-4" />
+              <span>Select a category to view dishes</span>
+           </div>
+        )}
+
+        {/* VISTA DE CARPETAS (Solo en raíz) */}
+        {!currentFolder && (
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {folders.map((folderName, idx) => (
+              <motion.div
+                key={folderName}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.05 }}
+                onClick={() => setCurrentFolder(folderName as string)}
+                className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3 relative group"
+              >
+                <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center">
+                  <Folder className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-white truncate w-full text-center">{folderName}</span>
+                <span className="text-[10px] text-muted-foreground uppercase bg-white/5 px-2 py-0.5 rounded-full">
+                  {menu.filter((i:any) => i.category === folderName).length} items
+                </span>
+              </motion.div>
+            ))}
+            
+            {/* Botón rápido para crear carpeta */}
+            {canManageMenu && (
+                <button 
+                  onClick={handleOpenAddDish}
+                  className="bg-white/5 hover:bg-white/10 border border-dashed border-white/10 rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-white transition-colors"
+                >
+                    <FolderPlus className="w-6 h-6 opacity-50" />
+                    <span className="text-xs font-bold">New Category</span>
+                </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* LISTA DE PLATOS (DENTRO DE CARPETA) */}
       <div className="space-y-4">
-        {menu.map((dish: MenuItem, idx: number) => (
+        {displayedItems.map((dish: MenuItem, idx: number) => (
           <motion.div
             key={dish.id}
             initial={{ opacity: 0, y: 10 }}
@@ -175,14 +229,12 @@ export default function Menu() {
                     <button 
                       onClick={(e) => { e.stopPropagation(); openEditDish(dish); }}
                       className="p-2 text-muted-foreground hover:text-flow-green transition-colors"
-                      data-testid={`button-edit-dish-${dish.id}`}
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button 
                       onClick={(e) => { e.stopPropagation(); deleteMenuItemMutation.mutate(dish.id); }}
                       className="p-2 text-muted-foreground hover:text-flow-red transition-colors"
-                      data-testid={`button-delete-${dish.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -195,14 +247,11 @@ export default function Menu() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">{dish.name}</h3>
-                  <span className="text-xs font-bold text-muted-foreground uppercase bg-white/5 px-2 py-0.5 rounded">{dish.category}</span>
+                  {!currentFolder && <span className="text-xs font-bold text-muted-foreground bg-white/5 px-2 py-0.5 rounded">Uncategorized</span>}
                 </div>
               </div>
               
-              <motion.div
-                animate={{ rotate: expandedItems.includes(dish.id) ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-              >
+              <motion.div animate={{ rotate: expandedItems.includes(dish.id) ? 180 : 0 }}>
                 <ChevronDown className="w-5 h-5 text-muted-foreground" />
               </motion.div>
             </div>
@@ -217,17 +266,10 @@ export default function Menu() {
                 >
                   <div className="p-4 space-y-3">
                     {dish.ingredients.map((ing) => (
-                      <div 
-                        key={ing.id} 
-                        className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02]"
-                      >
+                      <div key={ing.id} className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02]">
                          <div className="flex-1">
-                           <div className="flex items-center gap-2">
-                             <span className="font-semibold text-white">{ing.name}</span>
-                           </div>
-                           {ing.notes && (
-                             <p className="text-xs text-muted-foreground italic mt-0.5">"{ing.notes}"</p>
-                           )}
+                           <span className="font-semibold text-white">{ing.name}</span>
+                           {ing.notes && <p className="text-xs text-muted-foreground italic mt-0.5">"{ing.notes}"</p>}
                          </div>
                          <div className="flex items-center gap-3">
                            <div className="text-right">
@@ -235,30 +277,17 @@ export default function Menu() {
                              <span className="text-xs text-muted-foreground uppercase ml-1 font-medium">{ing.unit}</span>
                            </div>
                            {canManageMenu && (
-                             <button
-                               onClick={() => openEditIngredient(dish.id, ing)}
-                               className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
-                               data-testid={`button-edit-ingredient-${ing.id}`}
-                             >
+                             <button onClick={() => openEditIngredient(dish.id, ing)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white">
                                <Edit2 className="w-4 h-4" />
                              </button>
                            )}
                          </div>
                       </div>
                     ))}
-                    
-                    {dish.ingredients.length === 0 && (
-                      <p className="text-center text-muted-foreground text-sm py-2">No ingredients listed.</p>
-                    )}
-
+                    {dish.ingredients.length === 0 && <p className="text-center text-muted-foreground text-sm py-2">No ingredients.</p>}
                     {canManageMenu && (
-                      <Button 
-                        onClick={() => openAddIngredient(dish.id)}
-                        variant="ghost" 
-                        className="w-full border border-dashed border-white/10 text-muted-foreground hover:text-white hover:border-white/20 h-10 rounded-xl"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Ingredient
+                      <Button onClick={() => openAddIngredient(dish.id)} variant="ghost" className="w-full border border-dashed border-white/10 text-muted-foreground hover:text-white h-10 rounded-xl">
+                        <Plus className="w-4 h-4 mr-2" /> Add Ingredient
                       </Button>
                     )}
                   </div>
@@ -269,194 +298,74 @@ export default function Menu() {
         ))}
       </div>
 
-      {/* Add Dish Dialog */}
+      {/* MODALES DE CREACIÓN Y EDICIÓN (Añadir input de categoría para crear carpetas) */}
       <Dialog open={isAddingDish} onOpenChange={setIsAddingDish}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>Add New Dish</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader><DialogTitle>Add New Dish</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Dish Name</label>
-              <Input 
-                value={newDishName}
-                onChange={(e) => setNewDishName(e.target.value)}
-                placeholder="e.g. Spicy Chicken Sandwich"
-                className="bg-black/20 border-white/10"
-              />
+              <Input value={newDishName} onChange={(e) => setNewDishName(e.target.value)} placeholder="e.g. Spicy Chicken" className="bg-black/20 border-white/10" />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category</label>
-              <Input 
-                value={newDishCategory}
-                onChange={(e) => setNewDishCategory(e.target.value)}
-                placeholder="e.g. Burgers"
-                className="bg-black/20 border-white/10"
-              />
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category (Folder)</label>
+              <Input value={newDishCategory} onChange={(e) => setNewDishCategory(e.target.value)} placeholder="e.g. Burgers" className="bg-black/20 border-white/10" />
+              <p className="text-[10px] text-muted-foreground mt-1">Type a new name to create a new folder.</p>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={handleAddDish} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">Save Dish</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={handleAddDish} className="w-full bg-flow-green text-black font-bold">Save Dish</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dish Dialog */}
       <Dialog open={!!editingDish} onOpenChange={(open) => !open && setEditingDish(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>Edit Dish</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader><DialogTitle>Edit Dish</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Dish Name</label>
-              <Input 
-                value={editDishName}
-                onChange={(e) => setEditDishName(e.target.value)}
-                placeholder="e.g. Spicy Chicken Sandwich"
-                className="bg-black/20 border-white/10"
-              />
+              <Input value={editDishName} onChange={(e) => setEditDishName(e.target.value)} className="bg-black/20 border-white/10" />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category</label>
-              <Input 
-                value={editDishCategory}
-                onChange={(e) => setEditDishCategory(e.target.value)}
-                placeholder="e.g. Burgers"
-                className="bg-black/20 border-white/10"
-              />
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category (Folder)</label>
+              <Input value={editDishCategory} onChange={(e) => setEditDishCategory(e.target.value)} className="bg-black/20 border-white/10" />
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={handleEditDish} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">Update Dish</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={handleEditDish} className="w-full bg-flow-green text-black font-bold">Update Dish</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 5. DIÁLOGO DEL INGREDIENTE ACTUALIZADO 👇 */}
+      {/* ... (El resto de modales de ingredientes se mantienen igual) ... */}
       <Dialog open={!!addingIngredientTo || !!editingIngredient} onOpenChange={() => { setAddingIngredientTo(null); setEditingIngredient(null); }}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>{editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader><DialogTitle>{editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            
-            {/* --- SELECCIONAR DEL INVENTARIO (ESTILO MODERNO UI ✨) --- */}
             <div>
               <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Select from Inventory</label>
-              
-              <Select
-                value={selectedInventoryId || "manual"}
-                onValueChange={(value) => {
-                  if (value === "manual") {
-                    // Si eligen escribir a mano, limpiamos la selección
-                    setSelectedInventoryId(null);
-                    setIngName(""); // Opcional: limpiar el nombre para escribir de cero
-                  } else {
-                    // Lógica de Cerebro: Rellenar datos automáticamente
-                    const item = inventory.find((i: any) => i.id === value);
-                    if (item) {
-                      setIngName(item.name);
-                      setSelectedInventoryId(item.id);
-                      setIngUnit(item.unit as any);
-                    }
-                  }
-                }}
+              <select className="w-full h-10 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-ring"
+                onChange={(e) => { const item = inventory.find((i:any) => i.id === e.target.value); if(item) { setIngName(item.name); setSelectedInventoryId(item.id); setIngUnit(item.unit); } }}
+                value={selectedInventoryId || ""}
               >
-                <SelectTrigger className="w-full bg-black/20 border-white/10 text-white h-10">
-                  <SelectValue placeholder="-- Select an item --" />
-                </SelectTrigger>
-                
-                <SelectContent className="bg-[#1C1C1E] border-white/10 text-white max-h-[250px]">
-                  {/* Opción para volver al modo manual */}
-                  <SelectItem value="manual" className="text-muted-foreground italic focus:bg-white/5 cursor-pointer">
-                    -- Type name manually --
-                  </SelectItem>
-
-                  {/* Lista de productos del inventario */}
-                  {inventory.map((item: any) => (
-                    <SelectItem key={item.id} value={item.id} className="focus:bg-white/10 cursor-pointer py-2">
-                      <span className="mr-2">{item.emoji}</span>
-                      <span className="font-medium">{item.name}</span>
-                      <span className="ml-2 text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
-                        {item.unit}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {/* Input manual (Se desactiva visualmente si has elegido un producto) */}
-              <motion.div 
-                className="mt-2"
-                animate={{ opacity: selectedInventoryId ? 0.5 : 1 }}
-              >
-                <Input 
-                  value={ingName}
-                  onChange={(e) => setIngName(e.target.value)}
-                  placeholder="Or type name manually..."
-                  className="bg-black/20 border-white/10 text-xs h-9"
-                  disabled={!!selectedInventoryId} // Bloqueamos escritura si hay link al inventario
-                />
-              </motion.div>
+                <option value="">-- Select or type below --</option>
+                {inventory.map((item:any) => <option key={item.id} value={item.id}>{item.emoji} {item.name}</option>)}
+              </select>
+              <div className="mt-2"><Input value={ingName} onChange={(e) => setIngName(e.target.value)} placeholder="Or type manually..." className="bg-black/20 border-white/10 h-8 text-xs" /></div>
             </div>
-            {/* -------------------------------------------------------- */}
-
             <div className="grid grid-cols-2 gap-3">
-               <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Quantity</label>
-                <Input 
-                  type="number"
-                  value={ingQty}
-                  onChange={(e) => setIngQty(e.target.value)}
-                  placeholder="120"
-                  className="bg-black/20 border-white/10"
-                />
-               </div>
-               <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Unit</label>
+               <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Quantity</label><Input type="number" value={ingQty} onChange={(e) => setIngQty(e.target.value)} className="bg-black/20 border-white/10"/></div>
+               <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Unit</label>
                 <Select value={ingUnit} onValueChange={(v: MeasurementUnit) => setIngUnit(v)}>
-                  <SelectTrigger className="bg-black/20 border-white/10">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="bg-black/20 border-white/10"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                    <SelectItem value="grams">Grams</SelectItem>
-                    <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                    <SelectItem value="oz">Ounces (oz)</SelectItem>
-                    <SelectItem value="lb">Pounds (lb)</SelectItem>
-                    <SelectItem value="cups">Cups</SelectItem>
-                    <SelectItem value="bowls">Bowls</SelectItem>
-                    <SelectItem value="tablespoons">Tablespoons</SelectItem>
-                    <SelectItem value="pieces">Pieces</SelectItem>
+                    {['grams','kg','oz','lb','cups','bowls','tablespoons','pieces'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                   </SelectContent>
                 </Select>
                </div>
             </div>
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes (Optional)</label>
-              <Textarea 
-                value={ingNotes}
-                onChange={(e) => setIngNotes(e.target.value)}
-                placeholder="e.g. Must be filled to the top"
-                className="bg-black/20 border-white/10 h-20 resize-none"
-              />
-            </div>
+            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes</label><Textarea value={ingNotes} onChange={(e) => setIngNotes(e.target.value)} className="bg-black/20 border-white/10 h-20 resize-none" /></div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-             {editingIngredient && (
-                <Button 
-                  variant="ghost"
-                  onClick={handleDeleteIngredient}
-                  className="text-flow-red hover:text-flow-red/80 hover:bg-flow-red/10"
-                  data-testid="button-delete-ingredient"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </Button>
-             )}
-            <Button onClick={handleSaveIngredient} className="w-full bg-flow-green text-black font-bold hover:bg-flow-green/90">
-              {editingIngredient ? 'Update' : 'Add'}
-            </Button>
+             {editingIngredient && <Button variant="ghost" onClick={handleDeleteIngredient} className="text-flow-red hover:bg-flow-red/10"><Trash2 className="w-4 h-4 mr-2" />Delete</Button>}
+            <Button onClick={handleSaveIngredient} className="w-full bg-flow-green text-black font-bold">{editingIngredient ? 'Update' : 'Add'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
