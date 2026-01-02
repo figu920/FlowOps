@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useStore } from "@/lib/store"; // ✅ Importamos useStore para el logout
+import { useStore } from "@/lib/store";
 import { useInventory, useTasks } from "@/lib/hooks";
 import { 
   ClipboardList, 
@@ -10,14 +10,14 @@ import {
   Box, 
   Refrigerator,
   CalendarClock,
-  Activity,
-  LogOut // Icono para el botón
+  LogOut,
+  Users // ✅ Importamos el icono de Usuarios
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { logout } = useStore(); // ✅ Sacamos la función logout
+  const { logout } = useStore();
 
   // --- DATOS ---
   const { data: inventory = [] } = useInventory();
@@ -57,6 +57,13 @@ export default function Home() {
     </div>
   );
 
+  // ✅ LOGO DE EMPLEADOS (Rosa)
+  const EmployeesLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-[#E91E63] flex items-center justify-center shadow-[0_0_20px_rgba(233,30,99,0.3)]">
+      <Users className="w-7 h-7 text-white" strokeWidth={2.5} />
+    </div>
+  );
+
   // --- LISTA DE BOTONES ---
   const menuItems = [
     { 
@@ -68,7 +75,7 @@ export default function Home() {
       glowColor: 'bg-[#4ADE80]' 
     },
     { 
-      title: 'Schedule', 
+      title: 'Timeline', 
       path: '/schedule', 
       customIcon: <TimelineLogo />,
       glowColor: 'bg-[#3B82F6]' 
@@ -116,6 +123,13 @@ export default function Home() {
       iconColor: 'text-white',
       bgColor: 'bg-white/10',
       glowColor: 'bg-white'
+    },
+    // ✅ AÑADIDO EMPLOYEES AL FINAL
+    { 
+      title: 'Employees', 
+      path: '/employees', 
+      customIcon: <EmployeesLogo />,
+      glowColor: 'bg-[#E91E63]' 
     }
   ];
 
@@ -130,7 +144,6 @@ export default function Home() {
                Manager Mode
              </span>
              
-             {/* ✅ BOTÓN LOG OUT AÑADIDO */}
              <button 
                 onClick={() => logout()}
                 className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
@@ -144,6 +157,7 @@ export default function Home() {
            </h1>
         </div>
 
+        {/* GRID DE 2 COLUMNAS (Estilo App Móvil) */}
         <div className="grid grid-cols-2 gap-4">
           {menuItems.map((item) => (
             <motion.div
