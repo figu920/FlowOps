@@ -37,7 +37,7 @@ const getAutoEmoji = (name: string): string => {
     if (n.includes('sauce') || n.includes('ketchup')) return '🥫';
     if (n.includes('ice') || n.includes('cream')) return '🍦';
     if (n.includes('coffee')) return '☕';
-    return '📦'; // Default
+    return '📦'; 
 };
 
 export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor?: string }) {
@@ -66,11 +66,11 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const [folderNewName, setFolderNewName] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
   const [deletingFolder, setDeletingFolder] = useState<string | null>(null);
-  const [imageError, setImageError] = useState(false); // Estado para controlar errores de imagen
+  const [imageError, setImageError] = useState(false);
 
   // Formulario Item
   const [newItemName, setNewItemName] = useState("");
-  const [newItemIcon, setNewItemIcon] = useState("📦"); // Puede ser Emoji o URL
+  const [newItemIcon, setNewItemIcon] = useState("📦");
   const [newItemQty, setNewItemQty] = useState("");
   const [newItemUnit, setNewItemUnit] = useState("units");
   const [newItemCost, setNewItemCost] = useState("");
@@ -79,7 +79,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
   const canDelete = currentUser?.role === 'manager' || isAdmin;
 
-  // --- LÓGICA DE FILTRADO ---
+  // --- FILTRADO ---
   const itemsInCurrentPath = useMemo(() => {
     let items = rawInventory.filter((i: InventoryType) => {
       if (!currentPath) return !i.category;
@@ -163,7 +163,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
       else createMutation.mutate({ ...data, status: 'OK' });
       
       setIsAddingItem(false);
-      setImageError(false); // Resetear error de imagen al cerrar
+      setImageError(false);
     }
   };
 
@@ -194,17 +194,14 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
     }
   };
 
-  // --- AUTO-DETECT EMOJI ON NAME BLUR ---
   const handleNameBlur = () => {
     if (newItemIcon === "📦" || newItemIcon === "") {
         setNewItemIcon(getAutoEmoji(newItemName));
     }
   };
 
-  // --- HELPER PARA MOSTRAR ICONO O IMAGEN (MEJORADO) ---
   const renderItemIcon = (iconStr: string, isPreview = false) => {
       const isUrl = iconStr && (iconStr.startsWith('http') || iconStr.startsWith('data:image'));
-
       if (isUrl) {
           if (isPreview && imageError) {
               return <ImageOff className="w-8 h-8 text-muted-foreground opacity-50" />;
@@ -214,11 +211,10 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 src={iconStr} 
                 alt="icon" 
                 className="w-full h-full object-cover"
-                onError={() => isPreview ? setImageError(true) : null} // Solo marcamos error en el preview
+                onError={() => isPreview ? setImageError(true) : null}
               />
           );
       }
-      // Si no, mostramos EMOJI
       return <span className="text-4xl">{iconStr || '📦'}</span>;
   };
 
@@ -262,85 +258,84 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
          </div>
       </div>
 
-      <div className="space-y-3">
-        {visibleFolders.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {visibleFolders.map((folder) => (
-              <motion.div key={folder} onClick={() => handleEnterFolder(folder)} className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3 relative group">
-                {canEdit && (
-                    <div className="absolute top-2 right-2 flex gap-1 z-10">
-                         <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); setFolderNewName(folder); setIsRenamingFolder(true); }} className="p-1.5 bg-black/40 rounded-md text-white/70 hover:text-white"><Edit2 className="w-3 h-3"/></button>
-                         {canDelete && <button onClick={(e) => { e.stopPropagation(); setDeletingFolder(folder); }} className="p-1.5 bg-black/40 hover:bg-red-500/80 rounded-md text-white/70 hover:text-white"><Trash2 className="w-3 h-3"/></button>}
+      {/* ⚡ AQUÍ ESTÁ EL CAMBIO CLAVE: mode="wait" y key={currentPath} */}
+      <AnimatePresence mode="wait">
+        <motion.div
+            key={currentPath || 'root'} // Esto fuerza a que la vista antigua desaparezca ANTES de que la nueva entre
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-3"
+        >
+            {visibleFolders.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 mb-6">
+                {visibleFolders.map((folder) => (
+                <motion.div key={folder} onClick={() => handleEnterFolder(folder)} className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3 relative group">
+                    {canEdit && (
+                        <div className="absolute top-2 right-2 flex gap-1 z-10">
+                            <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); setFolderNewName(folder); setIsRenamingFolder(true); }} className="p-1.5 bg-black/40 rounded-md text-white/70 hover:text-white"><Edit2 className="w-3 h-3"/></button>
+                            {canDelete && <button onClick={(e) => { e.stopPropagation(); setDeletingFolder(folder); }} className="p-1.5 bg-black/40 hover:bg-red-500/80 rounded-md text-white/70 hover:text-white"><Trash2 className="w-3 h-3"/></button>}
+                        </div>
+                    )}
+                    <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mt-2"><Folder className="w-6 h-6" /></div>
+                    <span className="font-bold text-white truncate w-full text-center">{folder}</span>
+                </motion.div>
+                ))}
+            </div>
+            )}
+
+            {itemsInCurrentPath.map((item: InventoryType, idx: number) => (
+                <div
+                    key={item.id}
+                    className="rounded-[20px] p-5 border border-white/5 bg-card shadow-sm relative group overflow-hidden mb-3"
+                >
+                    <div className="absolute top-4 right-4 flex gap-2 z-10">
+                        {canEdit && <button onClick={() => { setIsAddingItem(true); setEditingItem(item); setNewItemName(item.name); setNewItemIcon(item.emoji); setNewItemQty(String(item.quantity)); setNewItemUnit(item.unit || "units"); setNewItemCost(String(item.costPerUnit)); setImageError(false); }} className="p-2 bg-black/20 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white"><Edit2 className="w-4 h-4"/></button>}
+                        {canDelete && <button onClick={() => deleteMutation.mutate(item.id)} className="p-2 bg-black/20 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4"/></button>}
                     </div>
-                )}
-                <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mt-2"><Folder className="w-6 h-6" /></div>
-                <span className="font-bold text-white truncate w-full text-center">{folder}</span>
-              </motion.div>
+
+                    <div className="flex items-center gap-4 mb-5">
+                    <div className="w-16 h-16 flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 overflow-hidden shrink-0">
+                        {renderItemIcon(item.emoji)}
+                    </div>
+                    
+                    <div className="min-w-0">
+                        <h3 className="font-bold text-[19px] text-white truncate max-w-[150px]">{item.name}</h3>
+                        {searchQuery && item.category && <span className="text-[10px] text-muted-foreground block">in {item.category}</span>}
+                        <div className="flex gap-2 mt-2">
+                        <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-white font-bold border border-white/5">📊 {item.quantity} {item.unit}</span>
+                        {(item.costPerUnit || 0) > 0 && <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-flow-green font-bold border border-white/5">💰 {item.costPerUnit}$</span>}
+                        </div>
+                    </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 bg-black/20 p-1.5 rounded-xl">
+                    {(['OK', 'LOW', 'OUT'] as const).map((status) => (
+                        <button
+                            key={status}
+                            onClick={() => handleStatusChange(item.id, status)}
+                            className={cn(
+                                "py-2.5 rounded-lg text-sm font-medium transition-all",
+                                item.status === status 
+                                    ? (status === 'OK' ? "bg-flow-green text-black font-bold" : status === 'LOW' ? "bg-flow-yellow text-black font-bold" : "bg-flow-red text-white font-bold")
+                                    : "text-muted-foreground hover:bg-white/5"
+                            )}
+                        >
+                            {status}
+                        </button>
+                    ))}
+                    </div>
+                    
+                    {item.status === 'LOW' && item.lowComment && <div className="mt-3 bg-flow-yellow/10 p-3 rounded-lg border border-flow-yellow/10 text-xs text-flow-yellow italic">"{item.lowComment}"</div>}
+                </div>
             ))}
-          </div>
-        )}
-
-        <AnimatePresence mode="popLayout">
-          {itemsInCurrentPath.map((item: InventoryType, idx: number) => {
-            // ✅ SIN COLORES DINÁMICOS
-            return (
-              <motion.div
-                key={item.id}
-                layoutId={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.03 }}
-                // ✅ Tarjeta neutra, sin bordes de color
-                className="rounded-[20px] p-5 border border-white/5 bg-card shadow-sm relative group overflow-hidden"
-              >
-                <div className="absolute top-4 right-4 flex gap-2 z-10">
-                    {canEdit && <button onClick={() => { setIsAddingItem(true); setEditingItem(item); setNewItemName(item.name); setNewItemIcon(item.emoji); setNewItemQty(String(item.quantity)); setNewItemUnit(item.unit || "units"); setNewItemCost(String(item.costPerUnit)); setImageError(false); }} className="p-2 bg-black/20 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white"><Edit2 className="w-4 h-4"/></button>}
-                    {canDelete && <button onClick={() => deleteMutation.mutate(item.id)} className="p-2 bg-black/20 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4"/></button>}
-                </div>
-
-                <div className="flex items-center gap-4 mb-5">
-                  {/* ✅ Icono neutro, sin fondo de color */}
-                  <div className="w-16 h-16 flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 overflow-hidden shrink-0">
-                    {renderItemIcon(item.emoji)}
-                  </div>
-                  
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-[19px] text-white truncate max-w-[150px]">{item.name}</h3>
-                    {searchQuery && item.category && <span className="text-[10px] text-muted-foreground block">in {item.category}</span>}
-                    <div className="flex gap-2 mt-2">
-                      <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-white font-bold border border-white/5">📊 {item.quantity} {item.unit}</span>
-                      {(item.costPerUnit || 0) > 0 && <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-flow-green font-bold border border-white/5">💰 {item.costPerUnit}$</span>}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 bg-black/20 p-1.5 rounded-xl">
-                  {(['OK', 'LOW', 'OUT'] as const).map((status) => (
-                    <button
-                        key={status}
-                        onClick={() => handleStatusChange(item.id, status)}
-                        className={cn(
-                            "py-2.5 rounded-lg text-sm font-medium transition-all",
-                            item.status === status 
-                                ? (status === 'OK' ? "bg-flow-green text-black font-bold" : status === 'LOW' ? "bg-flow-yellow text-black font-bold" : "bg-flow-red text-white font-bold")
-                                : "text-muted-foreground hover:bg-white/5"
-                        )}
-                    >
-                        {status}
-                    </button>
-                  ))}
-                </div>
-                
-                {item.status === 'LOW' && item.lowComment && <div className="mt-3 bg-flow-yellow/10 p-3 rounded-lg border border-flow-yellow/10 text-xs text-flow-yellow italic">"{item.lowComment}"</div>}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-        
-        {itemsInCurrentPath.length === 0 && visibleFolders.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground opacity-50">Empty here.</div>
-        )}
-      </div>
+            
+            {itemsInCurrentPath.length === 0 && visibleFolders.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground opacity-50">Empty here.</div>
+            )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* --- MODALES --- */}
       <Dialog open={!!lowCommentItem} onOpenChange={() => setLowCommentItem(null)}><DialogContent className="bg-[#1C1C1E] border-white/10 text-white"><DialogHeader><DialogTitle>Low Stock Note</DialogTitle></DialogHeader><Input autoFocus value={commentText} onChange={e=>setCommentText(e.target.value)} placeholder="Quantity left..." className="bg-black/20 border-white/10"/><DialogFooter><Button onClick={submitLowComment} className="w-full bg-flow-yellow text-black font-bold">Save</Button></DialogFooter></DialogContent></Dialog>
@@ -362,10 +357,8 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* VISTA PREVIA DEL ICONO/IMAGEN */}
             <div className="flex justify-center">
               <div className="w-24 h-24 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 overflow-hidden relative">
-                {/* Usamos el helper con isPreview=true para detectar errores */}
                 {renderItemIcon(newItemIcon, true)}
                 <div className="absolute bottom-0 w-full bg-black/60 text-[8px] text-center text-white py-1">PREVIEW</div>
               </div>
@@ -376,7 +369,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
               <Input 
                 value={newItemName} 
                 onChange={(e) => setNewItemName(e.target.value)} 
-                onBlur={handleNameBlur} // Auto-detect emoji on blur
+                onBlur={handleNameBlur} 
                 placeholder="e.g. Pepsi Can" 
                 className="bg-black/20 border-white/10"
               />
@@ -390,7 +383,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 </label>
                 <Input 
                     value={newItemIcon} 
-                    onChange={(e) => { setNewItemIcon(e.target.value); setImageError(false); }} // Reset error al cambiar URL
+                    onChange={(e) => { setNewItemIcon(e.target.value); setImageError(false); }} 
                     placeholder="🍔 or https://..." 
                     className="bg-black/20 border-white/10 text-center font-mono text-sm"
                 />
