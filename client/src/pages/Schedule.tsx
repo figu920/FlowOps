@@ -1,555 +1,359 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
-import { 
-  useChecklists, useUpdateChecklist, 
-  useTasks, useCompleteTask, useCreateTask, useDeleteTask, useUpdateTask, useUsers 
-} from '@/lib/hooks';
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from '@/lib/hooks'; // Asegúrate de tener useDeleteTask
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Check, Plus, Trash2, Camera, 
-  ChevronLeft, ChevronRight, Search, FolderPlus, Folder, 
-  ChevronDown, ChevronUp, Edit2, UserCircle
+  Plus, Trash2, Edit2, Search, X, CheckCircle2, Circle, 
+  Camera, ChevronDown, ChevronUp, FolderPlus, CalendarDays 
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  format, addMonths, subMonths, startOfMonth, endOfMonth, 
-  startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, 
-  isToday 
-} from 'date-fns';
+import { Textarea } from "@/components/ui/textarea";
+import { format } from 'date-fns';
 
-export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?: string }) {
+export default function Schedule() {
   const { currentUser } = useStore();
-  
-  // --- ESTADOS ---
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  
-  // --- DATA ---
-  const { data: openingList = [] } = useChecklists("opening");
-  const { data: shiftList = [] } = useChecklists("shift"); 
-  const { data: closingList = [] } = useChecklists("closing");
+  // Datos
   const { data: tasks = [] } = useTasks();
-  const { data: users = [] } = useUsers();
-
-  const updateChecklistMutation = useUpdateChecklist();
-  const updateTaskMutation = useUpdateTask(); 
-  const completeTaskMutation = useCompleteTask();
+  
+  // Mutaciones
   const createTaskMutation = useCreateTask();
-  const deleteTaskMutation = useDeleteTask();
-  
-  // --- UI STATE ---
-  const [viewingDay, setViewingDay] = useState<Date | null>(null);
+  const updateTaskMutation = useUpdateTask();
+  const deleteTaskMutation = useDeleteTask(); // 🗑️ El hook para borrar
+
+  // Estados
   const [searchQuery, setSearchQuery] = useState("");
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
+  const [expandedFolders, setExpandedFolders] = useState<string[]>(['Opening', 'Shift', 'Closing']); // Carpetas abiertas por defecto
 
-  // --- MODALES (CREAR/ASIGNAR) ---
-  const [isAddingTask, setIsAddingTask] = useState<{date: Date, category: string} | null>(null);
-  const [newTaskText, setNewTaskText] = useState("");
-  const [newTaskAssignee, setNewTaskAssignee] = useState("");
-
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [customFolders, setCustomFolders] = useState<string[]>([]);
+  // Modales
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [isAddingFolder, setIsAddingFolder] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
   
-  // --- MODALES (ACCIONES) ---
-  const [verifyingTask, setVerifyingTask] = useState<{id: string, type: 'task'|'checklist'} | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [editingTask, setEditingTask] = useState<{id: string, text: string, assignedTo: string} | null>(null);
-  const [folderToRename, setFolderToRename] = useState<string | null>(null);
-  const [renameFolderInput, setRenameFolderInput] = useState("");
-  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  // Formulario
+  const [taskText, setTaskText] = useState("");
+  const [taskCategory, setTaskCategory] = useState("");
+  const [taskAssignee, setTaskAssignee] = useState("");
+  const [newFolderName, setNewFolderName] = useState("");
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
 
-  // --- GENERAR CALENDARIO ---
-  const calendarDays = useMemo(() => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(monthStart);
-    const startDate = startOfWeek(monthStart);
-    const endDate = endOfWeek(monthEnd);
-    return eachDayOfInterval({ start: startDate, end: endDate });
-  }, [currentMonth]);
+  // --- AGRUPACIÓN DE TAREAS ---
+  const groupedTasks = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    
+    // 1. Agrupar por categoría
+    tasks.forEach((task: any) => {
+      const cat = task.category || "General";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(task);
+    });
 
-  // --- HANDLERS CARPETAS ---
+    // 2. Filtrar por búsqueda
+    if (searchQuery.trim()) {
+       Object.keys(groups).forEach(key => {
+         groups[key] = groups[key].filter((t: any) => t.text.toLowerCase().includes(searchQuery.toLowerCase()));
+         if (groups[key].length === 0) delete groups[key];
+       });
+    }
+
+    return groups;
+  }, [tasks, searchQuery]);
+
+  // Orden de carpetas (Opening primero, etc.)
+  const sortedCategories = Object.keys(groupedTasks).sort((a, b) => {
+     const order = ['Opening', 'Shift', 'Closing'];
+     const idxA = order.indexOf(a);
+     const idxB = order.indexOf(b);
+     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+     if (idxA !== -1) return -1;
+     if (idxB !== -1) return 1;
+     return a.localeCompare(b);
+  });
+
+  // --- HANDLERS ---
+
+  const toggleFolder = (folder: string) => {
+    setExpandedFolders(prev => 
+      prev.includes(folder) ? prev.filter(f => f !== folder) : [...prev, folder]
+    );
+  };
+
+  const handleOpenAddTask = (category: string) => {
+      setTaskText("");
+      setTaskCategory(category);
+      setTaskAssignee("");
+      setEditingTask(null);
+      setIsAddingTask(true);
+  };
+
+  const handleOpenEditTask = (task: any) => {
+      setTaskText(task.text);
+      setTaskCategory(task.category);
+      setTaskAssignee(task.assignee || "");
+      setEditingTask(task);
+      setIsAddingTask(true);
+  };
+
+  const handleSaveTask = () => {
+      if (!taskText.trim()) return;
+
+      const data = {
+          text: taskText,
+          category: taskCategory,
+          assignee: taskAssignee || "Team",
+          completed: editingTask ? editingTask.completed : false
+      };
+
+      if (editingTask) {
+          updateTaskMutation.mutate({ id: editingTask.id, updates: data });
+      } else {
+          createTaskMutation.mutate(data);
+      }
+      setIsAddingTask(false);
+  };
+
+  const handleDeleteTask = (id: string) => {
+      if (confirm("Delete this task permanently?")) {
+          deleteTaskMutation.mutate(id);
+      }
+  };
+
+  const toggleTaskCompletion = (task: any) => {
+      updateTaskMutation.mutate({ 
+          id: task.id, 
+          updates: { completed: !task.completed } 
+      });
+  };
 
   const handleCreateFolder = () => {
-      if (newFolderName.trim()) {
-          setCustomFolders(prev => [...prev, newFolderName.trim()]);
-          setNewFolderName("");
-          setIsCreatingFolder(false);
-      }
-  };
-
-  const handleRenameFolder = async () => {
-      if (folderToRename && renameFolderInput.trim() && folderToRename !== renameFolderInput) {
-          setCustomFolders(prev => prev.map(f => f === folderToRename ? renameFolderInput.trim() : f));
-          
-          const dateStr = viewingDay ? format(viewingDay, 'yyyy-MM-dd') : "";
-          const tasksToUpdate = tasks.filter((t: any) => t.notes?.includes(`CAT:${folderToRename}`) && t.notes?.includes(`DATE:${dateStr}`));
-          
-          for (const task of tasksToUpdate) {
-              const newNote = task.notes.replace(`CAT:${folderToRename}`, `CAT:${renameFolderInput.trim()}`);
-              await updateTaskMutation.mutateAsync({ id: task.id, updates: { notes: newNote } });
-          }
-
-          setFolderToRename(null);
-          setRenameFolderInput("");
-      }
-  };
-
-  const handleDeleteFolder = () => {
-      if (folderToDelete) {
-          setCustomFolders(prev => prev.filter(f => f !== folderToDelete));
-          setFolderToDelete(null);
-      }
-  };
-
-  const toggleFolder = (folderName: string) => {
-      setOpenFolders(prev => ({ ...prev, [folderName]: !prev[folderName] }));
-  };
-
-  // --- HANDLERS TAREAS ---
-
-  const handleAddTask = () => {
-    if (newTaskText && isAddingTask) {
-      const dateTag = format(isAddingTask.date, 'yyyy-MM-dd');
-      const noteTag = `DATE:${dateTag}|CAT:${isAddingTask.category}`; 
-      createTaskMutation.mutate({ 
-          text: newTaskText, 
-          assignedTo: newTaskAssignee || 'Team',
-          notes: noteTag, 
-          completed: false 
+      if (!newFolderName.trim()) return;
+      // Creamos una tarea dummy para inicializar la carpeta o simplemente preparamos el UI
+      // En este sistema basado en items, creamos una tarea placeholder
+      createTaskMutation.mutate({
+          text: "Check area",
+          category: newFolderName,
+          assignee: "Team",
+          completed: false
       });
-      setNewTaskText("");
-      setNewTaskAssignee("");
-      setIsAddingTask(null);
-      setOpenFolders(prev => ({ ...prev, [isAddingTask.category]: true }));
-    }
-  };
-
-  const handleEditTask = () => {
-      if (editingTask && editingTask.text.trim()) {
-          updateTaskMutation.mutate({ 
-              id: editingTask.id, 
-              updates: { 
-                  text: editingTask.text,
-                  assignedTo: editingTask.assignedTo
-              } 
-          });
-          setEditingTask(null);
-      }
-  };
-
-  const handleDeleteTask = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    deleteTaskMutation.mutate(id);
-  };
-
-  const handleToggleChecklist = (id: string, currentStatus: boolean) => {
-      updateChecklistMutation.mutate({ id, updates: { completed: !currentStatus } });
-  };
-
-  // --- FOTOS ---
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => { setPhotoPreview(ev.target?.result as string); };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const submitPhotoCompletion = () => {
-    if (verifyingTask && photoPreview) {
-      if (verifyingTask.type === 'task') {
-          completeTaskMutation.mutate({ id: verifyingTask.id, photo: photoPreview });
-      } else {
-          handleToggleChecklist(verifyingTask.id, false); 
-      }
-      setVerifyingTask(null);
-      setPhotoPreview(null);
-    }
-  };
-
-  // --- HELPERS ---
-  const getTaskCategory = (notes: string) => {
-    const match = notes?.match(/CAT:([^|]+)/);
-    return match ? match[1] : 'General';
-  };
-
-  const getTasksForDay = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    const dailyManualTasks = tasks.filter((t: any) => t.notes?.includes(`DATE:${dateStr}`)).map((t:any) => ({
-        ...t, 
-        type: 'task',
-        category: getTaskCategory(t.notes)
-    }));
-    
-    const isDayToday = isToday(day);
-    let checklistItems: any[] = [];
-    
-    if (isDayToday) {
-        checklistItems = [
-            ...openingList.map((i:any) => ({...i, type: 'checklist', category: 'Opening'})),
-            ...shiftList.map((i:any) => ({...i, type: 'checklist', category: 'Shift'})),
-            ...closingList.map((i:any) => ({...i, type: 'checklist', category: 'Closing'}))
-        ];
-    }
-
-    return [...checklistItems, ...dailyManualTasks];
+      setIsAddingFolder(false);
+      setNewFolderName("");
   };
 
   return (
-    <Layout title="Operations Calendar" showBack>
+    <Layout title="Operations Calendar" showBack={false}>
       
-      {/* CABECERA */}
-      <div className="flex items-center justify-between mb-6 px-1">
-        <h2 className="text-2xl font-black text-white capitalize">{format(currentMonth, 'MMMM yyyy')}</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronLeft className="w-5 h-5" /></Button>
-          <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="rounded-full border-white/10 hover:bg-white/10 text-xs font-bold">Today</Button>
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronRight className="w-5 h-5" /></Button>
+      {/* CABECERA: FECHA Y BUSCADOR */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+            <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    {format(new Date(), 'EEEE, MMM do')}
+                </h2>
+                <p className="text-xs text-muted-foreground">Daily Operations Hub</p>
+            </div>
+            {canEdit && (
+                <button 
+                    onClick={() => setIsAddingFolder(true)}
+                    className="bg-flow-blue/20 hover:bg-flow-blue/30 text-flow-blue px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-flow-blue/20"
+                >
+                    <FolderPlus className="w-3 h-3" /> New Folder
+                </button>
+            )}
+        </div>
+
+        <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                className="pl-9 bg-black/20 border-white/10 h-10 rounded-xl"
+            />
         </div>
       </div>
 
-      {/* GRID CALENDARIO */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} className="text-center text-[10px] uppercase font-bold text-muted-foreground py-2">{d}</div>)}
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 auto-rows-fr bg-white/5 p-1 rounded-2xl border border-white/5">
-        {calendarDays.map((day) => {
-          const isSelectedMonth = isSameMonth(day, currentMonth);
-          const isDayToday = isToday(day);
-          const allTasks = getTasksForDay(day);
-          const completedCount = allTasks.filter(t => t.completed).length;
-          const totalCount = allTasks.length;
-
-          return (
-            <div
-              key={day.toString()}
-              onClick={() => { setViewingDay(day); setSearchQuery(""); }}
-              className={cn(
-                "min-h-[100px] p-2 rounded-xl border flex flex-col gap-1 transition-all cursor-pointer relative group overflow-hidden",
-                isSelectedMonth ? "bg-black/40 border-white/5 hover:border-white/20" : "bg-black/20 border-transparent opacity-50",
-                isDayToday && "ring-1 ring-flow-green bg-flow-green/5"
-              )}
-            >
-              <div className="flex justify-between items-start">
-                <span className={cn("text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full", isDayToday ? "bg-flow-green text-black" : "text-muted-foreground")}>{format(day, 'd')}</span>
-                {canEdit && <button onClick={(e) => { e.stopPropagation(); setIsAddingTask({date: day, category: 'Shift'}); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-muted-foreground hover:text-white"><Plus className="w-3 h-3" /></button>}
-              </div>
-
-              <div className="flex-1 flex flex-col justify-end gap-1 mt-1">
-                 {totalCount > 0 && (
-                     <div className="text-[9px] text-muted-foreground font-medium">
-                         {completedCount}/{totalCount} Done
-                     </div>
-                 )}
-                 {allTasks.slice(0, 3).map((t: any, i: number) => (
-                    <div key={i} className={cn("h-1 w-full rounded-full", t.completed ? "bg-flow-green" : "bg-white/10")} />
-                 ))}
-                 {allTasks.length > 3 && <div className="h-1 w-1 rounded-full bg-white/10 mx-auto" />}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* MODAL: DETALLES DEL DÍA */}
-      <Dialog open={!!viewingDay && !isAddingTask && !verifyingTask && !isCreatingFolder && !editingTask && !folderToRename && !folderToDelete} onOpenChange={(open) => !open && setViewingDay(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
+      {/* LISTA DE CARPETAS Y TAREAS */}
+      <div className="space-y-4 pb-20">
+        {sortedCategories.map(category => {
+            const isExpanded = expandedFolders.includes(category);
+            const items = groupedTasks[category];
+            const completedCount = items.filter((t: any) => t.completed).length;
             
-            <div className="p-6 pb-4 border-b border-white/5 bg-black/20">
-                <div className="flex justify-between items-center mb-4">
-                    <div>
-                        <h3 className="text-xl font-bold text-white">{viewingDay && format(viewingDay, 'EEEE, MMM do')}</h3>
-                        <p className="text-xs text-muted-foreground">Daily Operations Hub</p>
+            return (
+                <motion.div 
+                    key={category}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-card rounded-[24px] border border-white/[0.04] overflow-hidden"
+                >
+                    {/* CABECERA DE CARPETA */}
+                    <div 
+                        onClick={() => toggleFolder(category)}
+                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                <CalendarDays className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-white">{category}</h3>
+                                <p className="text-[10px] text-muted-foreground">
+                                    {completedCount}/{items.length} done
+                                </p>
+                            </div>
+                        </div>
+                        {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground"/> : <ChevronDown className="w-5 h-5 text-muted-foreground"/>}
                     </div>
-                    {canEdit && (
-                        <Button 
-                            size="sm" 
-                            onClick={() => setIsCreatingFolder(true)} 
-                            className="text-xs h-8 text-white font-bold shadow-lg"
-                            style={{ backgroundColor: categoryColor }}
-                        >
-                            <FolderPlus className="w-3 h-3 mr-1.5" /> New Folder
-                        </Button>
-                    )}
-                </div>
 
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search tasks..." 
-                        className="bg-black/40 border-white/10 pl-9 h-10 text-sm rounded-xl focus-visible:ring-flow-green"
-                    />
-                </div>
-            </div>
-            
-            <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-black/10">
-                {viewingDay && (() => {
-                    const allTasks = getTasksForDay(viewingDay);
-                    const dynamicFoldersFromTasks = Array.from(new Set(allTasks.map(t => t.category)));
-                    const activeFolders = Array.from(new Set([...dynamicFoldersFromTasks, "Opening", "Shift", "Closing", ...customFolders]));
-                    const filteredTasks = searchQuery 
-                        ? allTasks.filter(t => t.text.toLowerCase().includes(searchQuery.toLowerCase()))
-                        : allTasks;
-
-                    return (
-                        <>
-                            {activeFolders.map((folderName) => {
-                                const folderTasks = filteredTasks.filter(t => t.category === folderName);
-                                if (searchQuery && folderTasks.length === 0) return null;
-                                const isOpen = openFolders[folderName];
-                                const isSystemFolder = ["Opening", "Shift", "Closing"].includes(folderName);
-
-                                return (
-                                    <div key={folderName} className="rounded-2xl overflow-hidden border border-white/5 bg-card">
-                                        {/* CABECERA DE CARPETA */}
+                    {/* LISTA DE TAREAS */}
+                    <AnimatePresence>
+                        {isExpanded && (
+                            <motion.div
+                                initial={{ height: 0 }}
+                                animate={{ height: 'auto' }}
+                                exit={{ height: 0 }}
+                                className="border-t border-white/[0.04] bg-black/20"
+                            >
+                                <div className="p-2 space-y-1">
+                                    {items.map((task: any) => (
                                         <div 
-                                            onClick={() => toggleFolder(folderName)}
-                                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors group"
+                                            key={task.id} 
+                                            className={cn(
+                                                "flex items-center gap-3 p-3 rounded-xl transition-all group",
+                                                task.completed ? "bg-green-500/5" : "hover:bg-white/5"
+                                            )}
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                                                    <Folder className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-white text-sm">{folderName}</h4>
-                                                    <span className="text-[10px] text-muted-foreground">{folderTasks.length} tasks</span>
-                                                </div>
+                                            {/* CHECKBOX */}
+                                            <button 
+                                                onClick={() => toggleTaskCompletion(task)}
+                                                className={cn(
+                                                    "w-6 h-6 rounded-full flex items-center justify-center border transition-all shrink-0",
+                                                    task.completed 
+                                                        ? "bg-flow-green border-flow-green text-black" 
+                                                        : "border-white/20 hover:border-white/40 text-transparent"
+                                                )}
+                                            >
+                                                <CheckCircle2 className="w-4 h-4" />
+                                            </button>
+
+                                            {/* TEXTO */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className={cn(
+                                                    "text-sm font-medium truncate transition-all",
+                                                    task.completed ? "text-muted-foreground line-through" : "text-white"
+                                                )}>
+                                                    {task.text}
+                                                </p>
+                                                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                    @{task.assignee}
+                                                </p>
                                             </div>
-                                            
+
+                                            {/* ACCIONES: CÁMARA | EDITAR | BORRAR */}
                                             <div className="flex items-center gap-1">
-                                                {/* BOTONES DE CARPETA (Siempre visibles para custom folders) */}
-                                                {canEdit && !isSystemFolder && (
-                                                    <div className="flex items-center mr-2">
+                                                <button className="p-2 text-muted-foreground hover:text-white hover:bg-white/10 rounded-full transition-colors">
+                                                    <Camera className="w-4 h-4" />
+                                                </button>
+                                                
+                                                {canEdit && (
+                                                    <>
                                                         <button 
-                                                            onClick={(e) => { e.stopPropagation(); setFolderToRename(folderName); setRenameFolderInput(folderName); }}
-                                                            className="p-2 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white"
+                                                            onClick={() => handleOpenEditTask(task)}
+                                                            className="p-2 text-muted-foreground hover:text-flow-blue hover:bg-flow-blue/10 rounded-full transition-colors"
                                                         >
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
+                                                        {/* 🗑️ BOTÓN DE BORRAR AÑADIDO */}
                                                         <button 
-                                                            onClick={(e) => { e.stopPropagation(); setFolderToDelete(folderName); }}
-                                                            className="p-2 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500"
+                                                            onClick={() => handleDeleteTask(task.id)}
+                                                            className="p-2 text-muted-foreground hover:text-flow-red hover:bg-flow-red/10 rounded-full transition-colors"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
-                                                    </div>
+                                                    </>
                                                 )}
-                                                <div className="bg-white/5 p-1 rounded-full">
-                                                    {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                                                </div>
                                             </div>
                                         </div>
+                                    ))}
 
-                                        {/* LISTA DE TAREAS */}
-                                        <AnimatePresence>
-                                            {isOpen && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    className="border-t border-white/5 bg-black/20"
-                                                >
-                                                    {folderTasks.length === 0 && (
-                                                        <div className="p-4 text-center text-[10px] text-muted-foreground">Empty folder</div>
-                                                    )}
-                                                    
-                                                    {folderTasks.map((t: any, i: number) => (
-                                                        <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                                                            {/* Checkbox */}
-                                                            <div 
-                                                                onClick={() => {
-                                                                    if (t.type === 'checklist') handleToggleChecklist(t.id, t.completed);
-                                                                    else if (!t.completed) setVerifyingTask({ id: t.id, type: 'task' });
-                                                                }}
-                                                                className={cn(
-                                                                    "w-6 h-6 rounded-lg flex items-center justify-center shrink-0 cursor-pointer border transition-all",
-                                                                    t.completed 
-                                                                        ? "bg-flow-green border-flow-green text-black" 
-                                                                        : "bg-white/5 border-white/20 text-transparent hover:border-white/40"
-                                                                )}
-                                                            >
-                                                                <Check className="w-4 h-4 stroke-[3]" />
-                                                            </div>
+                                    {/* BOTÓN AÑADIR TAREA */}
+                                    {canEdit && (
+                                        <button 
+                                            onClick={() => handleOpenAddTask(category)}
+                                            className="w-full py-3 flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all mt-2 border border-dashed border-white/10"
+                                        >
+                                            <Plus className="w-4 h-4" /> Add Task to {category}
+                                        </button>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </motion.div>
+            );
+        })}
 
-                                                            <div className="flex-1 min-w-0">
-                                                                <span className={cn("text-sm block", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
-                                                                {t.assignedTo && (
-                                                                    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground/80">
-                                                                        <UserCircle className="w-3 h-3" />
-                                                                        {t.assignedTo}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* BOTONES DE TAREA (Siempre visibles) */}
-                                                            <div className="flex items-center gap-1">
-                                                                <Button 
-                                                                    size="icon" 
-                                                                    variant="ghost" 
-                                                                    onClick={() => setVerifyingTask({ id: t.id, type: t.type })}
-                                                                    className={cn("h-8 w-8 rounded-full", t.completed ? "text-flow-green bg-flow-green/10" : "text-muted-foreground hover:bg-white/10 hover:text-white")}
-                                                                >
-                                                                    <Camera className="w-4 h-4" />
-                                                                </Button>
-
-                                                                {canEdit && (
-                                                                    <>
-                                                                        <Button 
-                                                                            size="icon" 
-                                                                            variant="ghost" 
-                                                                            onClick={() => setEditingTask({id: t.id, text: t.text, assignedTo: t.assignedTo})} 
-                                                                            className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10 rounded-full"
-                                                                        >
-                                                                            <Edit2 className="w-4 h-4" />
-                                                                        </Button>
-                                                                        {/* Solo permitimos borrar tareas manuales para no romper checklists del sistema, pero se puede habilitar si se desea */}
-                                                                        {t.type === 'task' && (
-                                                                            <Button 
-                                                                                size="icon" 
-                                                                                variant="ghost" 
-                                                                                onClick={(e) => handleDeleteTask(t.id, e)} 
-                                                                                className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full"
-                                                                            >
-                                                                                <Trash2 className="w-4 h-4" />
-                                                                            </Button>
-                                                                        )}
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    {canEdit && !searchQuery && (
-                                                        <button 
-                                                            onClick={() => setIsAddingTask({ date: viewingDay!, category: folderName })}
-                                                            className="w-full py-3 text-xs font-bold text-muted-foreground hover:text-flow-green hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
-                                                        >
-                                                            <Plus className="w-3 h-3" /> Add Task to {folderName}
-                                                        </button>
-                                                    )}
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                );
-                            })}
-                            
-                            {activeFolders.length === 0 && (
-                                <div className="text-center py-10 text-muted-foreground opacity-50">Empty day. Create a folder or add tasks.</div>
-                            )}
-                        </>
-                    );
-                })()}
+        {sortedCategories.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground opacity-50">
+                <p>No tasks for today.</p>
+                {canEdit && <Button onClick={() => setIsAddingFolder(true)} variant="link" className="text-flow-blue">Create First Folder</Button>}
             </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
 
-      {/* --- MODALES --- */}
-
-      {/* 1. CREAR CARPETA */}
-      <Dialog open={isCreatingFolder} onOpenChange={setIsCreatingFolder}>
+      {/* MODAL: AÑADIR / EDITAR TAREA */}
+      <Dialog open={isAddingTask} onOpenChange={setIsAddingTask}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Create New Folder</DialogTitle></DialogHeader>
-          <div className="py-4"><Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Maintenance..." className="bg-black/20 border-white/10" /></div>
-          <DialogFooter><Button onClick={handleCreateFolder} className="w-full text-white font-bold" style={{ backgroundColor: categoryColor }}>Create Folder</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 2. RENOMBRAR CARPETA */}
-      <Dialog open={!!folderToRename} onOpenChange={(open) => !open && setFolderToRename(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Rename Folder</DialogTitle></DialogHeader>
-          <div className="py-4">
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">New Name</label>
-              <Input autoFocus value={renameFolderInput} onChange={(e) => setRenameFolderInput(e.target.value)} className="bg-black/20 border-white/10" />
+          <DialogHeader><DialogTitle>{editingTask ? 'Edit Task' : 'New Task'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+              <div>
+                  <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Task Description</label>
+                  <Input 
+                    value={taskText} 
+                    onChange={(e) => setTaskText(e.target.value)} 
+                    placeholder="e.g. Turn on grill" 
+                    className="bg-black/20 border-white/10"
+                    autoFocus
+                  />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                      <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category</label>
+                      <Input value={taskCategory} onChange={(e) => setTaskCategory(e.target.value)} className="bg-black/20 border-white/10" />
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assignee</label>
+                      <Input value={taskAssignee} onChange={(e) => setTaskAssignee(e.target.value)} placeholder="Team" className="bg-black/20 border-white/10" />
+                  </div>
+              </div>
           </div>
-          <DialogFooter><Button onClick={handleRenameFolder} className="w-full bg-white text-black font-bold">Save Changes</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 3. BORRAR CARPETA */}
-      <Dialog open={!!folderToDelete} onOpenChange={(open) => !open && setFolderToDelete(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4"><Trash2 className="w-6 h-6" /></div>
-          <DialogTitle className="text-red-500 mb-2">Delete Folder?</DialogTitle>
-          <p className="text-sm text-muted-foreground mb-4">This will remove the folder "{folderToDelete}" from your view.</p>
-          <DialogFooter className="gap-2">
-              <Button variant="ghost" onClick={() => setFolderToDelete(null)} className="flex-1">Cancel</Button>
-              <Button onClick={handleDeleteFolder} className="flex-1 bg-red-500 text-white font-bold hover:bg-red-600">Delete</Button>
+          <DialogFooter>
+              <Button onClick={handleSaveTask} className="w-full bg-flow-blue text-white font-bold">Save Task</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 4. EDITAR TAREA (CON ASIGNACIÓN) */}
-      <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+      {/* MODAL: NUEVA CARPETA */}
+      <Dialog open={isAddingFolder} onOpenChange={setIsAddingFolder}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
-          <div className="py-4 space-y-4">
-              <div>
-                  <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
-                  <Input autoFocus value={editingTask?.text || ""} onChange={(e) => setEditingTask(prev => prev ? {...prev, text: e.target.value} : null)} className="bg-black/20 border-white/10" />
-              </div>
-              <div>
-                  <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assign To</label>
-                  <Select value={editingTask?.assignedTo} onValueChange={(val) => setEditingTask(prev => prev ? {...prev, assignedTo: val} : null)}>
-                    <SelectTrigger className="bg-black/20 border-white/10"><SelectValue placeholder="Select employee..." /></SelectTrigger>
-                    <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                        {users.map((user: any) => (<SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-              </div>
+          <DialogHeader><DialogTitle>New Folder Group</DialogTitle></DialogHeader>
+          <div className="py-4">
+              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Folder Name</label>
+              <Input 
+                value={newFolderName} 
+                onChange={(e) => setNewFolderName(e.target.value)} 
+                placeholder="e.g. Pre-Opening, Deep Cleaning..." 
+                className="bg-black/20 border-white/10"
+                autoFocus
+              />
           </div>
-          <DialogFooter><Button onClick={handleEditTask} className="w-full bg-blue-500 text-white font-bold">Update Task</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 5. AÑADIR TAREA (CON ASIGNACIÓN) */}
-      <Dialog open={!!isAddingTask} onOpenChange={() => setIsAddingTask(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Add to {isAddingTask?.category}</DialogTitle></DialogHeader>
-          <div className="py-4 space-y-4">
-            <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
-                <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Task name..." className="bg-black/20 border-white/10" />
-            </div>
-            <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assign To</label>
-                <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
-                    <SelectTrigger className="bg-black/20 border-white/10"><SelectValue placeholder="Select employee..." /></SelectTrigger>
-                    <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                        {users.map((user: any) => (<SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>))}
-                    </SelectContent>
-                </Select>
-            </div>
-          </div>
-          <DialogFooter><Button onClick={handleAddTask} className="w-full bg-flow-green text-black font-bold">Add Task</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 6. SUBIR FOTO */}
-      <Dialog open={!!verifyingTask} onOpenChange={(open) => !open && setVerifyingTask(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Upload Photo Proof</DialogTitle></DialogHeader>
-          <div className="py-4 flex flex-col items-center gap-4">
-             <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-             <div onClick={() => fileInputRef.current?.click()} className="w-full aspect-video bg-black/40 border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center cursor-pointer overflow-hidden active:scale-95 transition-transform">
-                {photoPreview ? <img src={photoPreview} className="w-full h-full object-cover" /> : <div className="flex flex-col items-center"><Camera className="w-8 h-8 opacity-50 mb-2"/><span className="text-xs opacity-50">Tap to take photo</span></div>}
-             </div>
-          </div>
-          <DialogFooter><Button onClick={submitPhotoCompletion} disabled={!photoPreview} className="w-full bg-flow-green text-black font-bold">Save Photo & Complete</Button></DialogFooter>
+          <DialogFooter>
+              <Button onClick={handleCreateFolder} className="w-full bg-flow-blue text-white font-bold">Create Folder</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
