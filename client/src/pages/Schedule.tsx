@@ -74,13 +74,24 @@ export default function Schedule() {
   };
 
   const getTasksForDayAndCategory = (category: string) => {
+      // Protección extra: si tasks no ha cargado, retornar array vacío
+      if (!tasks) return [];
+
       return tasks.filter((t: any) => {
-          // 1. Que coincida la categoría
           const isCategoryMatch = t.category === category;
           
-          // 2. Que coincida la fecha (asumiendo que t.date viene de la base de datos)
-          // Usamos 'isSameDay' de date-fns para evitar problemas con las horas
-          const isDateMatch = t.date && selectedDate ? isSameDay(new Date(t.date), selectedDate) : false;
+          // CORRECCIÓN DE FECHA:
+          // 1. Verificamos que t.date exista.
+          // 2. Creamos una fecha nueva basada en lo que venga (sea string o date).
+          // 3. Comparamos usando isSameDay.
+          if (!t.date || !selectedDate) return false;
+
+          const taskDate = new Date(t.date);
+          
+          // Verificamos si la fecha es válida antes de comparar
+          if (isNaN(taskDate.getTime())) return false;
+
+          const isDateMatch = isSameDay(taskDate, selectedDate);
 
           return isCategoryMatch && isDateMatch;
       });
@@ -103,9 +114,7 @@ export default function Schedule() {
   };
 
   const handleSaveTask = () => {
-      console.log("Saving task..."); // Debug log
       if (!taskText.trim()) {
-        console.warn("Task text is empty");
         return;
       }
       
@@ -114,7 +123,8 @@ export default function Schedule() {
           category: taskCategory,
           assignee: taskAssignee,
           completed: editingTask ? editingTask.completed : false,
-          date: selectedDate,
+          // CORRECCIÓN IMPORTANTE: Guardar fecha como ISO String para evitar errores de formato
+          date: selectedDate ? selectedDate.toISOString() : new Date().toISOString(),
       };
 
       try {
