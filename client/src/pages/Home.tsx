@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useStore } from "@/lib/store";
-import { useInventory } from "@/lib/hooks"; 
+import { useInventory, useTasks } from "@/lib/hooks"; 
 import { 
   ChefHat, 
   MessageSquare, 
@@ -9,20 +10,41 @@ import {
   Refrigerator,
   CalendarClock,
   LogOut,
-  Users
+  Users,
+  AlertTriangle,
+  CheckCircle2
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { format } from "date-fns";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const { logout, currentUser } = useStore();
 
-  // --- DATOS ---
+  // --- DATOS EN TIEMPO REAL ---
   const { data: inventory = [] } = useInventory();
+  const { data: tasks = [] } = useTasks();
   
+  // Calcular alertas
   const lowStockCount = inventory.filter((i: any) => i.status === 'LOW').length;
+  const pendingTasksCount = tasks.filter((t: any) => !t.completed).length;
 
-  // --- COMPONENTES DE LOGOS ---
+  // --- RELOJ EN VIVO ---
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Actualizar cada minuto
+    return () => clearInterval(timer);
+  }, []);
+
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  // --- COMPONENTES DE LOGOS (Tus iconos originales) ---
   const InventoryLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#4ADE80] flex items-center justify-center shadow-[0_0_20px_rgba(74,222,128,0.3)]">
       <Box className="w-7 h-7 text-black" strokeWidth={2.5} />
@@ -59,20 +81,22 @@ export default function Home() {
     </div>
   );
 
-  // --- LISTA DE BOTONES LIMPIA ---
+  // --- MENU CONFIG ---
   const menuItems = [
     { 
       title: 'Inventory', 
       path: '/inventory', 
       customIcon: <InventoryLogo />,
-      count: lowStockCount > 0 ? `${lowStockCount} Alert` : undefined,
+      count: lowStockCount > 0 ? `${lowStockCount} Low` : undefined,
       countColor: 'text-flow-yellow',
       glowColor: 'bg-[#4ADE80]' 
     },
     { 
-      title: 'Schedule', // ✅ CAMBIADO DE TIMELINE A SCHEDULE
+      title: 'Schedule', 
       path: '/schedule', 
       customIcon: <TimelineLogo />,
+      count: pendingTasksCount > 0 ? `${pendingTasksCount} Tasks` : undefined,
+      countColor: 'text-blue-200',
       glowColor: 'bg-[#3B82F6]' 
     },
     { 
@@ -111,26 +135,62 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background p-6 pb-24 flex justify-center">
-      <div className="w-full max-w-lg space-y-8">
+      <div className="w-full max-w-lg space-y-6">
         
-        {/* CABECERA PERSONALIZADA */}
-        <div className="pt-4 flex flex-col gap-2">
+        {/* --- NUEVA CABECERA DINÁMICA --- */}
+        <div className="pt-2 flex flex-col gap-1">
            <div className="flex justify-between items-start">
-               <h1 className="text-4xl font-black text-white tracking-tight">
-                 Hello, {currentUser?.name || 'Team'}
-               </h1>
+               <div>
+                   {/* Fecha elegante */}
+                   <p className="text-flow-green font-bold text-xs uppercase tracking-wider mb-1">
+                       {format(currentTime, 'EEEE, MMM do')}
+                   </p>
+                   {/* Saludo dinámico */}
+                   <h1 className="text-3xl font-black text-white tracking-tight leading-none">
+                     {getGreeting()}, <br/>
+                     <span className="opacity-80">{currentUser?.name.split(' ')[0] || 'Team'}</span>
+                   </h1>
+               </div>
                
                <button 
                   onClick={() => logout()}
                   className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5"
                >
-                  <LogOut className="w-3 h-3" /> Log Out
+                  <LogOut className="w-3 h-3" />
                </button>
            </div>
-           <p className="text-muted-foreground text-sm font-medium">Let's make today great 🚀</p>
         </div>
 
-        {/* GRID */}
+        {/* --- NUEVO: RESUMEN DE ESTADO (Mini Dashboard) --- */}
+        {(lowStockCount > 0 || pendingTasksCount > 0) && (
+            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                {lowStockCount > 0 && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-2xl shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
+                            <AlertTriangle className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <p className="text-red-200 font-bold text-sm">{lowStockCount} Items Low</p>
+                            <p className="text-red-400/60 text-[10px] uppercase font-bold">Check Inventory</p>
+                        </div>
+                    </motion.div>
+                )}
+                
+                {pendingTasksCount > 0 && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{delay: 0.1}} className="flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 px-4 py-3 rounded-2xl shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                            <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <p className="text-blue-200 font-bold text-sm">{pendingTasksCount} Tasks Left</p>
+                            <p className="text-blue-400/60 text-[10px] uppercase font-bold">View Schedule</p>
+                        </div>
+                    </motion.div>
+                )}
+            </div>
+        )}
+
+        {/* --- GRID DE BOTONES (Sin Cambios Visuales Mayores, solo Schedule actualizado) --- */}
         <div className="grid grid-cols-2 gap-4">
           {menuItems.map((item) => (
             <motion.div
@@ -153,7 +213,7 @@ export default function Home() {
                   </div>
                 )}
                 
-                {/* Notification Bubble */}
+                {/* Notification Bubble (Solo si hay conteo) */}
                 {item.count && (
                   <motion.div 
                     initial={{ scale: 0 }} 
