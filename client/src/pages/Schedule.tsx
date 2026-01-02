@@ -8,7 +8,7 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Check, Calendar as CalendarIcon, Plus, Trash2, Camera, 
+  Check, Plus, Trash2, Camera, 
   ChevronLeft, ChevronRight, Search, FolderPlus, Folder, 
   ChevronDown, ChevronUp, Sun, Moon, Clock, User 
 } from 'lucide-react';
@@ -22,6 +22,45 @@ import {
   isToday 
 } from 'date-fns';
 
+// --- COMPONENTE MINI PROGRESO CIRCULAR ---
+const CircularProgress = ({ percentage, size = 32, strokeWidth = 3, color = "text-flow-green" }: any) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        {/* Fondo del anillo */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          className="text-white/10"
+        />
+        {/* Progreso */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className={cn("transition-all duration-500 ease-out", color)}
+        />
+      </svg>
+      {/* Texto Porcentaje (Opcional, pequeño en el centro) */}
+      <span className="absolute text-[8px] font-bold text-white">{Math.round(percentage)}%</span>
+    </div>
+  );
+};
+
 export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?: string }) {
   const { currentUser } = useStore();
   
@@ -33,9 +72,8 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const { data: shiftList = [] } = useChecklists("shift"); 
   const { data: closingList = [] } = useChecklists("closing");
   const { data: tasks = [] } = useTasks();
-  const { data: allUsers = [] } = useUsers(); // Traemos los usuarios
+  const { data: allUsers = [] } = useUsers();
 
-  // Filtramos solo empleados activos
   const activeEmployees = useMemo(() => {
     return allUsers.filter((u: any) => u.status === 'active');
   }, [allUsers]);
@@ -48,12 +86,11 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   // --- MODALES Y ACCIONES ---
   const [isAddingTask, setIsAddingTask] = useState<{date: Date, category: string} | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
-  const [newTaskAssignee, setNewTaskAssignee] = useState("Team"); // Estado para el asignado
+  const [newTaskAssignee, setNewTaskAssignee] = useState("Team"); 
   
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [customFolders, setCustomFolders] = useState<string[]>([]);
-  
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   const [viewingDay, setViewingDay] = useState<Date | null>(null);
@@ -104,13 +141,13 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       
       createTaskMutation.mutate({
         text: newTaskText,
-        assignedTo: newTaskAssignee, // Guardamos el empleado seleccionado
+        assignedTo: newTaskAssignee,
         notes: noteTag, 
         completed: false
       });
       
       setNewTaskText("");
-      setNewTaskAssignee("Team"); // Resetear al default
+      setNewTaskAssignee("Team");
       setIsAddingTask(null);
       setOpenFolders(prev => ({ ...prev, [isAddingTask.category]: true }));
     }
@@ -176,12 +213,11 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   return (
     <Layout title="Operations Calendar" showBack>
       
-      {/* CABECERA (Modificada: Sin botón Today) */}
+      {/* CABECERA */}
       <div className="flex items-center justify-between mb-6 px-1">
         <h2 className="text-2xl font-black text-white capitalize">{format(currentMonth, 'MMMM yyyy')}</h2>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronLeft className="w-5 h-5" /></Button>
-          {/* BOTÓN TODAY ELIMINADO AQUÍ */}
           <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronRight className="w-5 h-5" /></Button>
         </div>
       </div>
@@ -196,15 +232,22 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
           const isSelectedMonth = isSameMonth(day, currentMonth);
           const isDayToday = isToday(day);
           const allTasks = getTasksForDay(day);
+          
           const completedCount = allTasks.filter(t => t.completed).length;
           const totalCount = allTasks.length;
+          const percentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+          // Color dinámico según el progreso
+          let progressColor = "text-flow-green"; // Verde por defecto
+          if (percentage < 50) progressColor = "text-red-400";
+          else if (percentage < 100) progressColor = "text-orange-400";
 
           return (
             <div
               key={day.toString()}
               onClick={() => { setViewingDay(day); setSearchQuery(""); }}
               className={cn(
-                "min-h-[100px] p-2 rounded-xl border flex flex-col gap-1 transition-all cursor-pointer relative group overflow-hidden",
+                "min-h-[100px] p-2 rounded-xl border flex flex-col justify-between transition-all cursor-pointer relative group overflow-hidden",
                 isSelectedMonth ? "bg-black/40 border-white/5 hover:border-white/20" : "bg-black/20 border-transparent opacity-50",
                 isDayToday && "ring-1 ring-flow-green bg-flow-green/5"
               )}
@@ -214,16 +257,18 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                 {canEdit && <button onClick={(e) => { e.stopPropagation(); setIsAddingTask({date: day, category: 'Shift'}); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-muted-foreground hover:text-white"><Plus className="w-3 h-3" /></button>}
               </div>
 
-              <div className="flex-1 flex flex-col justify-end gap-1 mt-1">
-                 {totalCount > 0 && (
-                     <div className="text-[9px] text-muted-foreground font-medium">
-                         {completedCount}/{totalCount} Done
+              {/* AQUI ESTA EL CAMBIO: CIRCULAR PROGRESS */}
+              <div className="flex items-center justify-center mt-2 mb-1">
+                 {totalCount > 0 ? (
+                     <div className="flex flex-col items-center">
+                        <CircularProgress percentage={percentage} size={36} strokeWidth={4} color={progressColor} />
+                        <span className="text-[9px] text-muted-foreground font-medium mt-1">{completedCount}/{totalCount} Done</span>
                      </div>
+                 ) : (
+                    <div className="h-9 flex items-center justify-center">
+                        <span className="text-[10px] text-muted-foreground/30 font-medium">No tasks</span>
+                    </div>
                  )}
-                 {allTasks.slice(0, 3).map((t: any, i: number) => (
-                    <div key={i} className={cn("h-1 w-full rounded-full", t.completed ? "bg-flow-green" : "bg-white/10")} />
-                 ))}
-                 {allTasks.length > 3 && <div className="h-1 w-1 rounded-full bg-white/10 mx-auto" />}
               </div>
             </div>
           );
