@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { useStore } from "@/lib/store";
-import { useInventory } from "@/lib/hooks"; // ✅ Ya no necesitamos useTasks aquí
+import { useInventory } from "@/lib/hooks"; 
 import { 
   ChefHat, 
   MessageSquare, 
@@ -19,8 +19,7 @@ export default function Home() {
 
   // --- DATOS ---
   const { data: inventory = [] } = useInventory();
-  // Eliminamos useTasks porque ya no mostramos el contador en el menú principal
-
+  
   const lowStockCount = inventory.filter((i: any) => i.status === 'LOW').length;
 
   // --- COMPONENTES DE LOGOS ---
@@ -71,7 +70,7 @@ export default function Home() {
       glowColor: 'bg-[#4ADE80]' 
     },
     { 
-      title: 'Timeline', 
+      title: 'Schedule', // ✅ CAMBIADO DE TIMELINE A SCHEDULE
       path: '/schedule', 
       customIcon: <TimelineLogo />,
       glowColor: 'bg-[#3B82F6]' 
