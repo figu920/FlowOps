@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format, addDays, subDays, isSameDay, startOfWeek } from 'date-fns';
 
-export default function Schedule() {
+export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?: string }) {
   const { currentUser } = useStore();
   
   // --- CALENDARIO & ESTADOS ---
@@ -248,10 +248,13 @@ export default function Schedule() {
         )}
       </div>
 
-      {/* Floating Action Button (Solo para añadir Tareas nuevas) */}
+     {/* Floating Action Button */}
       {canEdit && (
         <div className="fixed bottom-6 right-6">
-            <button className="w-14 h-14 bg-white text-black rounded-full shadow-2xl flex items-center justify-center hover:scale-105 transition-transform">
+            <button 
+                className="w-14 h-14 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 transition-transform"
+                style={{ backgroundColor: categoryColor, boxShadow: `0 0 20px ${categoryColor}60` }} // <--- AÑADIDO ESTILO DINÁMICO
+            >
                 <Plus className="w-6 h-6 stroke-[3]" />
             </button>
         </div>

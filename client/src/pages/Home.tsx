@@ -1,115 +1,69 @@
-import { CalendarClock } from "lucide-react"; 
-import { TrendingUp } from "lucide-react";
-import { Link } from 'wouter';
-import Layout from '@/components/Layout';
-import { motion } from 'framer-motion';
+import { useLocation } from "wouter";
+import { useInventory, useTasks } from "@/lib/hooks"; // Asumimos que tienes estos hooks
 import { 
-  Package, 
-  Wrench, 
   ClipboardList, 
-  CalendarDays, 
-  MessageCircle, 
-  Activity,
-  Users,
-  Utensils,
-  Refrigerator
-} from 'lucide-react';
-import { useStore } from '@/lib/store';
-import { useInventory, useEquipment, usePendingUsers, useNotificationCount } from '@/lib/hooks';
-
-// --- LOGOS PERSONALIZADOS (Estilo Unificado: Fondo Brillante + Icono Negro) ---
-
-// 1. INVENTORY (Verde Brillante)
-const InventoryLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#4ADE80] flex items-center justify-center shadow-lg shadow-green-500/20">
-    <Package className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 2. EQUIPMENT (Amarillo Alerta)
-const EquipmentLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#FACC15] flex items-center justify-center shadow-lg shadow-yellow-500/20">
-    <Refrigerator className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 3. CHECKLISTS (Azul Cielo Brillante) - Antes se veía apagado
-const ChecklistsLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#38BDF8] flex items-center justify-center shadow-lg shadow-sky-500/20">
-    <ClipboardList className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 4. TASKS (Violeta Vibrante) - Antes era morado oscuro
-const TasksLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#A78BFA] flex items-center justify-center shadow-lg shadow-violet-500/20">
-    <CalendarDays className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 5. MENU (Turquesa/Teal Brillante)
-const MenuLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#2DD4BF] flex items-center justify-center shadow-lg shadow-teal-500/20">
-    <Utensils className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 6. CHAT (Blanco Puro)
-const ChatLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-lg shadow-white/10">
-    <MessageCircle className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 7. TIMELINE (Naranja Intenso)
-const TimelineLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#FB923C] flex items-center justify-center shadow-lg shadow-orange-500/20">
-    <Activity className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 8. EMPLOYEES (Rosa Fuerte)
-const EmployeesLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#F472B6] flex items-center justify-center shadow-lg shadow-pink-500/20">
-    <Users className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 9. SALES (Verde Neón / Dinero)
-const SalesLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#00E676] flex items-center justify-center shadow-lg shadow-green-500/20">
-    <TrendingUp className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
-
-// 10. OPERATIONS (Nuevo Super Botón)
-const ScheduleLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-lg shadow-blue-500/20">
-    <CalendarClock className="w-7 h-7 text-black" strokeWidth={2.5} />
-  </div>
-);
+  CheckSquare, 
+  ChefHat, 
+  MessageSquare, 
+  TrendingUp, 
+  Box, 
+  Refrigerator,
+  CalendarClock,
+  Activity
+} from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function Home() {
-  const { currentUser } = useStore();
+  const [, setLocation] = useLocation();
+
+  // --- DATOS PARA LAS NOTIFICACIONES (ROJO/AMARILLO) ---
   const { data: inventory = [] } = useInventory();
-  const { data: equipment = [] } = useEquipment();
-  
-  // Only fetch pending users for managers or system admins
-  const canManageUsers = currentUser?.role === 'manager' || currentUser?.isSystemAdmin;
-  const { data: pendingUsers = [] } = usePendingUsers(canManageUsers);
-  
-  // Reservado para uso futuro
-  // const { data: notificationData } = useNotificationCount();
-  
-  if (!currentUser) return null;
+  const { data: tasks = [] } = useTasks();
 
-  // Dynamic status counts
-  const lowStockCount = inventory.filter((i: { status: string }) => i.status !== 'OK').length;
-  const brokenCount = equipment.filter((e: { status: string }) => e.status === 'Broken').length;
-  const pendingCount = canManageUsers ? pendingUsers.length : 0;
+  // Calcular alertas
+  const lowStockCount = inventory.filter((i: any) => i.status === 'LOW').length;
+  // Asumimos que las tareas vencidas son las que no están completas (simplificado)
+  const pendingTasksCount = tasks.filter((t: any) => !t.completed).length;
 
-  const canManageEmployees = currentUser.role === 'manager' || currentUser.role === 'lead' || currentUser.isSystemAdmin;
+  // --- COMPONENTES DE ICONOS PERSONALIZADOS ---
+  const InventoryLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-[#4ADE80] flex items-center justify-center shadow-[0_0_20px_rgba(74,222,128,0.3)]">
+      <Box className="w-7 h-7 text-black" strokeWidth={2.5} />
+    </div>
+  );
 
+  const EquipmentLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-[#FACC15] flex items-center justify-center shadow-[0_0_20px_rgba(250,204,21,0.3)]">
+      <Refrigerator className="w-7 h-7 text-black" strokeWidth={2.5} />
+    </div>
+  );
+
+  // ⭐ NUEVO ICONO PARA OPERATIONS ⭐
+  const ScheduleLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+      <CalendarClock className="w-7 h-7 text-white" strokeWidth={2.5} />
+    </div>
+  );
+  
+  const MenuLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-[#2DD4BF] flex items-center justify-center shadow-[0_0_20px_rgba(45,212,191,0.3)]">
+      <ChefHat className="w-7 h-7 text-black" strokeWidth={2.5} />
+    </div>
+  );
+
+  const SalesLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-[#00E676] flex items-center justify-center shadow-[0_0_20px_rgba(0,230,118,0.3)]">
+      <TrendingUp className="w-7 h-7 text-black" strokeWidth={2.5} />
+    </div>
+  );
+
+  const AnalyticsLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-[#F97316] flex items-center justify-center shadow-[0_0_20px_rgba(249,115,22,0.3)]">
+      <Activity className="w-7 h-7 text-black" strokeWidth={2.5} />
+    </div>
+  );
+
+  // --- LISTA DEL MENÚ ---
   const menuItems = [
     { 
       title: 'Inventory', 
@@ -117,103 +71,132 @@ export default function Home() {
       customIcon: <InventoryLogo />,
       count: lowStockCount > 0 ? `${lowStockCount} Alert` : undefined,
       countColor: 'text-flow-yellow',
-      glowColor: 'bg-[#4ADE80]' // Green glow
+      glowColor: 'bg-[#4ADE80]' 
     },
+    
+    // ⭐ NUEVO BOTÓN OPERATIONS (AQUÍ ESTÁ) ⭐
     { 
-      title: 'Equipment', 
-      path: '/equipment', 
-      customIcon: <EquipmentLogo />,
-      count: brokenCount > 0 ? `${brokenCount} Issue` : undefined,
-      countColor: 'text-flow-red',
-      glowColor: 'bg-[#FACC15]' // Yellow glow
+      title: 'Operations Hub', 
+      path: '/schedule', 
+      customIcon: <ScheduleLogo />,
+      glowColor: 'bg-[#3B82F6]' 
     },
+
+    // Botones antiguos (mantenidos para testing)
     { 
       title: 'Checklists', 
       path: '/checklists', 
-      customIcon: <ChecklistsLogo />,
-      glowColor: 'bg-[#38BDF8]' // Blue glow
+      icon: ClipboardList, 
+      iconColor: 'text-[#38BDF8]', // Azul claro
+      bgColor: 'bg-[#38BDF8]/10',
+      glowColor: 'bg-[#38BDF8]' 
     },
     { 
       title: 'Tasks', 
       path: '/tasks', 
-      customIcon: <TasksLogo />,
-      glowColor: 'bg-[#A78BFA]' // Violet glow
+      icon: CheckSquare,
+      count: pendingTasksCount > 0 ? `${pendingTasksCount} Active` : undefined, 
+      countColor: 'text-flow-red',
+      iconColor: 'text-[#A855F7]', // Morado
+      bgColor: 'bg-[#A855F7]/10',
+      glowColor: 'bg-[#A855F7]' 
     },
-    {
-      title: 'Menu & Sizes',
-      path: '/menu',
+
+    // Resto de botones
+    { 
+      title: 'Equipment', 
+      path: '/equipment', 
+      customIcon: <EquipmentLogo />,
+      glowColor: 'bg-[#FACC15]' 
+    },
+    { 
+      title: 'Menu & Sizes', 
+      path: '/menu', 
       customIcon: <MenuLogo />,
-      glowColor: 'bg-[#2DD4BF]' // Teal glow
+      glowColor: 'bg-[#2DD4BF]'
+    },
+    { 
+      title: 'Sales Register', 
+      path: '/sales', 
+      customIcon: <SalesLogo />,
+      glowColor: 'bg-[#00E676]'
+    },
+    { 
+      title: 'Team Chat', 
+      path: '/chat', 
+      icon: MessageSquare,
+      iconColor: 'text-white',
+      bgColor: 'bg-white/10',
+      glowColor: 'bg-white'
     },
     {
-      title: 'Sales Register',
-      path: '/sales',
-      customIcon: <SalesLogo />, // Usamos el logo que creamos arriba
-      glowColor: 'bg-[#00E676]' // El mismo verde neón para el brillo
-    },
-    { 
-      title: 'Chat', 
-      path: '/chat', 
-      customIcon: <ChatLogo />,
-      glowColor: 'bg-white' // White glow
-    },
-    { 
-      title: 'Timeline', 
-      path: '/timeline', 
-      customIcon: <TimelineLogo />,
-      glowColor: 'bg-[#FB923C]' // Orange glow
-    },
-    ...(canManageEmployees ? [{
-      title: 'Employees', 
-      path: '/employees', 
-      customIcon: <EmployeesLogo />,
-      count: pendingCount > 0 ? `${pendingCount} Pending` : undefined,
-      countColor: 'text-flow-yellow',
-      glowColor: 'bg-[#F472B6]' // Pink glow
-    }] : [])
+      title: 'Analytics',
+      path: '/analytics', // Asumiendo que existe o existirá
+      customIcon: <AnalyticsLogo />,
+      glowColor: 'bg-[#F97316]'
+    }
   ];
 
   return (
-    <Layout title={`Hello, ${currentUser.name.split(' ')[0]}`} showBack={false}>
+    <div className="min-h-screen bg-background p-6 pb-24">
+      <div className="flex justify-between items-center mb-8 pt-4">
+        <div>
+           <span className="px-2 py-1 rounded-full bg-flow-red text-white text-[10px] font-bold uppercase tracking-wider">
+             Manager Mode
+           </span>
+           <h1 className="text-4xl font-black text-white mt-2 tracking-tight">
+             Hello, Super
+           </h1>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
-        {menuItems.map((item, index) => (
-          <Link key={item.title} href={item.path}>
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.96 }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 20 }}
-              className="aspect-[1/1.1] bg-card rounded-[24px] p-5 flex flex-col justify-between relative overflow-hidden group border border-white/[0.03]"
-            >
-              {/* Ambient Glow (Efecto de brillo de fondo) */}
-              <div className={`absolute -right-10 -top-10 w-32 h-32 ${item.glowColor} opacity-[0.07] blur-3xl group-hover:opacity-[0.15] transition-opacity duration-500`} />
+        {menuItems.map((item) => (
+          <motion.div
+            key={item.title}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setLocation(item.path)}
+            className="relative bg-card rounded-[32px] p-5 flex flex-col items-center justify-center gap-4 text-center border border-white/5 shadow-xl cursor-pointer overflow-hidden group h-[180px]"
+          >
+            {/* Glow Effect */}
+            <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ${item.glowColor}`} />
+            
+            {/* Icon */}
+            <div className="relative z-10">
+              {item.customIcon ? (
+                item.customIcon
+              ) : (
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${item.bgColor || 'bg-white/5'}`}>
+                   {item.icon && <item.icon className={`w-7 h-7 ${item.iconColor || 'text-white'}`} strokeWidth={2.5} />}
+                </div>
+              )}
+              
+              {/* Notification Bubble */}
+              {item.count && (
+                <motion.div 
+                  initial={{ scale: 0 }} 
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 bg-[#1C1C1E] border border-white/10 rounded-full px-2 py-0.5 shadow-lg z-20"
+                >
+                  <span className={`text-[10px] font-bold ${item.countColor || 'text-white'}`}>
+                    {item.count}
+                  </span>
+                </motion.div>
+              )}
+            </div>
 
-              <div className="flex justify-between items-start relative z-10">
-                {/* Renderizamos el icono personalizado */}
-                {item.customIcon}
-
-                {item.count && (
-                  <div className="bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-full">
-                    <span className={`text-[10px] font-bold uppercase ${item.countColor}`}>{item.count}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative z-10">
-                <h3 className="font-semibold text-[19px] tracking-tight text-white/90">{item.title}</h3>
-                <p className="text-white/40 text-xs mt-1 font-medium">Tap to view</p>
-              </div>
-            </motion.div>
-          </Link>
+            {/* Title */}
+            <span className="font-bold text-base text-white relative z-10 leading-tight">
+              {item.title}
+            </span>
+            
+            <span className="text-[10px] text-muted-foreground absolute bottom-4 opacity-50 font-medium">
+              Tap to view
+            </span>
+          </motion.div>
         ))}
       </div>
-      
-      <div className="mt-8 text-center">
-        <p className="text-white/20 text-xs font-medium uppercase tracking-widest">
-           Role: {currentUser.role}
-        </p>
-      </div>
-    </Layout>
+    </div>
   );
 }
