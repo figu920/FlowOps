@@ -265,7 +265,8 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   return (
     <Layout
       title={currentPath ? currentPath.split('/').pop() : "Inventory"}
-      showBack={false}
+      // ✅ CORREGIDO: Mostramos 'Back' del sistema si NO hay carpeta actual (estamos en raíz)
+      showBack={!currentPath}
       action={
         canEdit && (
           <DropdownMenu>
@@ -296,7 +297,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
       <div className="mb-6 space-y-2">
          {currentPath && (
              <div className="flex items-center justify-between">
-                 {/* BOTÓN BACK PERSONALIZADO */}
+                 {/* BOTÓN BACK PERSONALIZADO (Solo visible dentro de carpetas) */}
                  <button 
                     onClick={handleBack}
                     className="flex items-center text-muted-foreground hover:text-white text-sm font-medium transition-colors mb-2"
@@ -477,7 +478,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
         </AnimatePresence>
       </div>
 
-      {/* --- MODALES --- */}
+      {/* --- MODALES (Igual que antes) --- */}
 
       {/* 1. Low Comment */}
       <Dialog open={!!lowCommentItem} onOpenChange={(open) => !open && setLowCommentItem(null)}>
