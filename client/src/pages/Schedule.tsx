@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, Calendar as CalendarIcon, Plus, Trash2, Camera, 
-  ChevronLeft, ChevronRight, X, Search, FolderPlus, Folder
+  ChevronLeft, ChevronRight, X, Search, FolderPlus, Folder, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -44,10 +44,13 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   // Estados para Carpetas
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [customFolders, setCustomFolders] = useState<string[]>([]); // Carpetas locales temporales
+  const [customFolders, setCustomFolders] = useState<string[]>([]);
+  
+  // Control de carpetas abiertas (Accordion)
+  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   const [viewingDay, setViewingDay] = useState<Date | null>(null);
-  const [searchQuery, setSearchQuery] = useState(""); // 🔍 Barra Buscadora
+  const [searchQuery, setSearchQuery] = useState("");
   
   // FOTOS
   const [verifyingTask, setVerifyingTask] = useState<{id: string, type: 'task'|'checklist'} | null>(null);
@@ -75,10 +78,13 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       }
   };
 
+  const toggleFolder = (folderName: string) => {
+      setOpenFolders(prev => ({ ...prev, [folderName]: !prev[folderName] }));
+  };
+
   const handleAddTask = () => {
     if (newTaskText && isAddingTask) {
       const dateTag = format(isAddingTask.date, 'yyyy-MM-dd');
-      // Guardamos la carpeta (category) en las notas
       const noteTag = `DATE:${dateTag}|CAT:${isAddingTask.category}`; 
       
       createTaskMutation.mutate({
@@ -90,6 +96,9 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       
       setNewTaskText("");
       setIsAddingTask(null);
+      
+      // Abrir la carpeta automáticamente al añadir tarea
+      setOpenFolders(prev => ({ ...prev, [isAddingTask.category]: true }));
     }
   };
 
@@ -102,7 +111,6 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       updateChecklistMutation.mutate({ id, updates: { completed: !currentStatus } });
   };
 
-  // Lógica de Fotos
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -114,12 +122,9 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
 
   const submitPhotoCompletion = () => {
     if (verifyingTask && photoPreview) {
-      // Si es Task usamos la mutación normal
       if (verifyingTask.type === 'task') {
           completeTaskMutation.mutate({ id: verifyingTask.id, photo: photoPreview });
       } else {
-          // Si es Checklist, como el backend original no soporta fotos en checklist nativo,
-          // lo marcamos como completado visualmente (en una app real se adaptaría el backend)
           handleToggleChecklist(verifyingTask.id, false); 
       }
       setVerifyingTask(null);
@@ -127,24 +132,19 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
     }
   };
 
-  // Helper para sacar la categoría de las notas
   const getTaskCategory = (notes: string) => {
     const match = notes?.match(/CAT:([^|]+)/);
     return match ? match[1] : 'General';
   };
 
-  // --- ORGANIZAR TAREAS DEL DÍA ---
   const getTasksForDay = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    
-    // 1. Tareas Manuales (Filtradas por fecha)
     const dailyManualTasks = tasks.filter((t: any) => t.notes?.includes(`DATE:${dateStr}`)).map((t:any) => ({
         ...t, 
         type: 'task',
         category: getTaskCategory(t.notes)
     }));
     
-    // 2. Checklist Items (Solo si es HOY para simplificar visualización)
     const isDayToday = isToday(day);
     let checklistItems: any[] = [];
     
@@ -182,7 +182,6 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
           const isSelectedMonth = isSameMonth(day, currentMonth);
           const isDayToday = isToday(day);
           const allTasks = getTasksForDay(day);
-          
           const completedCount = allTasks.filter(t => t.completed).length;
           const totalCount = allTasks.length;
 
@@ -198,11 +197,9 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
             >
               <div className="flex justify-between items-start">
                 <span className={cn("text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full", isDayToday ? "bg-flow-green text-black" : "text-muted-foreground")}>{format(day, 'd')}</span>
-                {/* Botón rápido para añadir a 'General' */}
                 {canEdit && <button onClick={(e) => { e.stopPropagation(); setIsAddingTask({date: day, category: 'Shift'}); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-muted-foreground hover:text-white"><Plus className="w-3 h-3" /></button>}
               </div>
 
-              {/* Resumen Visual */}
               <div className="flex-1 flex flex-col justify-end gap-1 mt-1">
                  {totalCount > 0 && (
                      <div className="text-[9px] text-muted-foreground font-medium">
@@ -219,25 +216,29 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
         })}
       </div>
 
-      {/* MODAL: DETALLES DEL DÍA (GESTOR DE CARPETAS) */}
+      {/* MODAL: DETALLES DEL DÍA */}
       <Dialog open={!!viewingDay && !isAddingTask && !verifyingTask && !isCreatingFolder} onOpenChange={(open) => !open && setViewingDay(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
             
-            {/* Cabecera del día */}
             <div className="p-6 pb-4 border-b border-white/5 bg-black/20">
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <h3 className="text-xl font-bold text-white">{viewingDay && format(viewingDay, 'EEEE, MMM do')}</h3>
                         <p className="text-xs text-muted-foreground">Daily Operations Hub</p>
                     </div>
+                    {/* Botón New Folder con color de categoría */}
                     {canEdit && (
-                        <Button size="sm" onClick={() => setIsCreatingFolder(true)} className="bg-white/10 hover:bg-white/20 text-xs h-8">
+                        <Button 
+                            size="sm" 
+                            onClick={() => setIsCreatingFolder(true)} 
+                            className="text-xs h-8 text-white font-bold shadow-lg"
+                            style={{ backgroundColor: categoryColor }}
+                        >
                             <FolderPlus className="w-3 h-3 mr-1.5" /> New Folder
                         </Button>
                     )}
                 </div>
 
-                {/* 🔍 BARRA BUSCADORA */}
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input 
@@ -249,14 +250,11 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                 </div>
             </div>
             
-            <div className="p-4 overflow-y-auto space-y-6 flex-1 bg-black/10">
+            <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-black/10">
                 {viewingDay && (() => {
                     const allTasks = getTasksForDay(viewingDay);
-                    // Combinamos carpetas por defecto + carpetas creadas + carpetas descubiertas de tareas existentes
                     const dynamicFoldersFromTasks = Array.from(new Set(allTasks.map(t => t.category)));
                     const activeFolders = Array.from(new Set([...dynamicFoldersFromTasks, "Opening", "Shift", "Closing", ...customFolders]));
-
-                    // Filtrado por búsqueda
                     const filteredTasks = searchQuery 
                         ? allTasks.filter(t => t.text.toLowerCase().includes(searchQuery.toLowerCase()))
                         : allTasks;
@@ -264,72 +262,91 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                     return (
                         <>
                             {activeFolders.map((folderName) => {
-                                // Tareas de esta carpeta
                                 const folderTasks = filteredTasks.filter(t => t.category === folderName);
-                                
-                                // Si hay búsqueda y no hay tareas en esta carpeta, no la mostramos
                                 if (searchQuery && folderTasks.length === 0) return null;
+                                const isOpen = openFolders[folderName];
 
                                 return (
-                                    <div key={folderName} className="space-y-2">
-                                        {/* Título de Carpeta */}
-                                        <div className="flex items-center gap-2 px-1">
-                                            <Folder className="w-4 h-4 text-muted-foreground" />
-                                            <h4 className="text-sm font-bold text-white uppercase tracking-wider">{folderName}</h4>
-                                            <span className="text-[10px] text-muted-foreground bg-white/10 px-1.5 rounded-full">{folderTasks.length}</span>
-                                        </div>
-
-                                        {/* Lista de Tareas */}
-                                        <div className="bg-card/50 border border-white/5 rounded-2xl overflow-hidden">
-                                            {folderTasks.map((t: any, i: number) => (
-                                                <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                                                    {/* Checkbox */}
-                                                    <div 
-                                                        onClick={() => {
-                                                            if (t.type === 'checklist') handleToggleChecklist(t.id, t.completed);
-                                                            else if (!t.completed) setVerifyingTask({ id: t.id, type: 'task' });
-                                                        }}
-                                                        className={cn(
-                                                            "w-6 h-6 rounded-lg flex items-center justify-center shrink-0 cursor-pointer border transition-all",
-                                                            t.completed 
-                                                                ? "bg-flow-green border-flow-green text-black" 
-                                                                : "bg-white/5 border-white/20 text-transparent hover:border-white/40"
-                                                        )}
-                                                    >
-                                                        <Check className="w-4 h-4 stroke-[3]" />
-                                                    </div>
-
-                                                    <span className={cn("flex-1 text-sm", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
-
-                                                    {/* 📷 BOTÓN CÁMARA (UNIVERSAL) */}
-                                                    <Button 
-                                                        size="icon" 
-                                                        variant="ghost" 
-                                                        onClick={() => setVerifyingTask({ id: t.id, type: t.type })}
-                                                        className={cn("h-8 w-8 rounded-full", t.completed ? "text-flow-green bg-flow-green/10" : "text-muted-foreground hover:bg-white/10 hover:text-white")}
-                                                    >
-                                                        <Camera className="w-4 h-4" />
-                                                    </Button>
-
-                                                    {/* Borrar (Solo tareas manuales) */}
-                                                    {t.type === 'task' && canEdit && (
-                                                        <Button size="icon" variant="ghost" onClick={(e) => handleDeleteTask(t.id, e)} className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full">
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    )}
+                                    <div key={folderName} className="rounded-2xl overflow-hidden border border-white/5 bg-card">
+                                        {/* CABECERA DE CARPETA (Clickable) */}
+                                        <div 
+                                            onClick={() => toggleFolder(folderName)}
+                                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                                                    <Folder className="w-5 h-5" />
                                                 </div>
-                                            ))}
-
-                                            {/* Botón Añadir Tarea a ESTA carpeta */}
-                                            {canEdit && !searchQuery && (
-                                                <button 
-                                                    onClick={() => setIsAddingTask({ date: viewingDay!, category: folderName })}
-                                                    className="w-full py-3 text-xs font-bold text-muted-foreground hover:text-flow-green hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <Plus className="w-3 h-3" /> Add Task to {folderName}
-                                                </button>
-                                            )}
+                                                <div>
+                                                    <h4 className="font-bold text-white text-sm">{folderName}</h4>
+                                                    <span className="text-[10px] text-muted-foreground">{folderTasks.length} tasks</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white/5 p-1 rounded-full">
+                                                {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                            </div>
                                         </div>
+
+                                        {/* LISTA DE TAREAS (Colapsable) */}
+                                        <AnimatePresence>
+                                            {isOpen && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="border-t border-white/5 bg-black/20"
+                                                >
+                                                    {folderTasks.length === 0 && (
+                                                        <div className="p-4 text-center text-[10px] text-muted-foreground">Empty folder</div>
+                                                    )}
+                                                    
+                                                    {folderTasks.map((t: any, i: number) => (
+                                                        <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                                                            <div 
+                                                                onClick={() => {
+                                                                    if (t.type === 'checklist') handleToggleChecklist(t.id, t.completed);
+                                                                    else if (!t.completed) setVerifyingTask({ id: t.id, type: 'task' });
+                                                                }}
+                                                                className={cn(
+                                                                    "w-6 h-6 rounded-lg flex items-center justify-center shrink-0 cursor-pointer border transition-all",
+                                                                    t.completed 
+                                                                        ? "bg-flow-green border-flow-green text-black" 
+                                                                        : "bg-white/5 border-white/20 text-transparent hover:border-white/40"
+                                                                )}
+                                                            >
+                                                                <Check className="w-4 h-4 stroke-[3]" />
+                                                            </div>
+
+                                                            <span className={cn("flex-1 text-sm", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
+
+                                                            <Button 
+                                                                size="icon" 
+                                                                variant="ghost" 
+                                                                onClick={() => setVerifyingTask({ id: t.id, type: t.type })}
+                                                                className={cn("h-8 w-8 rounded-full", t.completed ? "text-flow-green bg-flow-green/10" : "text-muted-foreground hover:bg-white/10 hover:text-white")}
+                                                            >
+                                                                <Camera className="w-4 h-4" />
+                                                            </Button>
+
+                                                            {t.type === 'task' && canEdit && (
+                                                                <Button size="icon" variant="ghost" onClick={(e) => handleDeleteTask(t.id, e)} className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full">
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+
+                                                    {canEdit && !searchQuery && (
+                                                        <button 
+                                                            onClick={() => setIsAddingTask({ date: viewingDay!, category: folderName })}
+                                                            className="w-full py-3 text-xs font-bold text-muted-foreground hover:text-flow-green hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
+                                                        >
+                                                            <Plus className="w-3 h-3" /> Add Task to {folderName}
+                                                        </button>
+                                                    )}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                 );
                             })}
@@ -351,11 +368,15 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
           <div className="py-4">
             <Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Maintenance, Events..." className="bg-black/20 border-white/10" />
           </div>
-          <DialogFooter><Button onClick={handleCreateFolder} className="w-full bg-blue-500 font-bold">Create Folder</Button></DialogFooter>
+          <DialogFooter>
+              <Button onClick={handleCreateFolder} className="w-full text-white font-bold" style={{ backgroundColor: categoryColor }}>
+                  Create Folder
+              </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: AÑADIR TAREA (Simplificado, ya sabe la carpeta) */}
+      {/* MODAL: AÑADIR TAREA */}
       <Dialog open={!!isAddingTask} onOpenChange={() => setIsAddingTask(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Add to {isAddingTask?.category}</DialogTitle></DialogHeader>

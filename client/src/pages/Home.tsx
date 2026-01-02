@@ -8,8 +8,7 @@ import {
   TrendingUp, 
   Box, 
   Refrigerator,
-  CalendarClock,
-  Activity
+  CalendarClock
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -36,7 +35,8 @@ export default function Home() {
     </div>
   );
 
-  const ScheduleLogo = () => (
+  // ✅ RECUPERADO: TIMELINE LOGO (Azul)
+  const TimelineLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
       <CalendarClock className="w-7 h-7 text-white" strokeWidth={2.5} />
     </div>
@@ -54,12 +54,6 @@ export default function Home() {
     </div>
   );
 
-  const AnalyticsLogo = () => (
-    <div className="w-14 h-14 rounded-full bg-[#F97316] flex items-center justify-center shadow-[0_0_20px_rgba(249,115,22,0.3)]">
-      <Activity className="w-7 h-7 text-black" strokeWidth={2.5} />
-    </div>
-  );
-
   // --- LISTA DE BOTONES ---
   const menuItems = [
     { 
@@ -70,10 +64,11 @@ export default function Home() {
       countColor: 'text-flow-yellow',
       glowColor: 'bg-[#4ADE80]' 
     },
+    // ✅ AQUÍ ESTÁ DE VUELTA "TIMELINE"
     { 
-      title: 'Operations Hub', 
+      title: 'Timeline', 
       path: '/schedule', 
-      customIcon: <ScheduleLogo />,
+      customIcon: <TimelineLogo />,
       glowColor: 'bg-[#3B82F6]' 
     },
     { 
@@ -119,13 +114,8 @@ export default function Home() {
       iconColor: 'text-white',
       bgColor: 'bg-white/10',
       glowColor: 'bg-white'
-    },
-    {
-      title: 'Analytics',
-      path: '/analytics', 
-      customIcon: <AnalyticsLogo />,
-      glowColor: 'bg-[#F97316]'
     }
+    // ❌ ANALYTICS ELIMINADO
   ];
 
   return (
@@ -141,7 +131,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ✅ CORREGIDO: aspect-square para que sean cuadradas y md:grid-cols-3 para PC */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {menuItems.map((item) => (
           <motion.div
