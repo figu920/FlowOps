@@ -16,32 +16,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function Equipment() {
   const { currentUser } = useStore();
+  // Datos
   const { data: equipmentList = [] } = useEquipment();
 
   // --- LÓGICA DE CARPETAS ---
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 1. Obtener carpetas (categorías únicas)
+  // 1. Extraer carpetas (Locations) únicas
   const folders = useMemo(() => {
     const categories = new Set(equipmentList.map((item: any) => item.location).filter(Boolean));
     return Array.from(categories).sort() as string[];
   }, [equipmentList]);
 
-  // 2. Filtrar items
+  // 2. Filtrar items para mostrar
   const displayedItems = useMemo(() => {
     let items = equipmentList;
     
-    // Si hay búsqueda, buscamos en todo (ignorando carpetas)
+    // Si hay búsqueda, ignoramos carpetas y buscamos en todo
     if (searchQuery.trim()) {
         return items.filter((i: any) => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
-    // Si no, filtramos por carpeta
+    // Si estamos dentro de una carpeta
     if (currentFolder) {
       return items.filter((i: any) => i.location === currentFolder);
     }
-    // Items sin carpeta en la raíz
+    
+    // Items huérfanos (sin carpeta) se muestran en la raíz debajo de las carpetas
     return items.filter((i: any) => !i.location);
   }, [equipmentList, currentFolder, searchQuery]);
 
@@ -54,9 +56,9 @@ export default function Equipment() {
   const [isAdding, setIsAdding] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   
-  // Formulario
+  // Campos del Formulario
   const [name, setName] = useState("");
-  const [category, setCategory] = useState(""); // Esto actúa como la carpeta
+  const [category, setCategory] = useState(""); // Usamos esto como "Folder/Location"
   const [status, setStatus] = useState<"OPERATIONAL" | "BROKEN" | "MAINTENANCE">("OPERATIONAL");
   const [notes, setNotes] = useState("");
 
@@ -66,7 +68,7 @@ export default function Equipment() {
 
   const handleOpenAdd = () => {
       setName("");
-      setCategory(currentFolder || ""); // Pre-rellenar si estamos dentro de una carpeta
+      setCategory(currentFolder || ""); // Si estamos en una carpeta, la pre-rellenamos
       setStatus("OPERATIONAL");
       setNotes("");
       setEditingItem(null);
@@ -87,7 +89,7 @@ export default function Equipment() {
 
       const data = {
           name,
-          location: category, // Usamos 'location' como campo para la carpeta
+          location: category, // Guardamos la carpeta aquí
           status,
           notes
       };
@@ -101,11 +103,12 @@ export default function Equipment() {
   };
 
   const handleDelete = (id: string) => {
-      deleteMutation.mutate(id);
-      setIsAdding(false); // Por si acaso estaba en el modal
+      if (confirm("Are you sure you want to delete this equipment?")) {
+          deleteMutation.mutate(id);
+      }
   };
 
-  // Helper para contar alertas en una carpeta
+  // Cuenta cuántas máquinas rotas hay en una carpeta
   const getFolderAlerts = (folderName: string) => {
       return equipmentList.filter((i:any) => i.location === folderName && i.status !== 'OPERATIONAL').length;
   };
@@ -113,7 +116,7 @@ export default function Equipment() {
   return (
     <Layout 
       title={currentFolder ? currentFolder : "Equipment"}
-      showBack={!currentFolder} // Muestra back del sistema en raíz, el nuestro dentro de carpetas
+      showBack={!currentFolder} // Muestra el back del sistema en raíz, y el nuestro dentro de carpetas
       action={
         canEdit && (
           <motion.button
@@ -126,9 +129,9 @@ export default function Equipment() {
         )
       }
     >
-      {/* BARRA DE BÚSQUEDA & NAVEGACIÓN */}
+      {/* BARRA DE NAVEGACIÓN Y BÚSQUEDA */}
       <div className="mb-6 space-y-4">
-        {/* Botón Atrás Personalizado */}
+        {/* Botón Atrás Personalizado (Solo cuando estamos dentro de una carpeta) */}
         {currentFolder && (
              <button 
                 onClick={() => { setCurrentFolder(null); setSearchQuery(""); }}
@@ -155,7 +158,7 @@ export default function Equipment() {
         </div>
       </div>
 
-      {/* VISTA DE CARPETAS (RAÍZ) */}
+      {/* VISTA 1: CARPETAS (RAÍZ) */}
       {!currentFolder && !searchQuery && (
           <div className="grid grid-cols-2 gap-3 mb-6">
             {folders.map((folderName, idx) => {
@@ -167,9 +170,9 @@ export default function Equipment() {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: idx * 0.05 }}
                     onClick={() => setCurrentFolder(folderName)}
-                    className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3 relative group"
+                    className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3 relative group transition-all"
                 >
-                    {/* Badge de Alerta si hay máquinas rotas dentro */}
+                    {/* Alerta Visual en la Carpeta si hay algo roto dentro */}
                     {alertCount > 0 && (
                         <div className="absolute top-2 right-2 bg-flow-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
                             <Wrench className="w-3 h-3" /> {alertCount}
@@ -187,7 +190,7 @@ export default function Equipment() {
               );
             })}
 
-            {/* Botón Rápido Crear Carpeta */}
+            {/* Botón Nueva Carpeta (Visual) */}
             {canEdit && (
                 <button 
                   onClick={handleOpenAdd}
@@ -200,10 +203,10 @@ export default function Equipment() {
           </div>
       )}
 
-      {/* LISTA DE ITEMS */}
+      {/* VISTA 2: LISTA DE MÁQUINAS (Dentro de carpeta o búsqueda) */}
       <div className="space-y-3 pb-20">
         <AnimatePresence mode="popLayout">
-            {displayedItems.map((item: any, idx: number) => (
+            {displayedItems.map((item: any) => (
                 <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -215,9 +218,9 @@ export default function Equipment() {
                         "bg-card border-white/5 hover:border-white/10"
                     )}
                 >
-                    {/* Icono de Estado */}
+                    {/* Icono Grande de Estado */}
                     <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-2xl border",
+                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-2xl border transition-colors",
                         item.status === 'BROKEN' ? "bg-red-500/10 border-red-500/20 text-red-500" :
                         item.status === 'MAINTENANCE' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" :
                         "bg-green-500/10 border-green-500/20 text-green-500"
@@ -229,12 +232,17 @@ export default function Equipment() {
 
                     <div className="flex-1 min-w-0 pt-1">
                         <div className="flex justify-between items-start">
-                            <h3 className="font-bold text-white truncate pr-8">{item.name}</h3>
-                            {/* Acciones (Editar/Borrar) */}
+                            <h3 className="font-bold text-white truncate pr-16">{item.name}</h3>
+                            
+                            {/* BOTONES DE ACCIÓN (Editar / Borrar) - Siempre visibles o en hover */}
                             {canEdit && (
-                                <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleOpenEdit(item)} className="p-1.5 hover:bg-white/10 rounded text-muted-foreground hover:text-white"><Edit2 className="w-4 h-4" /></button>
-                                    <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-500/10 rounded text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                <div className="absolute top-4 right-4 flex gap-1">
+                                    <button onClick={() => handleOpenEdit(item)} className="p-1.5 bg-white/5 hover:bg-white/20 rounded-lg text-muted-foreground hover:text-white transition-colors">
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={() => handleDelete(item.id)} className="p-1.5 bg-white/5 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500 transition-colors">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -247,30 +255,23 @@ export default function Equipment() {
                         </p>
 
                         {item.notes && (
-                            <p className="text-xs text-muted-foreground mt-2 italic bg-black/20 p-2 rounded-lg">
+                            <p className="text-xs text-muted-foreground mt-2 italic bg-black/20 p-2 rounded-lg border border-white/5">
                                 "{item.notes}"
                             </p>
-                        )}
-                        
-                        {/* Breadcrumb si estamos buscando */}
-                        {searchQuery && item.location && (
-                            <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
-                                <Folder className="w-3 h-3" /> {item.location}
-                            </div>
                         )}
                     </div>
                 </motion.div>
             ))}
         </AnimatePresence>
 
-        {displayedItems.length === 0 && (
+        {displayedItems.length === 0 && !isAdding && (
             <div className="text-center py-12 text-muted-foreground opacity-50">
-                <p>{searchQuery ? "No equipment found." : "This area is empty."}</p>
+                <p>{searchQuery ? "No equipment matches your search." : "This area is empty."}</p>
             </div>
         )}
       </div>
 
-      {/* MODAL CREAR/EDITAR */}
+      {/* MODAL: AÑADIR / EDITAR */}
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>{editingItem ? 'Edit Equipment' : 'Add Equipment'}</DialogTitle></DialogHeader>
@@ -279,28 +280,38 @@ export default function Equipment() {
                  <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Name</label>
                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Rational Oven 1" className="bg-black/20 border-white/10" />
              </div>
+             
+             {/* AQUÍ DEFINES LA CARPETA */}
              <div>
-                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Area (Folder)</label>
-                 <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Kitchen, Bar..." className="bg-black/20 border-white/10" />
+                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Location / Area</label>
+                 <Input 
+                    value={category} 
+                    onChange={(e) => setCategory(e.target.value)} 
+                    placeholder="e.g. Kitchen, Bar, Storage..." 
+                    className="bg-black/20 border-white/10" 
+                 />
+                 <p className="text-[10px] text-muted-foreground mt-1">Group items into folders by using the same Area name.</p>
              </div>
+             
              <div>
-                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
+                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Current Status</label>
                  <Select value={status} onValueChange={(v:any) => setStatus(v)}>
                     <SelectTrigger className={cn("bg-black/20 border-white/10", status === 'BROKEN' && "text-red-400 border-red-500/50", status === 'MAINTENANCE' && "text-orange-400 border-orange-500/50")}><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                        <SelectItem value="OPERATIONAL" className="text-green-400">Operational ✅</SelectItem>
-                        <SelectItem value="MAINTENANCE" className="text-orange-400">Maintenance 🔧</SelectItem>
-                        <SelectItem value="BROKEN" className="text-red-400">Broken 🚨</SelectItem>
+                        <SelectItem value="OPERATIONAL" className="text-green-400 font-bold">Operational ✅</SelectItem>
+                        <SelectItem value="MAINTENANCE" className="text-orange-400 font-bold">Maintenance 🔧</SelectItem>
+                        <SelectItem value="BROKEN" className="text-red-400 font-bold">Broken 🚨</SelectItem>
                     </SelectContent>
                  </Select>
              </div>
+             
              <div>
-                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes / Issues</label>
-                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Describe the issue or details..." className="bg-black/20 border-white/10 h-20 resize-none" />
+                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes</label>
+                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Model number, service phone, issue description..." className="bg-black/20 border-white/10 h-20 resize-none" />
              </div>
           </div>
           <DialogFooter>
-              <Button onClick={handleSave} className="w-full bg-flow-yellow text-black font-bold hover:bg-yellow-400">Save Equipment</Button>
+              <Button onClick={handleSave} className="w-full bg-flow-yellow text-black font-bold hover:bg-yellow-400">Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
