@@ -107,8 +107,7 @@ export default function Schedule() {
           category: taskCategory,
           assignee: taskAssignee,
           completed: editingTask ? editingTask.completed : false,
-          // 🔥 Asegúrate de guardar la fecha seleccionada si es necesario para tu backend
-          // date: selectedDate, 
+          date: selectedDate,
       };
 
       try {
