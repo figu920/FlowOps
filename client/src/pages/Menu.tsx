@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast"; // Importar Toast
 
 export default function Menu() {
   const { currentUser } = useStore();
+  const { toast } = useToast();
   const { data: menu = [] } = useMenu();
   const { data: inventory = [] } = useInventory();
 
@@ -41,30 +43,68 @@ export default function Menu() {
   const updateIngredientMutation = useUpdateIngredient();
   const deleteIngredientMutation = useDeleteIngredient();
   
-  // Estados para añadir/editar
+  // Estados para añadir/editar platos
   const [isAddingDish, setIsAddingDish] = useState(false);
   const [newDishName, setNewDishName] = useState("");
   const [newDishCategory, setNewDishCategory] = useState(""); 
-  
   const [editingDish, setEditingDish] = useState<string | null>(null);
   const [editDishName, setEditDishName] = useState("");
   const [editDishCategory, setEditDishCategory] = useState("");
 
+  // Estados para Gestión de Carpetas (NUEVO)
+  const [editingFolder, setEditingFolder] = useState<string | null>(null);
+  const [folderNewName, setFolderNewName] = useState("");
+  const [isRenamingFolder, setIsRenamingFolder] = useState(false);
+  const [deletingFolder, setDeletingFolder] = useState<string | null>(null);
+
+  // Estados ingredientes
   const [addingIngredientTo, setAddingIngredientTo] = useState<string | null>(null);
   const [editingIngredient, setEditingIngredient] = useState<{menuId: string, ingId: string} | null>(null);
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
-  
   const [ingName, setIngName] = useState("");
   const [ingQty, setIngQty] = useState("");
   const [ingUnit, setIngUnit] = useState<MeasurementUnit>("grams");
   const [ingNotes, setIngNotes] = useState("");
-
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const isAdmin = currentUser?.isSystemAdmin === true;
   const canManageMenu = currentUser?.role === 'manager' || isAdmin;
 
-  // --- HANDLERS ---
+  // --- HANDLERS CARPETAS ---
+
+  const performRenameFolder = async () => {
+    if (!editingFolder || !folderNewName.trim() || folderNewName === editingFolder) {
+      setIsRenamingFolder(false); return;
+    }
+    // Buscar platos en esta categoría
+    const dishesToUpdate = menu.filter((d: any) => d.category === editingFolder);
+    
+    // Actualizar uno a uno
+    for (const dish of dishesToUpdate) {
+        await updateMenuItemMutation.mutateAsync({ 
+            id: dish.id, 
+            updates: { category: folderNewName } 
+        });
+    }
+    setIsRenamingFolder(false);
+    setEditingFolder(null);
+    toast({ title: "Category Renamed", description: `${dishesToUpdate.length} dishes moved.` });
+  };
+
+  const performDeleteFolder = async () => {
+    if (!deletingFolder) return;
+    // Buscar platos en esta categoría
+    const dishesToDelete = menu.filter((d: any) => d.category === deletingFolder);
+    
+    // Borrar uno a uno
+    for (const dish of dishesToDelete) {
+        await deleteMenuItemMutation.mutateAsync(dish.id);
+    }
+    setDeletingFolder(null);
+    toast({ title: "Category Deleted", description: `Removed category and ${dishesToDelete.length} dishes.` });
+  };
+
+  // --- HANDLERS PLATOS ---
   const toggleExpand = (id: string) => {
     setExpandedItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
@@ -78,10 +118,7 @@ export default function Menu() {
 
   const handleAddDish = () => {
     if (newDishName && newDishCategory) {
-      createMenuItemMutation.mutate({
-        name: newDishName,
-        category: newDishCategory
-      });
+      createMenuItemMutation.mutate({ name: newDishName, category: newDishCategory });
       setIsAddingDish(false);
       setNewDishName("");
       if (!currentFolder) setNewDishCategory(""); 
@@ -96,15 +133,12 @@ export default function Menu() {
 
   const handleEditDish = () => {
     if (editingDish && editDishName && editDishCategory) {
-      updateMenuItemMutation.mutate({
-        id: editingDish,
-        updates: { name: editDishName, category: editDishCategory }
-      });
+      updateMenuItemMutation.mutate({ id: editingDish, updates: { name: editDishName, category: editDishCategory } });
       setEditingDish(null);
     }
   };
 
-  // Ingredientes logic
+  // --- HANDLERS INGREDIENTES ---
   const openAddIngredient = (menuId: string) => {
     setAddingIngredientTo(menuId);
     setIngName(""); setIngQty(""); setIngUnit("grams"); setIngNotes(""); setSelectedInventoryId(null);
@@ -141,38 +175,24 @@ export default function Menu() {
   return (
     <Layout 
       title={currentFolder ? currentFolder : "Menu & Portions"}
-      // ✅ CORREGIDO: Muestra Back si NO hay carpeta seleccionada
       showBack={!currentFolder} 
-      action={
-        canManageMenu && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={handleOpenAddDish}
-            className="w-9 h-9 rounded-full bg-flow-green text-black flex items-center justify-center shadow-lg shadow-flow-green/20"
-          >
+      action={canManageMenu && (
+          <motion.button whileTap={{ scale: 0.9 }} onClick={handleOpenAddDish} className="w-9 h-9 rounded-full bg-flow-green text-black flex items-center justify-center shadow-lg shadow-flow-green/20">
             <Plus className="w-5 h-5" strokeWidth={3} />
           </motion.button>
-        )
-      }
+      )}
     >
-      {/* NAVEGACIÓN DE CARPETAS */}
       <div className="mb-6">
         {currentFolder ? (
-           <button 
-             onClick={() => setCurrentFolder(null)}
-             className="flex items-center text-muted-foreground hover:text-white text-sm font-medium transition-colors mb-4"
-           >
-             <ChevronLeft className="w-4 h-4 mr-1" />
-             Back to Categories
+           <button onClick={() => setCurrentFolder(null)} className="flex items-center text-muted-foreground hover:text-white text-sm font-medium transition-colors mb-4">
+             <ChevronLeft className="w-4 h-4 mr-1" /> Back to Categories
            </button>
         ) : (
            <div className="flex items-center gap-2 mb-4 text-muted-foreground text-sm">
-              <Folder className="w-4 h-4" />
-              <span>Select a category to view dishes</span>
+              <Folder className="w-4 h-4" /> <span>Select a category to view dishes</span>
            </div>
         )}
 
-        {/* VISTA DE CARPETAS (Solo en raíz) */}
         {!currentFolder && (
           <div className="grid grid-cols-2 gap-3 mb-6">
             {folders.map((folderName, idx) => (
@@ -184,110 +204,61 @@ export default function Menu() {
                 onClick={() => setCurrentFolder(folderName as string)}
                 className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3 relative group"
               >
-                <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center">
-                  <Folder className="w-6 h-6" />
-                </div>
+                {/* BOTONES ACCIÓN CARPETA */}
+                {canManageMenu && (
+                    <div className="absolute top-2 right-2 flex gap-1 z-10">
+                         <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folderName); setFolderNewName(folderName); setIsRenamingFolder(true); }} className="p-1.5 bg-black/40 rounded-md text-white/70 hover:text-white"><Edit2 className="w-3 h-3"/></button>
+                         <button onClick={(e) => { e.stopPropagation(); setDeletingFolder(folderName); }} className="p-1.5 bg-black/40 hover:bg-red-500/80 rounded-md text-white/70 hover:text-white"><Trash2 className="w-3 h-3"/></button>
+                    </div>
+                )}
+
+                <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center"><Folder className="w-6 h-6" /></div>
                 <span className="font-bold text-white truncate w-full text-center">{folderName}</span>
-                <span className="text-[10px] text-muted-foreground uppercase bg-white/5 px-2 py-0.5 rounded-full">
-                  {menu.filter((i:any) => i.category === folderName).length} items
-                </span>
+                <span className="text-[10px] text-muted-foreground uppercase bg-white/5 px-2 py-0.5 rounded-full">{menu.filter((i:any) => i.category === folderName).length} items</span>
               </motion.div>
             ))}
             
-            {/* Botón rápido para crear carpeta */}
             {canManageMenu && (
-                <button 
-                  onClick={handleOpenAddDish}
-                  className="bg-white/5 hover:bg-white/10 border border-dashed border-white/10 rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-white transition-colors"
-                >
-                    <FolderPlus className="w-6 h-6 opacity-50" />
-                    <span className="text-xs font-bold">New Category</span>
+                <button onClick={handleOpenAddDish} className="bg-white/5 hover:bg-white/10 border border-dashed border-white/10 rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-white transition-colors">
+                    <FolderPlus className="w-6 h-6 opacity-50" /> <span className="text-xs font-bold">New Category</span>
                 </button>
             )}
           </div>
         )}
       </div>
 
-      {/* LISTA DE PLATOS (DENTRO DE CARPETA) */}
       <div className="space-y-4">
         {displayedItems.map((dish: MenuItem, idx: number) => (
-          <motion.div
-            key={dish.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.05 }}
-            className="bg-card rounded-[24px] border border-white/[0.04] overflow-hidden group"
-          >
-            <div 
-              onClick={() => toggleExpand(dish.id)}
-              className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors relative"
-            >
+          <motion.div key={dish.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="bg-card rounded-[24px] border border-white/[0.04] overflow-hidden group">
+            <div onClick={() => toggleExpand(dish.id)} className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors relative">
                {canManageMenu && (
                   <div className="absolute top-5 right-12 flex items-center gap-1 z-10">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); openEditDish(dish); }}
-                      className="p-2 text-muted-foreground hover:text-flow-green transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); deleteMenuItemMutation.mutate(dish.id); }}
-                      className="p-2 text-muted-foreground hover:text-flow-red transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); openEditDish(dish); }} className="p-2 text-muted-foreground hover:text-flow-green transition-colors"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteMenuItemMutation.mutate(dish.id); }} className="p-2 text-muted-foreground hover:text-flow-red transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div>
                )}
-              
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-flow-green">
-                  <Utensils className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">{dish.name}</h3>
-                  {!currentFolder && <span className="text-xs font-bold text-muted-foreground bg-white/5 px-2 py-0.5 rounded">Uncategorized</span>}
-                </div>
+                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-flow-green"><Utensils className="w-6 h-6" /></div>
+                <div><h3 className="text-lg font-bold text-white">{dish.name}</h3>{!currentFolder && <span className="text-xs font-bold text-muted-foreground bg-white/5 px-2 py-0.5 rounded">Uncategorized</span>}</div>
               </div>
-              
-              <motion.div animate={{ rotate: expandedItems.includes(dish.id) ? 180 : 0 }}>
-                <ChevronDown className="w-5 h-5 text-muted-foreground" />
-              </motion.div>
+              <motion.div animate={{ rotate: expandedItems.includes(dish.id) ? 180 : 0 }}><ChevronDown className="w-5 h-5 text-muted-foreground" /></motion.div>
             </div>
 
             <AnimatePresence>
               {expandedItems.includes(dish.id) && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="bg-black/20 border-t border-white/[0.04]"
-                >
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-black/20 border-t border-white/[0.04]">
                   <div className="p-4 space-y-3">
                     {dish.ingredients.map((ing) => (
                       <div key={ing.id} className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02]">
-                         <div className="flex-1">
-                           <span className="font-semibold text-white">{ing.name}</span>
-                           {ing.notes && <p className="text-xs text-muted-foreground italic mt-0.5">"{ing.notes}"</p>}
-                         </div>
+                         <div className="flex-1"><span className="font-semibold text-white">{ing.name}</span>{ing.notes && <p className="text-xs text-muted-foreground italic mt-0.5">"{ing.notes}"</p>}</div>
                          <div className="flex items-center gap-3">
-                           <div className="text-right">
-                             <span className="text-lg font-bold text-flow-green">{ing.quantity}</span>
-                             <span className="text-xs text-muted-foreground uppercase ml-1 font-medium">{ing.unit}</span>
-                           </div>
-                           {canManageMenu && (
-                             <button onClick={() => openEditIngredient(dish.id, ing)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white">
-                               <Edit2 className="w-4 h-4" />
-                             </button>
-                           )}
+                           <div className="text-right"><span className="text-lg font-bold text-flow-green">{ing.quantity}</span><span className="text-xs text-muted-foreground uppercase ml-1 font-medium">{ing.unit}</span></div>
+                           {canManageMenu && <button onClick={() => openEditIngredient(dish.id, ing)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white"><Edit2 className="w-4 h-4" /></button>}
                          </div>
                       </div>
                     ))}
                     {dish.ingredients.length === 0 && <p className="text-center text-muted-foreground text-sm py-2">No ingredients.</p>}
-                    {canManageMenu && (
-                      <Button onClick={() => openAddIngredient(dish.id)} variant="ghost" className="w-full border border-dashed border-white/10 text-muted-foreground hover:text-white h-10 rounded-xl">
-                        <Plus className="w-4 h-4 mr-2" /> Add Ingredient
-                      </Button>
-                    )}
+                    {canManageMenu && <Button onClick={() => openAddIngredient(dish.id)} variant="ghost" className="w-full border border-dashed border-white/10 text-muted-foreground hover:text-white h-10 rounded-xl"><Plus className="w-4 h-4 mr-2" /> Add Ingredient</Button>}
                   </div>
                 </motion.div>
               )}
@@ -296,20 +267,15 @@ export default function Menu() {
         ))}
       </div>
 
-      {/* MODALES DE CREACIÓN Y EDICIÓN */}
+      {/* --- MODALES --- */}
+      
+      {/* ADD/EDIT DISH */}
       <Dialog open={isAddingDish} onOpenChange={setIsAddingDish}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Add New Dish</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Dish Name</label>
-              <Input value={newDishName} onChange={(e) => setNewDishName(e.target.value)} placeholder="e.g. Spicy Chicken" className="bg-black/20 border-white/10" />
-            </div>
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category (Folder)</label>
-              <Input value={newDishCategory} onChange={(e) => setNewDishCategory(e.target.value)} placeholder="e.g. Burgers" className="bg-black/20 border-white/10" />
-              <p className="text-[10px] text-muted-foreground mt-1">Type a new name to create a new folder.</p>
-            </div>
+            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Dish Name</label><Input value={newDishName} onChange={(e) => setNewDishName(e.target.value)} placeholder="e.g. Spicy Chicken" className="bg-black/20 border-white/10" /></div>
+            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category (Folder)</label><Input value={newDishCategory} onChange={(e) => setNewDishCategory(e.target.value)} placeholder="e.g. Burgers" className="bg-black/20 border-white/10" /></div>
           </div>
           <DialogFooter><Button onClick={handleAddDish} className="w-full bg-flow-green text-black font-bold">Save Dish</Button></DialogFooter>
         </DialogContent>
@@ -319,20 +285,31 @@ export default function Menu() {
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Edit Dish</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Dish Name</label>
-              <Input value={editDishName} onChange={(e) => setEditDishName(e.target.value)} className="bg-black/20 border-white/10" />
-            </div>
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category (Folder)</label>
-              <Input value={editDishCategory} onChange={(e) => setEditDishCategory(e.target.value)} className="bg-black/20 border-white/10" />
-            </div>
+            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Dish Name</label><Input value={editDishName} onChange={(e) => setEditDishName(e.target.value)} className="bg-black/20 border-white/10" /></div>
+            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category (Folder)</label><Input value={editDishCategory} onChange={(e) => setEditDishCategory(e.target.value)} className="bg-black/20 border-white/10" /></div>
           </div>
           <DialogFooter><Button onClick={handleEditDish} className="w-full bg-flow-green text-black font-bold">Update Dish</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Modales de ingredientes */}
+      {/* MODALES CARPETAS */}
+      <Dialog open={isRenamingFolder} onOpenChange={setIsRenamingFolder}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+          <DialogHeader><DialogTitle>Rename Category</DialogTitle></DialogHeader>
+          <div className="py-4"><Input autoFocus value={folderNewName} onChange={(e) => setFolderNewName(e.target.value)} className="bg-black/20 border-white/10"/></div>
+          <DialogFooter><Button onClick={performRenameFolder} className="w-full bg-white text-black font-bold">Update Name</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deletingFolder} onOpenChange={() => setDeletingFolder(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 text-center">
+          <DialogHeader><DialogTitle className="text-red-500">Delete Category?</DialogTitle></DialogHeader>
+          <p className="mb-4 text-sm text-muted-foreground">This will delete all dishes inside.</p>
+          <DialogFooter><Button onClick={performDeleteFolder} className="w-full bg-red-500 text-white font-bold">Delete All</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODALES INGREDIENTES */}
       <Dialog open={!!addingIngredientTo || !!editingIngredient} onOpenChange={() => { setAddingIngredientTo(null); setEditingIngredient(null); }}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>{editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}</DialogTitle></DialogHeader>
