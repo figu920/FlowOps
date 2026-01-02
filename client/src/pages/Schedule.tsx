@@ -5,9 +5,9 @@ import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useUsers } from 
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Plus, Trash2, Edit2, Search, CheckCircle2, 
-  Camera, ChevronDown, ChevronUp, 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon,
+  Plus, Trash2, Edit2, CheckCircle2, 
+  ChevronDown, ChevronUp, 
+  ChevronLeft, ChevronRight, 
   Sun, Moon, Clock, User
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -68,13 +68,14 @@ export default function Schedule() {
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
 
   // --- HANDLERS ---
-
   const handleDayClick = (date: Date) => {
       setSelectedDate(date);
       setIsDayOpen(true);
   };
 
   const getTasksForDayAndCategory = (category: string) => {
+      // Nota: Aquí deberías filtrar también por 'selectedDate' si tus tareas tienen fecha
+      // Por ahora lo dejo como lo tenías:
       return tasks.filter((t: any) => t.category === category);
   };
 
@@ -95,20 +96,31 @@ export default function Schedule() {
   };
 
   const handleSaveTask = () => {
-      if (!taskText.trim()) return;
+      console.log("Saving task..."); // Debug log
+      if (!taskText.trim()) {
+        console.warn("Task text is empty");
+        return;
+      }
+      
       const data = {
           text: taskText,
           category: taskCategory,
           assignee: taskAssignee,
           completed: editingTask ? editingTask.completed : false,
+          // 🔥 Asegúrate de guardar la fecha seleccionada si es necesario para tu backend
+          // date: selectedDate, 
       };
 
-      if (editingTask) {
-          updateTaskMutation.mutate({ id: editingTask.id, updates: data });
-      } else {
-          createTaskMutation.mutate(data);
+      try {
+        if (editingTask) {
+            updateTaskMutation.mutate({ id: editingTask.id, updates: data });
+        } else {
+            createTaskMutation.mutate(data);
+        }
+        setIsAddingTask(false);
+      } catch (error) {
+        console.error("Error saving task:", error);
       }
-      setIsAddingTask(false);
   };
 
   const handleDeleteTask = (id: string) => {
@@ -124,11 +136,11 @@ export default function Schedule() {
   };
 
   return (
-    // ✅ AQUÍ ESTÁ EL CAMBIO: showBack={true}
     <Layout title="Operations Calendar" showBack={true}>
       
       {/* --- VISTA CALENDARIO --- */}
       <div className="mb-6 space-y-4">
+        {/* ... (Todo el código del calendario se mantiene igual) ... */}
         <div className="flex items-center justify-between px-2">
             <button onClick={prevMonth} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-white transition-colors">
                 <ChevronLeft className="w-5 h-5" />
@@ -173,7 +185,6 @@ export default function Schedule() {
                             <span className={cn("text-sm font-bold", isToday ? "text-white" : "text-white/80")}>
                                 {format(date, 'd')}
                             </span>
-                            
                             <div className="flex gap-0.5 mt-1 h-1.5">
                                 {showDots && (
                                     <>
@@ -187,16 +198,13 @@ export default function Schedule() {
                 })}
             </div>
         </div>
-        
-        <div className="text-center text-xs text-muted-foreground mt-4">
-            Tap a day to view or edit tasks.
-        </div>
       </div>
 
-      {/* --- DESPLEGABLE DEL DÍA (MODAL) --- */}
+      {/* --- DESPLEGABLE DEL DÍA (MODAL 1) --- */}
       <Dialog open={isDayOpen} onOpenChange={setIsDayOpen}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[95%] max-w-lg rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[95%] max-w-lg rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col z-[50]">
             
+            {/* ... (Contenido del modal del día se mantiene igual) ... */}
             <div className="p-6 bg-white/5 border-b border-white/5">
                 <h2 className="text-2xl font-black text-white flex items-center gap-2">
                     {selectedDate && format(selectedDate, 'EEEE, MMM do')}
@@ -226,7 +234,6 @@ export default function Schedule() {
                                 {isExpanded && (
                                     <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="border-t border-white/5">
                                         <div className="p-2 space-y-1">
-                                            {items.length === 0 && <p className="text-center text-[10px] text-muted-foreground py-2 italic">No tasks yet.</p>}
                                             {items.map((task: any) => (
                                                 <div key={task.id} className={cn("flex items-center gap-3 p-3 rounded-xl transition-all group", task.completed ? "bg-green-500/5 opacity-60" : "bg-white/5")}>
                                                     <button onClick={() => toggleTaskCompletion(task)} className={cn("w-5 h-5 rounded-full flex items-center justify-center border shrink-0 transition-colors", task.completed ? "bg-flow-green border-flow-green text-black" : "border-white/20 hover:border-white/40 text-transparent")}>
@@ -260,12 +267,22 @@ export default function Schedule() {
         </DialogContent>
       </Dialog>
 
-      {/* --- MODAL CREAR TAREA (ENCIMA) --- */}
+      {/* --- MODAL CREAR TAREA (MODAL 2) --- */}
+      {/* 🔥 CORRECCIÓN: z-[60] es correcto, pero el Select necesita más */}
       <Dialog open={isAddingTask} onOpenChange={setIsAddingTask}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 z-[60]">
           <DialogHeader><DialogTitle>{editingTask ? 'Edit Task' : `New ${taskCategory} Task`}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-              <div><label className="text-xs font-bold text-muted-foreground mb-1 block">Description</label><Input value={taskText} onChange={(e) => setTaskText(e.target.value)} placeholder="e.g. Turn on grill" className="bg-black/20 border-white/10" autoFocus /></div>
+              <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1 block">Description</label>
+                  <Input 
+                    value={taskText} 
+                    onChange={(e) => setTaskText(e.target.value)} 
+                    placeholder="e.g. Turn on grill" 
+                    className="bg-black/20 border-white/10" 
+                    autoFocus 
+                  />
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -276,8 +293,16 @@ export default function Schedule() {
                   <div>
                       <label className="text-xs font-bold text-muted-foreground mb-1 block">Assignee</label>
                       <Select value={taskAssignee} onValueChange={setTaskAssignee}>
-                        <SelectTrigger className="bg-black/20 border-white/10 h-10"><SelectValue placeholder="Select..." /></SelectTrigger>
-                        <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
+                        <SelectTrigger className="bg-black/20 border-white/10 h-10">
+                            <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        
+                        {/* 🔥 CORRECCIÓN CRÍTICA: 'z-[100]' y 'position="popper"' */}
+                        <SelectContent 
+                            className="bg-[#1C1C1E] border-white/10 text-white z-[100]" 
+                            position="popper" 
+                            sideOffset={5}
+                        >
                             <SelectItem value="Team">Team</SelectItem>
                             {activeEmployees.map((emp: any) => (
                                 <SelectItem key={emp.id} value={emp.name}>{emp.name}</SelectItem>
@@ -287,7 +312,11 @@ export default function Schedule() {
                   </div>
               </div>
           </div>
-          <DialogFooter><Button onClick={handleSaveTask} className="w-full bg-flow-blue text-white font-bold">Save Task</Button></DialogFooter>
+          <DialogFooter>
+              <Button onClick={handleSaveTask} className="w-full bg-flow-blue text-white font-bold">
+                  Save Task
+              </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
