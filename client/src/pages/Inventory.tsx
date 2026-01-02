@@ -45,7 +45,6 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const [isRenamingFolder, setIsRenamingFolder] = useState(false);
   const [folderNewName, setFolderNewName] = useState("");
 
-  // ✅ ESTADO AÑADIDO (Corrección del error 'newFolderName')
   const [newFolderName, setNewFolderName] = useState("");
 
   // Borrado de Carpeta
@@ -266,7 +265,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   return (
     <Layout
       title={currentPath ? currentPath.split('/').pop() : "Inventory"}
-      showBack={false} // ✅ CORREGIDO: Desactivamos el back del layout para usar el nuestro
+      showBack={false}
       action={
         canEdit && (
           <DropdownMenu>
@@ -345,19 +344,19 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 onClick={() => handleEnterFolder(folderName)}
                 className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3 relative group"
               >
-                {/* ACCIONES DE CARPETA (EDITAR Y BORRAR) */}
+                {/* ACCIONES DE CARPETA (SIEMPRE VISIBLES PARA MÓVIL) */}
                 {canEdit && (
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-2 right-2 flex gap-1 z-10">
                          <button 
                             onClick={(e) => openRenameFolder(folderName, e)}
-                            className="p-1.5 bg-black/40 hover:bg-black/60 rounded-md text-white/70 hover:text-white"
+                            className="p-1.5 bg-black/40 hover:bg-black/60 rounded-md text-white/70 hover:text-white backdrop-blur-sm"
                          >
                             <Edit2 className="w-3 h-3" />
                          </button>
                          {canDelete && (
                              <button 
                                 onClick={(e) => openDeleteFolder(folderName, e)}
-                                className="p-1.5 bg-black/40 hover:bg-flow-red rounded-md text-white/70 hover:text-white"
+                                className="p-1.5 bg-black/40 hover:bg-flow-red rounded-md text-white/70 hover:text-white backdrop-blur-sm"
                              >
                                 <Trash2 className="w-3 h-3" />
                              </button>
@@ -365,7 +364,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                     </div>
                 )}
 
-                <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mt-2">
                   <Folder className="w-6 h-6" />
                 </div>
                 <span className="font-bold text-white truncate w-full text-center">{folderName}</span>
@@ -408,14 +407,15 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                 transition={{ delay: idx * 0.03 }}
                 className="bg-card rounded-[20px] p-5 border border-white/[0.04] shadow-sm relative group"
               >
-                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* ACCIONES DE ITEM (SIEMPRE VISIBLES PARA MÓVIL) */}
+                <div className="absolute top-4 right-4 flex gap-2 z-10">
                     {canEdit && (
-                      <button onClick={() => openEditItemModal(item)} className="p-2 text-muted-foreground hover:text-white bg-black/20 hover:bg-black/40 rounded-lg transition-colors">
+                      <button onClick={() => openEditItemModal(item)} className="p-2 text-muted-foreground hover:text-white bg-black/20 hover:bg-black/40 rounded-lg transition-colors backdrop-blur-sm">
                         <Edit2 className="w-4 h-4" />
                       </button>
                     )}
                     {canDelete && (
-                      <button onClick={() => deleteMutation.mutate(item.id)} className="p-2 text-muted-foreground hover:text-flow-red bg-black/20 hover:bg-black/40 rounded-lg transition-colors">
+                      <button onClick={() => deleteMutation.mutate(item.id)} className="p-2 text-muted-foreground hover:text-flow-red bg-black/20 hover:bg-black/40 rounded-lg transition-colors backdrop-blur-sm">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
@@ -426,7 +426,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                     {item.emoji}
                   </div>
                   <div>
-                    <h3 className="font-bold text-[19px] text-white truncate">{item.name}</h3>
+                    <h3 className="font-bold text-[19px] text-white truncate max-w-[150px]">{item.name}</h3>
                     {searchQuery && item.category && (
                         <span className="text-[10px] text-muted-foreground block">
                             in {item.category.replaceAll('/', ' > ')}
@@ -436,7 +436,6 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
                       <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-white font-bold border border-white/5">
                         📊 {item.quantity} {item.unit}
                       </span>
-                      {/* ✅ CORREGIDO: Evitamos error de null en costPerUnit */}
                       {(item.costPerUnit || 0) > 0 && (
                         <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-flow-green font-bold border border-white/5">
                           💰 {item.costPerUnit} $
