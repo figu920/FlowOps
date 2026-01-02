@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   format, addMonths, subMonths, startOfMonth, 
   endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, 
-  isSameDay, isSameMonth, parseISO
+  isSameDay, isSameMonth
 } from 'date-fns';
 
 export default function Schedule() {
@@ -37,6 +37,7 @@ export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDayOpen, setIsDayOpen] = useState(false);
 
+  // Carpetas expandidas por defecto
   const [expandedFolders, setExpandedFolders] = useState<string[]>(['Opening', 'Shift', 'Closing']); 
 
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -55,6 +56,32 @@ export default function Schedule() {
     { id: 'Closing', label: 'Closing', icon: Moon, color: 'text-purple-400', bg: 'bg-purple-500/10' }
   ];
 
+  // --- LÓGICA TIPO INVENTARIO (Texto simple) ---
+  // Creamos un ID de texto para el día seleccionado (ej: "2026-01-02")
+  const selectedDateKey = useMemo(() => {
+      return selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
+  }, [selectedDate]);
+
+  // Filtramos comparando TEXTO, igual que en Inventory comparas categorías
+  const getTasksForDayAndCategory = (category: string) => {
+      if (!tasks || !selectedDateKey) return [];
+
+      return tasks.filter((t: any) => {
+          if (!t.date) return false;
+          
+          // Convertimos la fecha de la tarea a texto simple (YYYY-MM-DD)
+          // Esto maneja tanto si viene como "2026-01-02" como si viene "2026-01-02T15:00:00.000Z"
+          let taskDateKey = "";
+          if (typeof t.date === 'string') {
+              taskDateKey = t.date.substring(0, 10); // Nos quedamos solo con los primeros 10 caracteres
+          } else {
+              taskDateKey = format(new Date(t.date), 'yyyy-MM-dd');
+          }
+
+          return t.category === category && taskDateKey === selectedDateKey;
+      });
+  };
+
   // --- LÓGICA CALENDARIO ---
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -67,32 +94,9 @@ export default function Schedule() {
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
 
-  // --- HANDLERS ---
   const handleDayClick = (date: Date) => {
       setSelectedDate(date);
       setIsDayOpen(true);
-  };
-
-  // 1. FILTRADO ROBUSTO (Igual que Inventory filtra por path, aquí filtramos por fecha exacta)
-  const getTasksForDayAndCategory = (category: string) => {
-      if (!tasks || !selectedDate) return [];
-
-      return tasks.filter((t: any) => {
-          // Si no tiene fecha, lo ignoramos
-          if (!t.date) return false;
-          
-          // Convertimos la fecha de la DB a objeto Date de forma segura
-          const taskDate = typeof t.date === 'string' ? parseISO(t.date) : new Date(t.date);
-          
-          // Verificamos si es válida
-          if (isNaN(taskDate.getTime())) return false;
-
-          // Comparamos
-          const isCategoryMatch = t.category === category;
-          const isDateMatch = isSameDay(taskDate, selectedDate);
-
-          return isCategoryMatch && isDateMatch;
-      });
   };
 
   const handleOpenAddTask = (category: string) => {
@@ -111,30 +115,26 @@ export default function Schedule() {
       setIsAddingTask(true);
   };
 
-  // 2. GUARDADO (Réplica exacta de la estructura de Inventory.tsx)
+  // --- GUARDAR (Estilo Inventory) ---
   const handleSaveTask = () => {
-      if (taskText.trim()) {
-        // Aseguramos que la fecha sea un string ISO estándar
-        const dateToSave = selectedDate ? selectedDate.toISOString() : new Date().toISOString();
+      if (!taskText.trim() || !selectedDateKey) return;
+      
+      const data = {
+          text: taskText,
+          category: taskCategory,
+          assignee: taskAssignee,
+          completed: editingTask ? editingTask.completed : false,
+          // CLAVE: Guardamos la fecha como texto simple "YYYY-MM-DD"
+          // Esto evita cualquier problema de zonas horarias.
+          date: selectedDateKey, 
+      };
 
-        const data = {
-            text: taskText,
-            category: taskCategory,
-            assignee: taskAssignee,
-            completed: editingTask ? editingTask.completed : false,
-            date: dateToSave, 
-        };
-
-        if (editingTask) {
-            updateTaskMutation.mutate({ id: editingTask.id, updates: data });
-        } else {
-            createTaskMutation.mutate(data);
-        }
-
-        // Limpieza de estado igual que en Inventory
-        setIsAddingTask(false);
-        setTaskText("");
+      if (editingTask) {
+          updateTaskMutation.mutate({ id: editingTask.id, updates: data });
+      } else {
+          createTaskMutation.mutate(data);
       }
+      setIsAddingTask(false);
   };
 
   const handleDeleteTask = (id: string) => {
@@ -179,19 +179,18 @@ export default function Schedule() {
                 {calendarDays.map((date, idx) => {
                     const isToday = isSameDay(date, new Date());
                     const isCurrentMonth = isSameMonth(date, currentMonth);
-                    const isSelected = selectedDate && isSameDay(date, selectedDate); // Highlight selección
+                    const isSelected = selectedDate && isSameDay(date, selectedDate);
                     
-                    // Cálculo de puntos (dots) optimizado
+                    // Lógica visual de puntitos
+                    const dayKey = format(date, 'yyyy-MM-dd');
                     const dayTasks = tasks.filter((t: any) => {
                         if(!t.date) return false;
-                        const tDate = typeof t.date === 'string' ? parseISO(t.date) : new Date(t.date);
-                        return isSameDay(tDate, date);
+                        const tKey = typeof t.date === 'string' ? t.date.substring(0, 10) : format(new Date(t.date), 'yyyy-MM-dd');
+                        return tKey === dayKey;
                     });
                     
                     const hasOpening = dayTasks.some((t:any) => t.category === 'Opening'); 
                     const hasClosing = dayTasks.some((t:any) => t.category === 'Closing');
-                    
-                    // Mostrar puntos si hay tareas O si es hoy
                     const showDots = dayTasks.length > 0 || isToday; 
 
                     return (
@@ -260,6 +259,9 @@ export default function Schedule() {
                                 {isExpanded && (
                                     <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="border-t border-white/5">
                                         <div className="p-2 space-y-1">
+                                            {items.length === 0 && (
+                                                <div className="py-4 text-center text-xs text-muted-foreground italic opacity-50">No tasks yet</div>
+                                            )}
                                             {items.map((task: any) => (
                                                 <div key={task.id} className={cn("flex items-center gap-3 p-3 rounded-xl transition-all group", task.completed ? "bg-green-500/5 opacity-60" : "bg-white/5")}>
                                                     <button onClick={() => toggleTaskCompletion(task)} className={cn("w-5 h-5 rounded-full flex items-center justify-center border shrink-0 transition-colors", task.completed ? "bg-flow-green border-flow-green text-black" : "border-white/20 hover:border-white/40 text-transparent")}>
