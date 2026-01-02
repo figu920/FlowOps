@@ -19,18 +19,17 @@ export default function Menu() {
   // --- LÓGICA DE CARPETAS ---
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
 
-  // 1. Obtener lista de carpetas (Categorías únicas)
+  // 1. Obtener lista de carpetas
   const folders = useMemo(() => {
     const categories = new Set(menu.map((item: any) => item.category).filter(Boolean));
-    return Array.from(categories).sort()as string[];
+    return Array.from(categories).sort() as string[];
   }, [menu]);
 
-  // 2. Filtrar items según si estamos en una carpeta o en la raíz
+  // 2. Filtrar items
   const displayedItems = useMemo(() => {
     if (currentFolder) {
       return menu.filter((item: any) => item.category === currentFolder);
     }
-    // En la raíz, mostramos items que NO tengan categoría (huérfanos)
     return menu.filter((item: any) => !item.category);
   }, [menu, currentFolder]);
 
@@ -45,7 +44,7 @@ export default function Menu() {
   // Estados para añadir/editar
   const [isAddingDish, setIsAddingDish] = useState(false);
   const [newDishName, setNewDishName] = useState("");
-  const [newDishCategory, setNewDishCategory] = useState(""); // Esto define la carpeta
+  const [newDishCategory, setNewDishCategory] = useState(""); 
   
   const [editingDish, setEditingDish] = useState<string | null>(null);
   const [editDishName, setEditDishName] = useState("");
@@ -71,7 +70,6 @@ export default function Menu() {
   };
 
   const handleOpenAddDish = () => {
-    // Si estamos dentro de una carpeta, pre-rellenamos la categoría
     if (currentFolder) setNewDishCategory(currentFolder);
     else setNewDishCategory("");
     setNewDishName("");
@@ -86,7 +84,6 @@ export default function Menu() {
       });
       setIsAddingDish(false);
       setNewDishName("");
-      // No reseteamos categoría si estamos dentro de una carpeta para facilitar añadir varios
       if (!currentFolder) setNewDishCategory(""); 
     }
   };
@@ -144,7 +141,8 @@ export default function Menu() {
   return (
     <Layout 
       title={currentFolder ? currentFolder : "Menu & Portions"}
-      showBack={false} // Usamos nuestra propia navegación
+      // ✅ CORREGIDO: Muestra Back si NO hay carpeta seleccionada
+      showBack={!currentFolder} 
       action={
         canManageMenu && (
           <motion.button
@@ -298,7 +296,7 @@ export default function Menu() {
         ))}
       </div>
 
-      {/* MODALES DE CREACIÓN Y EDICIÓN (Añadir input de categoría para crear carpetas) */}
+      {/* MODALES DE CREACIÓN Y EDICIÓN */}
       <Dialog open={isAddingDish} onOpenChange={setIsAddingDish}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Add New Dish</DialogTitle></DialogHeader>
@@ -334,7 +332,7 @@ export default function Menu() {
         </DialogContent>
       </Dialog>
 
-      {/* ... (El resto de modales de ingredientes se mantienen igual) ... */}
+      {/* Modales de ingredientes */}
       <Dialog open={!!addingIngredientTo || !!editingIngredient} onOpenChange={() => { setAddingIngredientTo(null); setEditingIngredient(null); }}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>{editingIngredient ? 'Edit Ingredient' : 'Add Ingredient'}</DialogTitle></DialogHeader>
