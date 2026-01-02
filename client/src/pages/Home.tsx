@@ -11,13 +11,13 @@ import {
   Refrigerator,
   CalendarClock,
   LogOut,
-  Users // ✅ Importamos el icono de Usuarios
+  Users
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { logout } = useStore();
+  const { logout, currentUser } = useStore(); // ✅ Traemos currentUser para el nombre
 
   // --- DATOS ---
   const { data: inventory = [] } = useInventory();
@@ -57,7 +57,6 @@ export default function Home() {
     </div>
   );
 
-  // ✅ LOGO DE EMPLEADOS (Rosa)
   const EmployeesLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#E91E63] flex items-center justify-center shadow-[0_0_20px_rgba(233,30,99,0.3)]">
       <Users className="w-7 h-7 text-white" strokeWidth={2.5} />
@@ -124,7 +123,6 @@ export default function Home() {
       bgColor: 'bg-white/10',
       glowColor: 'bg-white'
     },
-    // ✅ AÑADIDO EMPLOYEES AL FINAL
     { 
       title: 'Employees', 
       path: '/employees', 
@@ -137,27 +135,25 @@ export default function Home() {
     <div className="min-h-screen bg-background p-6 pb-24 flex justify-center">
       <div className="w-full max-w-lg space-y-8">
         
-        {/* CABECERA CON LOGOUT */}
-        <div className="pt-4">
-          <div className="flex items-center gap-3 mb-2">
-             <span className="px-2 py-1 rounded-full bg-flow-red text-white text-[10px] font-bold uppercase tracking-wider">
-               Manager Mode
-             </span>
-             
-             <button 
-                onClick={() => logout()}
-                className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
-             >
-                <LogOut className="w-3 h-3" /> Log Out
-             </button>
-          </div>
-
-           <h1 className="text-4xl font-black text-white tracking-tight">
-             Hello, Super
-           </h1>
+        {/* CABECERA PERSONALIZADA */}
+        <div className="pt-4 flex flex-col gap-2">
+           <div className="flex justify-between items-start">
+               <h1 className="text-4xl font-black text-white tracking-tight">
+                 Hello, {currentUser?.name || 'Team'}
+               </h1>
+               
+               {/* Botón Log Out Discreto */}
+               <button 
+                  onClick={() => logout()}
+                  className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5"
+               >
+                  <LogOut className="w-3 h-3" /> Log Out
+               </button>
+           </div>
+           <p className="text-muted-foreground text-sm font-medium">Let's make today great 🚀</p>
         </div>
 
-        {/* GRID DE 2 COLUMNAS (Estilo App Móvil) */}
+        {/* GRID */}
         <div className="grid grid-cols-2 gap-4">
           {menuItems.map((item) => (
             <motion.div
