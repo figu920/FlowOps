@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useInventory, useTasks } from "@/lib/hooks"; // Asumimos que tienes estos hooks
+import { useInventory, useTasks } from "@/lib/hooks";
 import { 
   ClipboardList, 
   CheckSquare, 
@@ -16,16 +16,14 @@ import { motion } from "framer-motion";
 export default function Home() {
   const [, setLocation] = useLocation();
 
-  // --- DATOS PARA LAS NOTIFICACIONES (ROJO/AMARILLO) ---
+  // --- DATOS ---
   const { data: inventory = [] } = useInventory();
   const { data: tasks = [] } = useTasks();
 
-  // Calcular alertas
   const lowStockCount = inventory.filter((i: any) => i.status === 'LOW').length;
-  // Asumimos que las tareas vencidas son las que no están completas (simplificado)
   const pendingTasksCount = tasks.filter((t: any) => !t.completed).length;
 
-  // --- COMPONENTES DE ICONOS PERSONALIZADOS ---
+  // --- COMPONENTES DE LOGOS ---
   const InventoryLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#4ADE80] flex items-center justify-center shadow-[0_0_20px_rgba(74,222,128,0.3)]">
       <Box className="w-7 h-7 text-black" strokeWidth={2.5} />
@@ -38,7 +36,6 @@ export default function Home() {
     </div>
   );
 
-  // ⭐ NUEVO ICONO PARA OPERATIONS ⭐
   const ScheduleLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
       <CalendarClock className="w-7 h-7 text-white" strokeWidth={2.5} />
@@ -63,7 +60,7 @@ export default function Home() {
     </div>
   );
 
-  // --- LISTA DEL MENÚ ---
+  // --- LISTA DE BOTONES ---
   const menuItems = [
     { 
       title: 'Inventory', 
@@ -73,21 +70,17 @@ export default function Home() {
       countColor: 'text-flow-yellow',
       glowColor: 'bg-[#4ADE80]' 
     },
-    
-    // ⭐ NUEVO BOTÓN OPERATIONS (AQUÍ ESTÁ) ⭐
     { 
       title: 'Operations Hub', 
       path: '/schedule', 
       customIcon: <ScheduleLogo />,
       glowColor: 'bg-[#3B82F6]' 
     },
-
-    // Botones antiguos (mantenidos para testing)
     { 
       title: 'Checklists', 
       path: '/checklists', 
       icon: ClipboardList, 
-      iconColor: 'text-[#38BDF8]', // Azul claro
+      iconColor: 'text-[#38BDF8]',
       bgColor: 'bg-[#38BDF8]/10',
       glowColor: 'bg-[#38BDF8]' 
     },
@@ -97,12 +90,10 @@ export default function Home() {
       icon: CheckSquare,
       count: pendingTasksCount > 0 ? `${pendingTasksCount} Active` : undefined, 
       countColor: 'text-flow-red',
-      iconColor: 'text-[#A855F7]', // Morado
+      iconColor: 'text-[#A855F7]',
       bgColor: 'bg-[#A855F7]/10',
       glowColor: 'bg-[#A855F7]' 
     },
-
-    // Resto de botones
     { 
       title: 'Equipment', 
       path: '/equipment', 
@@ -131,7 +122,7 @@ export default function Home() {
     },
     {
       title: 'Analytics',
-      path: '/analytics', // Asumiendo que existe o existirá
+      path: '/analytics', 
       customIcon: <AnalyticsLogo />,
       glowColor: 'bg-[#F97316]'
     }
@@ -150,14 +141,15 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* ✅ CORREGIDO: aspect-square para que sean cuadradas y md:grid-cols-3 para PC */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {menuItems.map((item) => (
           <motion.div
             key={item.title}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => setLocation(item.path)}
-            className="relative bg-card rounded-[32px] p-5 flex flex-col items-center justify-center gap-4 text-center border border-white/5 shadow-xl cursor-pointer overflow-hidden group h-[180px]"
+            className="relative bg-card rounded-[32px] p-5 flex flex-col items-center justify-center gap-4 text-center border border-white/5 shadow-xl cursor-pointer overflow-hidden group aspect-square"
           >
             {/* Glow Effect */}
             <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ${item.glowColor}`} />

@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { 
@@ -9,269 +9,253 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, Calendar as CalendarIcon, Plus, Trash2, Camera, 
-  ChevronLeft, ChevronRight, Filter, Clock 
+  ChevronLeft, ChevronRight, X, Clock
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format, addDays, subDays, isSameDay, startOfWeek } from 'date-fns';
+import { 
+  format, addMonths, subMonths, startOfMonth, endOfMonth, 
+  startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, 
+  isSameDay, isToday, parseISO 
+} from 'date-fns';
 
 export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?: string }) {
   const { currentUser } = useStore();
   
-  // --- CALENDARIO & ESTADOS ---
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [activeTab, setActiveTab] = useState<"all" | "opening" | "closing" | "maintenance">("all");
-
-  // --- DATA FETCHING (TRAEMOS TODO) ---
+  // --- ESTADOS DEL CALENDARIO ---
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // --- DATA FETCHING ---
   const { data: openingList = [] } = useChecklists("opening");
   const { data: closingList = [] } = useChecklists("closing");
-  const { data: shiftList = [] } = useChecklists("shift"); // Podemos agruparlo en opening/closing o maintenance
-  const { data: maintenanceTasks = [] } = useTasks();
+  const { data: tasks = [] } = useTasks();
 
   // --- MUTACIONES ---
   const updateChecklistMutation = useUpdateChecklist();
   const completeTaskMutation = useCompleteTask();
-  const createChecklistMutation = useCreateTask(); // Reusamos para tareas simples por ahora o creamos nueva logica
+  const createTaskMutation = useCreateTask();
+  const deleteTaskMutation = useDeleteTask();
   
-  // --- LÓGICA DE FOTOS (Heredada de Tasks) ---
-  const [verifyingItem, setVerifyingItem] = useState<{id: string, type: 'checklist' | 'task'} | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // --- ESTADOS DE MODALES ---
+  const [isAddingTask, setIsAddingTask] = useState<Date | null>(null); // Fecha seleccionada para añadir
+  const [newTaskText, setNewTaskText] = useState("");
+  
+  const [viewingDay, setViewingDay] = useState<Date | null>(null); // Ver detalles de un día (para móvil)
 
-  const isAdmin = currentUser?.isSystemAdmin === true;
-  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
+  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
 
-  // --- UNIFICACIÓN DE DATOS 🧠 ---
-  const unifiedSchedule = useMemo(() => {
-    // 1. Convertimos Checklists al formato común
-    const checklistItems = [
-      ...openingList.map((i: any) => ({ ...i, type: 'checklist', category: 'opening', time: '08:00 AM' })),
-      ...shiftList.map((i: any) => ({ ...i, type: 'checklist', category: 'opening', time: '02:00 PM' })),
-      ...closingList.map((i: any) => ({ ...i, type: 'checklist', category: 'closing', time: '11:00 PM' }))
-    ];
-
-    // 2. Convertimos Tasks al formato común
-    // NOTA: Aquí podrías filtrar por fecha si las tareas tuvieran fecha específica
-    const taskItems = maintenanceTasks.map((t: any) => ({
-      ...t,
-      type: 'task',
-      category: 'maintenance',
-      time: 'Flexible'
-    }));
-
-    // 3. Fusionamos y filtramos
-    const all = [...checklistItems, ...taskItems];
-
-    if (activeTab === 'all') return all;
-    return all.filter(item => item.category === activeTab);
-  }, [openingList, closingList, shiftList, maintenanceTasks, activeTab]);
+  // --- GENERAR DÍAS DEL CALENDARIO ---
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [currentMonth]);
 
   // --- HANDLERS ---
 
-  // Completar item (Checklist es directo, Task requiere foto)
-  const handleToggleItem = (item: any) => {
-    if (item.type === 'checklist') {
-      // Checklist simple: click y listo
-      updateChecklistMutation.mutate({ 
-        id: item.id, 
-        updates: { completed: !item.completed } 
+  const handleAddTask = () => {
+    if (newTaskText && isAddingTask) {
+      // Guardamos la fecha en las notas o en un campo específico si existiera
+      // Aquí simulamos guardando la fecha ISO en las notas para filtrarlo luego
+      const dateTag = format(isAddingTask, 'yyyy-MM-dd');
+      
+      createTaskMutation.mutate({
+        text: newTaskText,
+        assignedTo: 'Team',
+        notes: `DATE:${dateTag}`, // Truco para persistir fecha sin cambiar DB
+        completed: false
       });
-    } else {
-      // Tarea compleja: requiere verificación o foto
-      if (item.completed) {
-        // Si ya está hecha, no hacemos nada o mostramos historial (opcional)
-      } else {
-        setVerifyingItem({ id: item.id, type: 'task' });
-        setPhotoPreview(null);
-      }
+      
+      setNewTaskText("");
+      setIsAddingTask(null);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => { setPhotoPreview(ev.target?.result as string); };
-      reader.readAsDataURL(file);
-    }
+  const handleDeleteTask = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteTaskMutation.mutate(id);
   };
 
-  const submitPhotoCompletion = () => {
-    if (verifyingItem && photoPreview && verifyingItem.type === 'task') {
-      completeTaskMutation.mutate({ id: verifyingItem.id, photo: photoPreview });
-      setVerifyingItem(null);
-      setPhotoPreview(null);
-    }
-  };
+  // Helper para obtener tareas de un día específico
+  const getTasksForDay = (day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    
+    // 1. Tareas Puntuales (Filtradas por nuestra etiqueta mágica DATE:YYYY-MM-DD)
+    const dailyTasks = tasks.filter((t: any) => t.notes?.includes(`DATE:${dateStr}`));
+    
+    // 2. Rutinas Diarias (Siempre aparecen, pero calculamos su estado para HOY)
+    // Nota: El backend actual no guarda histórico diario de checklists, así que mostramos el estado actual
+    // Solo mostramos checklists si el día es HOY (para no confundir historial)
+    const isDayToday = isToday(day);
+    const dailyRoutines = isDayToday ? [
+        { id: 'opening-group', text: `Opening (${openingList.filter((i:any)=>i.completed).length}/${openingList.length})`, type: 'routine', completed: openingList.every((i:any)=>i.completed) && openingList.length > 0 },
+        { id: 'closing-group', text: `Closing (${closingList.filter((i:any)=>i.completed).length}/${closingList.length})`, type: 'routine', completed: closingList.every((i:any)=>i.completed) && closingList.length > 0 }
+    ] : [];
 
-  // --- GENERADOR DE FECHAS (TIRA HORIZONTAL) ---
-  const dateStrip = useMemo(() => {
-    const start = subDays(selectedDate, 2); // 2 días atrás
-    return Array.from({ length: 5 }).map((_, i) => addDays(start, i));
-  }, [selectedDate]);
+    return [...dailyRoutines, ...dailyTasks];
+  };
 
   return (
-    <Layout title="Operations Schedule" showBack>
+    <Layout title="Operations Calendar" showBack>
       
-      {/* 1. CALENDARIO HORIZONTAL */}
-      <div className="bg-black/20 -mx-4 px-4 pb-4 mb-4 border-b border-white/5">
-        <div className="flex justify-between items-center mb-4 px-2">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-flow-green" />
-                {format(selectedDate, 'MMMM yyyy')}
-            </h3>
-            <div className="flex gap-2">
-                <button onClick={() => setSelectedDate(subDays(selectedDate, 7))} className="p-1 rounded-full hover:bg-white/10"><ChevronLeft className="w-5 h-5"/></button>
-                <button onClick={() => setSelectedDate(new Date())} className="text-xs font-bold bg-white/10 px-3 py-1 rounded-full hover:bg-white/20">Today</button>
-                <button onClick={() => setSelectedDate(addDays(selectedDate, 7))} className="p-1 rounded-full hover:bg-white/10"><ChevronRight className="w-5 h-5"/></button>
-            </div>
-        </div>
-        
-        <div className="flex justify-between gap-2">
-            {dateStrip.map((date, idx) => {
-                const isSelected = isSameDay(date, selectedDate);
-                const isToday = isSameDay(date, new Date());
-                return (
-                    <button
-                        key={idx}
-                        onClick={() => setSelectedDate(date)}
-                        className={cn(
-                            "flex-1 flex flex-col items-center justify-center py-3 rounded-2xl transition-all border",
-                            isSelected 
-                                ? "bg-flow-green text-black border-flow-green shadow-lg shadow-green-500/20 scale-105" 
-                                : "bg-white/5 text-muted-foreground border-transparent hover:bg-white/10"
-                        )}
-                    >
-                        <span className="text-[10px] uppercase font-bold mb-1 opacity-80">{format(date, 'EEE')}</span>
-                        <span className={cn("text-xl font-bold", isSelected ? "text-black" : "text-white")}>
-                            {format(date, 'd')}
-                        </span>
-                        {isToday && !isSelected && <div className="w-1 h-1 rounded-full bg-flow-green mt-1" />}
-                    </button>
-                )
-            })}
+      {/* 1. CABECERA DEL MES */}
+      <div className="flex items-center justify-between mb-6 px-1">
+        <h2 className="text-2xl font-black text-white capitalize">
+          {format(currentMonth, 'MMMM yyyy')}
+        </h2>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="rounded-full border-white/10 hover:bg-white/10 text-xs font-bold">
+            Today
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10">
+            <ChevronRight className="w-5 h-5" />
+          </Button>
         </div>
       </div>
 
-      {/* 2. FILTROS (TABS) */}
-      <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
-        {[
-            { id: 'all', label: 'All Tasks' },
-            { id: 'opening', label: 'Opening' },
-            { id: 'closing', label: 'Closing' },
-            { id: 'maintenance', label: 'Maintenance' }
-        ].map(tab => (
-            <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={cn(
-                    "whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold border transition-all",
-                    activeTab === tab.id 
-                        ? "bg-white text-black border-white" 
-                        : "bg-transparent text-muted-foreground border-white/10 hover:border-white/30"
-                )}
-            >
-                {tab.label}
-            </button>
+      {/* 2. GRID DEL CALENDARIO */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day} className="text-center text-[10px] uppercase font-bold text-muted-foreground py-2">
+            {day}
+          </div>
         ))}
       </div>
 
-      {/* 3. LISTA UNIFICADA */}
-      <div className="space-y-3 pb-20">
-        <AnimatePresence mode="popLayout">
-            {unifiedSchedule.map((item: any, idx: number) => (
-                <motion.div
-                    key={`${item.type}-${item.id}`}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className={cn(
-                        "relative p-4 rounded-2xl border flex items-start gap-4 transition-all group",
-                        item.completed 
-                            ? "bg-card/40 border-white/5 opacity-60" 
-                            : "bg-card border-white/10 hover:border-white/20"
-                    )}
-                >
-                    {/* Checkbox / Status Icon */}
+      <div className="grid grid-cols-7 gap-1 auto-rows-fr bg-white/5 p-1 rounded-2xl border border-white/5">
+        {calendarDays.map((day, dayIdx) => {
+          const isSelectedMonth = isSameMonth(day, currentMonth);
+          const isDayToday = isToday(day);
+          const dayTasks = getTasksForDay(day);
+
+          return (
+            <div
+              key={day.toString()}
+              onClick={() => setViewingDay(day)}
+              className={cn(
+                "min-h-[100px] p-2 rounded-xl border flex flex-col gap-1 transition-all cursor-pointer relative group overflow-hidden",
+                isSelectedMonth ? "bg-black/40 border-white/5 hover:border-white/20" : "bg-black/20 border-transparent opacity-50",
+                isDayToday && "ring-1 ring-flow-green bg-flow-green/5"
+              )}
+            >
+              {/* Número del día */}
+              <div className="flex justify-between items-start">
+                <span className={cn(
+                  "text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full",
+                  isDayToday ? "bg-flow-green text-black shadow-lg shadow-green-500/20" : "text-muted-foreground"
+                )}>
+                  {format(day, 'd')}
+                </span>
+                
+                {/* Botón Añadir (Solo visible en hover o si es hoy) */}
+                {canEdit && (
                     <button 
-                        onClick={() => handleToggleItem(item)}
+                        onClick={(e) => { e.stopPropagation(); setIsAddingTask(day); }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/20 rounded text-muted-foreground hover:text-white"
+                    >
+                        <Plus className="w-3 h-3" />
+                    </button>
+                )}
+              </div>
+
+              {/* Lista de Tareas (Resumida) */}
+              <div className="flex-1 flex flex-col gap-1 mt-1 overflow-hidden">
+                {dayTasks.map((task: any, i) => (
+                    <div 
+                        key={i} 
                         className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all border-2",
-                            item.completed
-                                ? "bg-flow-green border-flow-green text-black"
-                                : item.type === 'task' 
-                                    ? "border-purple-500/50 text-purple-500 hover:bg-purple-500/10" // Tareas: Morado
-                                    : "border-white/20 text-muted-foreground hover:border-white/50" // Checklist: Gris
+                            "text-[9px] px-1.5 py-1 rounded truncate flex items-center justify-between group/task",
+                            task.type === 'routine' 
+                                ? (task.completed ? "bg-flow-green/20 text-flow-green" : "bg-white/5 text-muted-foreground")
+                                : (task.completed ? "bg-purple-500/20 text-purple-400 line-through" : "bg-purple-500/10 text-purple-200 border border-purple-500/20")
                         )}
                     >
-                        {item.completed ? <Check className="w-5 h-5 stroke-[3]" /> : (item.type === 'task' ? <Camera className="w-5 h-5"/> : <div className="w-3 h-3 rounded-full bg-white/20" />)}
-                    </button>
-
-                    <div className="flex-1 pt-1">
-                        <div className="flex justify-between items-start">
-                            <h4 className={cn("font-semibold text-sm leading-tight", item.completed && "line-through")}>
-                                {item.text}
-                            </h4>
-                            <span className="text-[10px] font-mono text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">
-                                {item.time}
-                            </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mt-2">
-                            {/* Badges de Categoría */}
-                            <span className={cn(
-                                "text-[9px] uppercase font-bold px-2 py-0.5 rounded-full",
-                                item.category === 'opening' && "bg-blue-500/10 text-blue-400",
-                                item.category === 'closing' && "bg-orange-500/10 text-orange-400",
-                                item.category === 'maintenance' && "bg-purple-500/10 text-purple-400",
-                            )}>
-                                {item.category}
-                            </span>
-
-                            {item.assignedTo && (
-                                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                    • {item.assignedTo}
-                                </span>
-                            )}
-                        </div>
+                        <span className="truncate">{task.text}</span>
+                        {task.type !== 'routine' && canEdit && (
+                            <button onClick={(e) => handleDeleteTask(task.id, e)} className="hidden group-hover/task:block text-flow-red ml-1">
+                                <X className="w-3 h-3" />
+                            </button>
+                        )}
                     </div>
-                </motion.div>
-            ))}
-        </AnimatePresence>
-        
-        {unifiedSchedule.length === 0 && (
-            <div className="text-center py-10 text-muted-foreground">
-                <p>No tasks scheduled for this filter.</p>
+                ))}
+              </div>
             </div>
-        )}
+          );
+        })}
       </div>
 
-     {/* Floating Action Button */}
-      {canEdit && (
-        <div className="fixed bottom-6 right-6">
-            <button 
-                className="w-14 h-14 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 transition-transform"
-                style={{ backgroundColor: categoryColor, boxShadow: `0 0 20px ${categoryColor}60` }} // <--- AÑADIDO ESTILO DINÁMICO
-            >
-                <Plus className="w-6 h-6 stroke-[3]" />
-            </button>
-        </div>
-      )}
+      {/* 3. MODAL: DETALLES DEL DÍA (Para ver mejor en móvil) */}
+      <Dialog open={!!viewingDay && !isAddingTask} onOpenChange={(open) => !open && setViewingDay(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-0 overflow-hidden max-h-[80vh] flex flex-col">
+            <div className="p-6 pb-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+                <div>
+                    <h3 className="text-xl font-bold text-white">{viewingDay && format(viewingDay, 'EEEE, MMMM do')}</h3>
+                    <p className="text-sm text-muted-foreground">Daily Overview</p>
+                </div>
+                {canEdit && (
+                    <Button size="sm" onClick={() => setIsAddingTask(viewingDay)} className="bg-white/10 hover:bg-white/20 text-white border border-white/5">
+                        <Plus className="w-4 h-4 mr-2" /> Add Task
+                    </Button>
+                )}
+            </div>
+            
+            <div className="p-4 overflow-y-auto space-y-3 flex-1">
+                {viewingDay && getTasksForDay(viewingDay).length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground opacity-50">
+                        <CalendarIcon className="w-12 h-12 mx-auto mb-3 stroke-1" />
+                        <p>No tasks planned for this day.</p>
+                    </div>
+                ) : (
+                    viewingDay && getTasksForDay(viewingDay).map((task: any, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-white/5">
+                            <div className={cn(
+                                "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                                task.completed ? "bg-flow-green/10 text-flow-green" : "bg-white/5 text-muted-foreground"
+                            )}>
+                                {task.completed ? <Check className="w-5 h-5" /> : (task.type==='routine' ? <Clock className="w-5 h-5"/> : <Camera className="w-5 h-5"/>)}
+                            </div>
+                            <div className="flex-1">
+                                <p className={cn("text-sm font-medium", task.completed && "line-through text-muted-foreground")}>{task.text}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase font-bold mt-0.5">
+                                    {task.type === 'routine' ? 'Routine Checklist' : 'Scheduled Task'}
+                                </p>
+                            </div>
+                            {task.type !== 'routine' && canEdit && (
+                                <Button variant="ghost" size="icon" onClick={(e) => handleDeleteTask(task.id, e)} className="text-muted-foreground hover:text-flow-red">
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
+        </DialogContent>
+      </Dialog>
 
-      {/* DIALOG: SUBIR FOTO (Solo para Tasks) */}
-      <Dialog open={!!verifyingItem} onOpenChange={(open) => !open && setVerifyingItem(null)}>
+      {/* 4. MODAL: AÑADIR TAREA */}
+      <Dialog open={!!isAddingTask} onOpenChange={() => setIsAddingTask(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Verify Task</DialogTitle></DialogHeader>
-          <div className="py-4 space-y-4 flex flex-col items-center">
-             <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-             <div onClick={() => fileInputRef.current?.click()} className="w-full aspect-video bg-black/40 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center cursor-pointer overflow-hidden relative">
-                {photoPreview ? <img src={photoPreview} className="w-full h-full object-cover" /> : <><Camera className="w-8 h-8 opacity-50 mb-2"/><span className="text-xs opacity-50">Tap to verify with photo</span></>}
-             </div>
+          <DialogHeader>
+            <DialogTitle>Add Task for {isAddingTask && format(isAddingTask, 'MMM do')}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Task Description</label>
+            <Input 
+                autoFocus
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                placeholder="e.g. Deep Clean Fryer"
+                className="bg-black/20 border-white/10"
+            />
           </div>
           <DialogFooter>
-            <Button onClick={submitPhotoCompletion} disabled={!photoPreview} className="w-full bg-flow-green text-black font-bold">Complete Task</Button>
+            <Button onClick={handleAddTask} className="w-full bg-blue-500 text-white font-bold">Create Task</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
