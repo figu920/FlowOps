@@ -18,22 +18,21 @@ export default function Sales() {
 
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   
-  // --- LÓGICA DE CARPETAS (IGUAL QUE EN MENÚ) ---
+  // --- LÓGICA DE CARPETAS ---
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
 
-  // 1. Obtener carpetas (categorías del menú)
+  // 1. Obtener carpetas (categorías del menú) - ✅ CORREGIDO TIPO
   const folders = useMemo(() => {
     const categories = new Set(menu.map((item: any) => item.category).filter(Boolean));
-    return Array.from(categories).sort()as string[];
+    return Array.from(categories).sort() as string[]; 
   }, [menu]);
 
-  // 2. Items a mostrar (filtrados por carpeta)
+  // 2. Items a mostrar
   const displayedItems = useMemo(() => {
     if (currentFolder) {
       return menu.filter((item: any) => item.category === currentFolder);
     }
-    // Si estamos en raíz, NO mostramos items sueltos para mantenerlo limpio, 
-    // o mostramos items sin categoría. Decisión: Mostrar huérfanos.
+    // Mostramos items huérfanos en la raíz
     return menu.filter((item: any) => !item.category);
   }, [menu, currentFolder]);
 
@@ -108,7 +107,11 @@ export default function Sales() {
   };
 
   return (
-    <Layout title="Daily Sales Register" showBack={false}>
+    <Layout 
+      title="Daily Sales Register" 
+      // ✅ CORREGIDO: Mostramos 'Back' del sistema solo si NO estamos dentro de una carpeta
+      showBack={!currentFolder}
+    >
       <div className="space-y-8 pb-24">
         
         {/* === SECTION 1: INPUT SALES === */}
@@ -147,7 +150,7 @@ export default function Sales() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: idx * 0.05 }}
-                    onClick={() => setCurrentFolder(folderName as string)}
+                    onClick={() => setCurrentFolder(folderName)}
                     className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3"
                   >
                     <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center">
