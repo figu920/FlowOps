@@ -8,8 +8,6 @@ import { useEffect } from "react";
 import Home from "@/pages/Home";
 import Inventory from "@/pages/Inventory";
 import Equipment from "@/pages/Equipment";
-import Checklists from "@/pages/Checklists";
-import Tasks from "@/pages/Tasks";
 import Chat from "@/pages/Chat";
 import Timeline from "@/pages/Timeline";
 import Login from "@/pages/Login";
@@ -54,16 +52,6 @@ function Router() {
       {/* 2. EQUIPAMIENTO (Amarillo/Dorado) */}
       <Route path="/equipment">
          {() => <PrivateRoute component={Equipment} categoryColor="#FFC107" />}
-      </Route>
-
-      {/* 3. CHECKLISTS (Azul Cielo) */}
-      <Route path="/checklists">
-         {() => <PrivateRoute component={Checklists} categoryColor="#2196F3" />}
-      </Route>
-
-      {/* 4. TASKS (Violeta) */}
-      <Route path="/tasks">
-         {() => <PrivateRoute component={Tasks} categoryColor="#9C27B0" />}
       </Route>
 
       {/* 5. MENU (Verde Azulado / Teal) */}
