@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   format, addMonths, subMonths, startOfMonth, 
   endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, 
-  isSameDay, isSameMonth 
+  isSameDay, isSameMonth, parseISO
 } from 'date-fns';
 
 export default function Schedule() {
@@ -73,24 +73,22 @@ export default function Schedule() {
       setIsDayOpen(true);
   };
 
+  // 1. FILTRADO ROBUSTO (Igual que Inventory filtra por path, aquí filtramos por fecha exacta)
   const getTasksForDayAndCategory = (category: string) => {
-      // Protección extra: si tasks no ha cargado, retornar array vacío
-      if (!tasks) return [];
+      if (!tasks || !selectedDate) return [];
 
       return tasks.filter((t: any) => {
-          const isCategoryMatch = t.category === category;
+          // Si no tiene fecha, lo ignoramos
+          if (!t.date) return false;
           
-          // CORRECCIÓN DE FECHA:
-          // 1. Verificamos que t.date exista.
-          // 2. Creamos una fecha nueva basada en lo que venga (sea string o date).
-          // 3. Comparamos usando isSameDay.
-          if (!t.date || !selectedDate) return false;
-
-          const taskDate = new Date(t.date);
+          // Convertimos la fecha de la DB a objeto Date de forma segura
+          const taskDate = typeof t.date === 'string' ? parseISO(t.date) : new Date(t.date);
           
-          // Verificamos si la fecha es válida antes de comparar
+          // Verificamos si es válida
           if (isNaN(taskDate.getTime())) return false;
 
+          // Comparamos
+          const isCategoryMatch = t.category === category;
           const isDateMatch = isSameDay(taskDate, selectedDate);
 
           return isCategoryMatch && isDateMatch;
@@ -113,29 +111,29 @@ export default function Schedule() {
       setIsAddingTask(true);
   };
 
+  // 2. GUARDADO (Réplica exacta de la estructura de Inventory.tsx)
   const handleSaveTask = () => {
-      if (!taskText.trim()) {
-        return;
-      }
-      
-      const data = {
-          text: taskText,
-          category: taskCategory,
-          assignee: taskAssignee,
-          completed: editingTask ? editingTask.completed : false,
-          // CORRECCIÓN IMPORTANTE: Guardar fecha como ISO String para evitar errores de formato
-          date: selectedDate ? selectedDate.toISOString() : new Date().toISOString(),
-      };
+      if (taskText.trim()) {
+        // Aseguramos que la fecha sea un string ISO estándar
+        const dateToSave = selectedDate ? selectedDate.toISOString() : new Date().toISOString();
 
-      try {
+        const data = {
+            text: taskText,
+            category: taskCategory,
+            assignee: taskAssignee,
+            completed: editingTask ? editingTask.completed : false,
+            date: dateToSave, 
+        };
+
         if (editingTask) {
             updateTaskMutation.mutate({ id: editingTask.id, updates: data });
         } else {
             createTaskMutation.mutate(data);
         }
+
+        // Limpieza de estado igual que en Inventory
         setIsAddingTask(false);
-      } catch (error) {
-        console.error("Error saving task:", error);
+        setTaskText("");
       }
   };
 
@@ -156,7 +154,6 @@ export default function Schedule() {
       
       {/* --- VISTA CALENDARIO --- */}
       <div className="mb-6 space-y-4">
-        {/* ... (Todo el código del calendario se mantiene igual) ... */}
         <div className="flex items-center justify-between px-2">
             <button onClick={prevMonth} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-white transition-colors">
                 <ChevronLeft className="w-5 h-5" />
@@ -182,9 +179,20 @@ export default function Schedule() {
                 {calendarDays.map((date, idx) => {
                     const isToday = isSameDay(date, new Date());
                     const isCurrentMonth = isSameMonth(date, currentMonth);
-                    const hasOpening = tasks.some((t:any) => t.category === 'Opening'); 
-                    const hasClosing = tasks.some((t:any) => t.category === 'Closing');
-                    const showDots = isToday; 
+                    const isSelected = selectedDate && isSameDay(date, selectedDate); // Highlight selección
+                    
+                    // Cálculo de puntos (dots) optimizado
+                    const dayTasks = tasks.filter((t: any) => {
+                        if(!t.date) return false;
+                        const tDate = typeof t.date === 'string' ? parseISO(t.date) : new Date(t.date);
+                        return isSameDay(tDate, date);
+                    });
+                    
+                    const hasOpening = dayTasks.some((t:any) => t.category === 'Opening'); 
+                    const hasClosing = dayTasks.some((t:any) => t.category === 'Closing');
+                    
+                    // Mostrar puntos si hay tareas O si es hoy
+                    const showDots = dayTasks.length > 0 || isToday; 
 
                     return (
                         <button
@@ -194,7 +202,9 @@ export default function Schedule() {
                                 "h-14 rounded-xl flex flex-col items-center justify-center relative transition-all border",
                                 isToday 
                                     ? "bg-flow-blue text-white border-flow-blue shadow-lg shadow-blue-500/20 z-10" 
-                                    : "bg-transparent border-transparent hover:bg-white/5",
+                                    : isSelected 
+                                        ? "bg-white/10 border-white/20 text-white"
+                                        : "bg-transparent border-transparent hover:bg-white/5",
                                 !isCurrentMonth && "opacity-20"
                             )}
                         >
@@ -206,6 +216,7 @@ export default function Schedule() {
                                     <>
                                         {hasOpening && <div className="w-1 h-1 rounded-full bg-blue-400" />}
                                         {hasClosing && <div className="w-1 h-1 rounded-full bg-purple-400" />}
+                                        {!hasOpening && !hasClosing && isToday && <div className="w-1 h-1 rounded-full bg-white/50" />}
                                     </>
                                 )}
                             </div>
@@ -216,11 +227,10 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* --- DESPLEGABLE DEL DÍA (MODAL 1) --- */}
+      {/* --- DESPLEGABLE DEL DÍA --- */}
       <Dialog open={isDayOpen} onOpenChange={setIsDayOpen}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[95%] max-w-lg rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col z-[50]">
             
-            {/* ... (Contenido del modal del día se mantiene igual) ... */}
             <div className="p-6 bg-white/5 border-b border-white/5">
                 <h2 className="text-2xl font-black text-white flex items-center gap-2">
                     {selectedDate && format(selectedDate, 'EEEE, MMM do')}
@@ -283,8 +293,7 @@ export default function Schedule() {
         </DialogContent>
       </Dialog>
 
-      {/* --- MODAL CREAR TAREA (MODAL 2) --- */}
-      {/* 🔥 CORRECCIÓN: z-[60] es correcto, pero el Select necesita más */}
+      {/* --- MODAL CREAR TAREA --- */}
       <Dialog open={isAddingTask} onOpenChange={setIsAddingTask}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6 z-[60]">
           <DialogHeader><DialogTitle>{editingTask ? 'Edit Task' : `New ${taskCategory} Task`}</DialogTitle></DialogHeader>
@@ -313,7 +322,6 @@ export default function Schedule() {
                             <SelectValue placeholder="Select..." />
                         </SelectTrigger>
                         
-                        {/* 🔥 CORRECCIÓN CRÍTICA: 'z-[100]' y 'position="popper"' */}
                         <SelectContent 
                             className="bg-[#1C1C1E] border-white/10 text-white z-[100]" 
                             position="popper" 
@@ -330,7 +338,7 @@ export default function Schedule() {
           </div>
           <DialogFooter>
               <Button onClick={handleSaveTask} className="w-full bg-flow-blue text-white font-bold">
-                  Save Task
+                  {editingTask ? 'Update' : 'Save Task'}
               </Button>
           </DialogFooter>
         </DialogContent>
