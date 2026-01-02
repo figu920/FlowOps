@@ -33,6 +33,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const { data: closingList = [] } = useChecklists("closing");
   const { data: tasks = [] } = useTasks();
 
+  const updateChecklistMutation = useUpdateChecklist(); // Necesario para marcar checklist como hechos
   const completeTaskMutation = useCompleteTask();
   const createTaskMutation = useCreateTask();
   const deleteTaskMutation = useDeleteTask();
@@ -40,12 +41,12 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   // --- MODALES Y ACCIONES ---
   const [isAddingTask, setIsAddingTask] = useState<Date | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
-  const [newTaskCategory, setNewTaskCategory] = useState<"opening" | "shift" | "closing">("shift"); 
+  const [newTaskCategory, setNewTaskCategory] = useState<"opening" | "shift" | "closing">("shift");
   
   const [viewingDay, setViewingDay] = useState<Date | null>(null);
   
   // FOTOS
-  const [verifyingTask, setVerifyingTask] = useState<string | null>(null);
+  const [verifyingTask, setVerifyingTask] = useState<{id: string, type: 'task'|'checklist'} | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,6 +66,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const handleAddTask = () => {
     if (newTaskText && isAddingTask) {
       const dateTag = format(isAddingTask, 'yyyy-MM-dd');
+      // Guardamos la categoría en las notas
       const noteTag = `DATE:${dateTag}|CAT:${newTaskCategory}`; 
       
       createTaskMutation.mutate({
@@ -84,6 +86,11 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
     deleteTaskMutation.mutate(id);
   };
 
+  const handleToggleChecklist = (id: string, currentStatus: boolean) => {
+      updateChecklistMutation.mutate({ id, updates: { completed: !currentStatus } });
+  };
+
+  // Lógica de Fotos
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -94,44 +101,35 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   };
 
   const submitPhotoCompletion = () => {
-    if (verifyingTask && photoPreview) {
-      completeTaskMutation.mutate({ id: verifyingTask, photo: photoPreview });
+    if (verifyingTask && photoPreview && verifyingTask.type === 'task') {
+      completeTaskMutation.mutate({ id: verifyingTask.id, photo: photoPreview });
       setVerifyingTask(null);
       setPhotoPreview(null);
     }
   };
 
-  // --- ORGANIZAR TAREAS DEL DÍA ---
+  // --- ORGANIZAR TAREAS DEL DÍA (VERSIÓN PLANA) ---
   const getTasksForDay = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
     
-    // Tareas Puntuales
-    const dailyTasks = tasks.filter((t: any) => t.notes?.includes(`DATE:${dateStr}`));
+    // 1. Tareas Puntuales (Manuales)
+    const dailyManualTasks = tasks.filter((t: any) => t.notes?.includes(`DATE:${dateStr}`)).map((t:any) => ({...t, type: 'task'}));
     
-    // Rutinas Diarias (Solo HOY)
+    // 2. Checklist Items (Individuales) - Solo si es HOY (o quieres ver historial, por ahora simplificamos a HOY para no saturar días pasados)
+    // Si quieres que salgan TODOS los días, quita la condición `isDayToday`.
     const isDayToday = isToday(day);
-    const routines = isDayToday ? [
-        { 
-          id: 'opening-group', text: `Opening (${openingList.filter((i:any)=>i.completed).length}/${openingList.length})`, 
-          type: 'routine', category: 'opening', completed: openingList.every((i:any)=>i.completed) && openingList.length > 0 
-        },
-        { 
-          id: 'shift-group', text: `Shift (${shiftList.filter((i:any)=>i.completed).length}/${shiftList.length})`, 
-          type: 'routine', category: 'shift', completed: shiftList.every((i:any)=>i.completed) && shiftList.length > 0 
-        },
-        { 
-          id: 'closing-group', text: `Closing (${closingList.filter((i:any)=>i.completed).length}/${closingList.length})`, 
-          type: 'routine', category: 'closing', completed: closingList.every((i:any)=>i.completed) && closingList.length > 0 
-        }
-    ] : [];
+    let checklistItems: any[] = [];
+    
+    if (isDayToday) {
+        checklistItems = [
+            ...openingList.map((i:any) => ({...i, type: 'checklist', category: 'opening'})),
+            ...shiftList.map((i:any) => ({...i, type: 'checklist', category: 'shift'})),
+            ...closingList.map((i:any) => ({...i, type: 'checklist', category: 'closing'}))
+        ];
+    }
 
-    return { routines, tasks: dailyTasks };
-  };
-
-  const getTaskCategory = (notes: string) => {
-    if (notes?.includes('CAT:opening')) return 'opening';
-    if (notes?.includes('CAT:closing')) return 'closing';
-    return 'shift'; 
+    // Combinamos todo en una lista plana
+    return [...checklistItems, ...dailyManualTasks];
   };
 
   return (
@@ -156,7 +154,11 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
         {calendarDays.map((day) => {
           const isSelectedMonth = isSameMonth(day, currentMonth);
           const isDayToday = isToday(day);
-          const { routines, tasks } = getTasksForDay(day);
+          const allTasks = getTasksForDay(day);
+          
+          // Contadores para los puntitos
+          const completedCount = allTasks.filter(t => t.completed).length;
+          const totalCount = allTasks.length;
 
           return (
             <div
@@ -173,27 +175,25 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                 {canEdit && <button onClick={(e) => { e.stopPropagation(); setIsAddingTask(day); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-muted-foreground hover:text-white"><Plus className="w-3 h-3" /></button>}
               </div>
 
-              {/* Puntos de Resumen en el Calendario */}
-              <div className="flex-1 flex flex-col gap-1 mt-1">
-                {/* Rutinas */}
-                {routines.map((r: any, i: number) => (
-                    <div key={i} className={cn("h-1.5 w-full rounded-full", r.completed ? "bg-flow-green" : "bg-white/10")} />
-                ))}
-                {/* Tareas Puntuales (AQUÍ ESTABA EL ERROR) */}
-                {tasks.map((t: any, i: number) => (
-                    <div key={i} className={cn("text-[8px] px-1 py-0.5 rounded truncate border", 
-                        t.completed ? "bg-purple-500/20 border-purple-500/30 text-purple-300 line-through" : "bg-white/5 border-white/10 text-muted-foreground"
-                    )}>
-                        {t.text}
-                    </div>
-                ))}
+              {/* Resumen Visual (Puntitos o barras) */}
+              <div className="flex-1 flex flex-col justify-end gap-1 mt-1">
+                 {totalCount > 0 && (
+                     <div className="text-[9px] text-muted-foreground font-medium">
+                         {completedCount}/{totalCount} Done
+                     </div>
+                 )}
+                 {/* Mostramos hasta 3 tiritas de ejemplo */}
+                 {allTasks.slice(0, 3).map((t: any, i: number) => (
+                    <div key={i} className={cn("h-1 w-full rounded-full", t.completed ? "bg-flow-green" : "bg-white/10")} />
+                 ))}
+                 {allTasks.length > 3 && <div className="h-1 w-1 rounded-full bg-white/10 mx-auto" />}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* MODAL: DETALLES DEL DÍA */}
+      {/* MODAL: DETALLES DEL DÍA (LIMPIO Y PLANO) */}
       <Dialog open={!!viewingDay && !isAddingTask && !verifyingTask} onOpenChange={(open) => !open && setViewingDay(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-0 overflow-hidden max-h-[80vh] flex flex-col">
             <div className="p-6 pb-4 border-b border-white/5 flex justify-between items-center bg-black/20">
@@ -201,71 +201,77 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                     <h3 className="text-xl font-bold text-white">{viewingDay && format(viewingDay, 'EEEE, MMM do')}</h3>
                     <p className="text-sm text-muted-foreground">Daily Operations</p>
                 </div>
-                {canEdit && <Button size="sm" onClick={() => setIsAddingTask(viewingDay)} className="bg-white/10 hover:bg-white/20"><Plus className="w-4 h-4 mr-2" />Add</Button>}
+                {canEdit && (
+                    <Button 
+                        size="sm" 
+                        onClick={() => setIsAddingTask(viewingDay)} 
+                        className="bg-flow-green text-black font-bold hover:bg-flow-green/90 border-none" // ✅ BOTÓN VERDE
+                    >
+                        <Plus className="w-4 h-4 mr-2" /> Add
+                    </Button>
+                )}
             </div>
             
-            <div className="p-4 overflow-y-auto space-y-6 flex-1">
+            <div className="p-4 overflow-y-auto space-y-3 flex-1">
                 {viewingDay && (() => {
-                    const { routines, tasks } = getTasksForDay(viewingDay);
+                    const allTasks = getTasksForDay(viewingDay);
                     
-                    const renderSection = (title: string, cat: string, colorClass: string) => {
-                        const sectionRoutines = routines.filter(r => r.category === cat);
-                        const sectionTasks = tasks.filter((t:any) => getTaskCategory(t.notes) === cat);
-                        
-                        if (sectionRoutines.length === 0 && sectionTasks.length === 0) return null;
-
+                    if (allTasks.length === 0) {
                         return (
-                            <div className="space-y-2">
-                                <h4 className={cn("text-xs font-bold uppercase tracking-wider", colorClass)}>{title}</h4>
-                                {sectionRoutines.map((r: any) => (
-                                    <div key={r.id} className="p-3 rounded-xl bg-card border border-white/5 flex items-center justify-between opacity-70">
-                                        <div className="flex items-center gap-3">
-                                            <Clock className="w-4 h-4 text-muted-foreground" />
-                                            <span className="text-sm">{r.text}</span>
-                                        </div>
-                                        {r.completed && <Check className="w-4 h-4 text-flow-green" />}
-                                    </div>
-                                ))}
-                                {sectionTasks.map((t:any) => (
-                                    <div key={t.id} className="p-3 rounded-xl bg-card border border-white/10 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div 
-                                                onClick={() => !t.completed && setVerifyingTask(t.id)}
-                                                className={cn("w-5 h-5 rounded flex items-center justify-center border cursor-pointer", t.completed ? "bg-purple-500 border-purple-500" : "border-white/30")}
-                                            >
-                                                {t.completed && <Check className="w-3 h-3 text-white" />}
-                                            </div>
-                                            <span className={cn("text-sm", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-2">
-                                            {!t.completed && (
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-purple-400 hover:bg-purple-500/10" onClick={() => setVerifyingTask(t.id)}>
-                                                    <Camera className="w-4 h-4" />
-                                                </Button>
-                                            )}
-                                            {canEdit && (
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={(e) => handleDeleteTask(t.id, e)}>
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                            <div className="text-center py-10 text-muted-foreground opacity-50">
+                                <CalendarIcon className="w-12 h-12 mx-auto mb-3 stroke-1" />
+                                <p>No tasks scheduled.</p>
                             </div>
                         );
                     }
 
                     return (
-                        <>
-                            {renderSection("Morning / Opening", "opening", "text-blue-400")}
-                            {renderSection("Shift / Faena", "shift", "text-yellow-400")}
-                            {renderSection("Evening / Closing", "closing", "text-orange-400")}
-                            
-                            {routines.length === 0 && tasks.length === 0 && (
-                                <div className="text-center py-8 text-muted-foreground opacity-50">Nothing scheduled.</div>
-                            )}
-                        </>
+                        <div className="space-y-2">
+                            {allTasks.map((t: any, i: number) => (
+                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-white/10 hover:border-white/20 transition-all">
+                                    {/* Icono de Estado / Acción */}
+                                    <div 
+                                        onClick={() => {
+                                            if (t.type === 'checklist') handleToggleChecklist(t.id, t.completed);
+                                            else if (!t.completed) setVerifyingTask({ id: t.id, type: 'task' });
+                                        }}
+                                        className={cn(
+                                            "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 cursor-pointer border transition-all",
+                                            t.completed 
+                                                ? "bg-flow-green/20 border-flow-green text-flow-green" 
+                                                : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10"
+                                        )}
+                                    >
+                                        {t.completed ? <Check className="w-5 h-5" /> : (t.type === 'task' ? <Camera className="w-5 h-5" /> : <div className="w-3 h-3 rounded-full bg-white/30" />)}
+                                    </div>
+
+                                    {/* Texto de la Tarea */}
+                                    <div className="flex-1">
+                                        <p className={cn("text-sm font-medium", t.completed && "line-through text-muted-foreground")}>
+                                            {t.text}
+                                        </p>
+                                        {/* Etiqueta pequeña indicando categoría (opcional, para diferenciar visualmente) */}
+                                        <div className="flex gap-2 mt-1">
+                                            <span className={cn(
+                                                "text-[9px] uppercase font-bold px-1.5 py-0.5 rounded",
+                                                t.category === 'opening' && "bg-blue-500/10 text-blue-400",
+                                                t.category === 'shift' && "bg-yellow-500/10 text-yellow-400",
+                                                t.category === 'closing' && "bg-orange-500/10 text-orange-400"
+                                            )}>
+                                                {t.category}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Borrar (Solo manuales) */}
+                                    {t.type === 'task' && canEdit && (
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={(e) => handleDeleteTask(t.id, e)}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     );
                 })()}
             </div>
@@ -282,13 +288,14 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                 <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="e.g. Clean Deep Fryer" className="bg-black/20 border-white/10" />
             </div>
             <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Time Block</label>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Category</label>
                 <Select value={newTaskCategory} onValueChange={(v: any) => setNewTaskCategory(v)}>
                     <SelectTrigger className="bg-black/20 border-white/10"><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-[#1C1C1E] border-white/10 text-white">
-                        <SelectItem value="opening">Opening (Morning)</SelectItem>
-                        <SelectItem value="shift">Shift (During Work)</SelectItem>
-                        <SelectItem value="closing">Closing (Evening)</SelectItem>
+                        {/* ✅ TEXTO LIMPIO SIN PARÉNTESIS */}
+                        <SelectItem value="opening">Opening</SelectItem>
+                        <SelectItem value="shift">Shift</SelectItem>
+                        <SelectItem value="closing">Closing</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
