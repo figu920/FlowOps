@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { useStore } from "@/lib/store"; // ✅ Importamos useStore para el logout
 import { useInventory, useTasks } from "@/lib/hooks";
 import { 
   ClipboardList, 
@@ -8,12 +9,15 @@ import {
   TrendingUp, 
   Box, 
   Refrigerator,
-  CalendarClock
+  CalendarClock,
+  Activity,
+  LogOut // Icono para el botón
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const { logout } = useStore(); // ✅ Sacamos la función logout
 
   // --- DATOS ---
   const { data: inventory = [] } = useInventory();
@@ -35,7 +39,6 @@ export default function Home() {
     </div>
   );
 
-  // Logo de TIMELINE (Azul)
   const TimelineLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
       <CalendarClock className="w-7 h-7 text-white" strokeWidth={2.5} />
@@ -65,7 +68,7 @@ export default function Home() {
       glowColor: 'bg-[#4ADE80]' 
     },
     { 
-      title: 'Timeline', 
+      title: 'Schedule', 
       path: '/schedule', 
       customIcon: <TimelineLogo />,
       glowColor: 'bg-[#3B82F6]' 
@@ -117,21 +120,30 @@ export default function Home() {
   ];
 
   return (
-    // CAMBIO CLAVE: "flex justify-center" para centrar en PC
     <div className="min-h-screen bg-background p-6 pb-24 flex justify-center">
-      {/* CAMBIO CLAVE: "max-w-lg w-full" limita el ancho para que parezca móvil */}
       <div className="w-full max-w-lg space-y-8">
         
+        {/* CABECERA CON LOGOUT */}
         <div className="pt-4">
-          <span className="px-2 py-1 rounded-full bg-flow-red text-white text-[10px] font-bold uppercase tracking-wider">
-             Manager Mode
-           </span>
-           <h1 className="text-4xl font-black text-white mt-2 tracking-tight">
+          <div className="flex items-center gap-3 mb-2">
+             <span className="px-2 py-1 rounded-full bg-flow-red text-white text-[10px] font-bold uppercase tracking-wider">
+               Manager Mode
+             </span>
+             
+             {/* ✅ BOTÓN LOG OUT AÑADIDO */}
+             <button 
+                onClick={() => logout()}
+                className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+             >
+                <LogOut className="w-3 h-3" /> Log Out
+             </button>
+          </div>
+
+           <h1 className="text-4xl font-black text-white tracking-tight">
              Hello, Super
            </h1>
         </div>
 
-        {/* CAMBIO CLAVE: "grid-cols-2" fijo (sin md:grid-cols-3...) */}
         <div className="grid grid-cols-2 gap-4">
           {menuItems.map((item) => (
             <motion.div
@@ -139,7 +151,6 @@ export default function Home() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.96 }}
               onClick={() => setLocation(item.path)}
-              // aspect-square asegura que sean cuadrados perfectos
               className="relative bg-card rounded-[32px] p-5 flex flex-col items-center justify-center gap-4 text-center border border-white/5 shadow-xl cursor-pointer overflow-hidden group aspect-square"
             >
               {/* Glow Effect */}
