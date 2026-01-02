@@ -1,9 +1,7 @@
 import { useLocation } from "wouter";
 import { useStore } from "@/lib/store";
-import { useInventory, useTasks } from "@/lib/hooks";
+import { useInventory } from "@/lib/hooks"; // ✅ Ya no necesitamos useTasks aquí
 import { 
-  ClipboardList, 
-  CheckSquare, 
   ChefHat, 
   MessageSquare, 
   TrendingUp, 
@@ -17,14 +15,13 @@ import { motion } from "framer-motion";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { logout, currentUser } = useStore(); // ✅ Traemos currentUser para el nombre
+  const { logout, currentUser } = useStore();
 
   // --- DATOS ---
   const { data: inventory = [] } = useInventory();
-  const { data: tasks = [] } = useTasks();
+  // Eliminamos useTasks porque ya no mostramos el contador en el menú principal
 
   const lowStockCount = inventory.filter((i: any) => i.status === 'LOW').length;
-  const pendingTasksCount = tasks.filter((t: any) => !t.completed).length;
 
   // --- COMPONENTES DE LOGOS ---
   const InventoryLogo = () => (
@@ -63,7 +60,7 @@ export default function Home() {
     </div>
   );
 
-  // --- LISTA DE BOTONES ---
+  // --- LISTA DE BOTONES LIMPIA ---
   const menuItems = [
     { 
       title: 'Inventory', 
@@ -78,24 +75,6 @@ export default function Home() {
       path: '/schedule', 
       customIcon: <TimelineLogo />,
       glowColor: 'bg-[#3B82F6]' 
-    },
-    { 
-      title: 'Checklists', 
-      path: '/checklists', 
-      icon: ClipboardList, 
-      iconColor: 'text-[#38BDF8]',
-      bgColor: 'bg-[#38BDF8]/10',
-      glowColor: 'bg-[#38BDF8]' 
-    },
-    { 
-      title: 'Tasks', 
-      path: '/tasks', 
-      icon: CheckSquare,
-      count: pendingTasksCount > 0 ? `${pendingTasksCount} Active` : undefined, 
-      countColor: 'text-flow-red',
-      iconColor: 'text-[#A855F7]',
-      bgColor: 'bg-[#A855F7]/10',
-      glowColor: 'bg-[#A855F7]' 
     },
     { 
       title: 'Equipment', 
@@ -142,7 +121,6 @@ export default function Home() {
                  Hello, {currentUser?.name || 'Team'}
                </h1>
                
-               {/* Botón Log Out Discreto */}
                <button 
                   onClick={() => logout()}
                   className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5"
