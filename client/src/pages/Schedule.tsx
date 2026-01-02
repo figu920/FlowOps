@@ -74,9 +74,16 @@ export default function Schedule() {
   };
 
   const getTasksForDayAndCategory = (category: string) => {
-      // Nota: Aquí deberías filtrar también por 'selectedDate' si tus tareas tienen fecha
-      // Por ahora lo dejo como lo tenías:
-      return tasks.filter((t: any) => t.category === category);
+      return tasks.filter((t: any) => {
+          // 1. Que coincida la categoría
+          const isCategoryMatch = t.category === category;
+          
+          // 2. Que coincida la fecha (asumiendo que t.date viene de la base de datos)
+          // Usamos 'isSameDay' de date-fns para evitar problemas con las horas
+          const isDateMatch = t.date && selectedDate ? isSameDay(new Date(t.date), selectedDate) : false;
+
+          return isCategoryMatch && isDateMatch;
+      });
   };
 
   const handleOpenAddTask = (category: string) => {
