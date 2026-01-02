@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useUsers } from '@/lib/hooks'; // ✅ Importamos useUsers
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useUsers } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -23,9 +23,8 @@ import {
 export default function Schedule() {
   const { currentUser } = useStore();
   const { data: tasks = [] } = useTasks();
-  const { data: allUsers = [] } = useUsers(); // ✅ Traemos los usuarios reales
+  const { data: allUsers = [] } = useUsers(); 
   
-  // Filtramos solo los empleados activos para la lista
   const activeEmployees = useMemo(() => {
     return allUsers.filter((u: any) => u.status === 'active');
   }, [allUsers]);
@@ -76,7 +75,6 @@ export default function Schedule() {
   };
 
   const getTasksForDayAndCategory = (category: string) => {
-      // Nota: En un entorno real filtrarías también por fecha (selectedDate)
       return tasks.filter((t: any) => t.category === category);
   };
 
@@ -126,7 +124,8 @@ export default function Schedule() {
   };
 
   return (
-    <Layout title="Operations Calendar" showBack={false}>
+    // ✅ AQUÍ ESTÁ EL CAMBIO: showBack={true}
+    <Layout title="Operations Calendar" showBack={true}>
       
       {/* --- VISTA CALENDARIO --- */}
       <div className="mb-6 space-y-4">
@@ -198,7 +197,6 @@ export default function Schedule() {
       <Dialog open={isDayOpen} onOpenChange={setIsDayOpen}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[95%] max-w-lg rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
             
-            {/* Cabecera del Día (X eliminada, usa la de por defecto) */}
             <div className="p-6 bg-white/5 border-b border-white/5">
                 <h2 className="text-2xl font-black text-white flex items-center gap-2">
                     {selectedDate && format(selectedDate, 'EEEE, MMM do')}
@@ -206,7 +204,6 @@ export default function Schedule() {
                 <p className="text-muted-foreground text-sm font-medium">Daily Task Manager</p>
             </div>
 
-            {/* Contenido */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {FIXED_CATEGORIES.map(category => {
                     const isExpanded = expandedFolders.includes(category.id);
@@ -276,7 +273,6 @@ export default function Schedule() {
                       <div className="h-10 px-3 py-2 rounded-md border border-white/10 bg-white/5 text-sm text-muted-foreground flex items-center">{taskCategory}</div>
                   </div>
                   
-                  {/* SELECTOR DE EMPLEADO CONECTADO A DB */}
                   <div>
                       <label className="text-xs font-bold text-muted-foreground mb-1 block">Assignee</label>
                       <Select value={taskAssignee} onValueChange={setTaskAssignee}>
