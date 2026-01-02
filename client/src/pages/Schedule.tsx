@@ -8,8 +8,8 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Check, Calendar as CalendarIcon, Plus, Trash2, Camera, 
-  ChevronLeft, ChevronRight, X, Search, FolderPlus, Folder, 
+  Check, Plus, Trash2, Camera, 
+  ChevronLeft, ChevronRight, Search, FolderPlus, Folder, 
   ChevronDown, ChevronUp, Edit2, UserCircle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -33,7 +33,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const { data: shiftList = [] } = useChecklists("shift"); 
   const { data: closingList = [] } = useChecklists("closing");
   const { data: tasks = [] } = useTasks();
-  const { data: users = [] } = useUsers(); // ✅ CARGAMOS USUARIOS
+  const { data: users = [] } = useUsers();
 
   const updateChecklistMutation = useUpdateChecklist();
   const updateTaskMutation = useUpdateTask(); 
@@ -41,26 +41,25 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const createTaskMutation = useCreateTask();
   const deleteTaskMutation = useDeleteTask();
   
-  // --- ESTADOS DE UI ---
+  // --- UI STATE ---
   const [viewingDay, setViewingDay] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
-  // --- MODALES (CREAR) ---
+  // --- MODALES (CREAR/ASIGNAR) ---
   const [isAddingTask, setIsAddingTask] = useState<{date: Date, category: string} | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
-  const [newTaskAssignee, setNewTaskAssignee] = useState(""); // ✅ Estado para asignar usuario
+  const [newTaskAssignee, setNewTaskAssignee] = useState("");
 
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [customFolders, setCustomFolders] = useState<string[]>([]);
   
-  // --- MODALES (FOTOS) ---
+  // --- MODALES (ACCIONES) ---
   const [verifyingTask, setVerifyingTask] = useState<{id: string, type: 'task'|'checklist'} | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- MODALES (EDITAR/BORRAR) ---
   const [editingTask, setEditingTask] = useState<{id: string, text: string, assignedTo: string} | null>(null);
   const [folderToRename, setFolderToRename] = useState<string | null>(null);
   const [renameFolderInput, setRenameFolderInput] = useState("");
@@ -89,10 +88,8 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
 
   const handleRenameFolder = async () => {
       if (folderToRename && renameFolderInput.trim() && folderToRename !== renameFolderInput) {
-          // 1. Actualizar lista local de carpetas
           setCustomFolders(prev => prev.map(f => f === folderToRename ? renameFolderInput.trim() : f));
           
-          // 2. Actualizar etiquetas en las notas de las tareas
           const dateStr = viewingDay ? format(viewingDay, 'yyyy-MM-dd') : "";
           const tasksToUpdate = tasks.filter((t: any) => t.notes?.includes(`CAT:${folderToRename}`) && t.notes?.includes(`DATE:${dateStr}`));
           
@@ -125,7 +122,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       const noteTag = `DATE:${dateTag}|CAT:${isAddingTask.category}`; 
       createTaskMutation.mutate({ 
           text: newTaskText, 
-          assignedTo: newTaskAssignee || 'Team', // ✅ Guardamos el trabajador asignado
+          assignedTo: newTaskAssignee || 'Team',
           notes: noteTag, 
           completed: false 
       });
@@ -142,7 +139,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
               id: editingTask.id, 
               updates: { 
                   text: editingTask.text,
-                  assignedTo: editingTask.assignedTo // ✅ Actualizamos trabajador
+                  assignedTo: editingTask.assignedTo
               } 
           });
           setEditingTask(null);
@@ -333,20 +330,20 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                             </div>
                                             
                                             <div className="flex items-center gap-1">
-                                                {/* ACCIONES DE CARPETA (Editar/Borrar - Solo Custom) */}
+                                                {/* BOTONES DE CARPETA (Siempre visibles para custom folders) */}
                                                 {canEdit && !isSystemFolder && (
                                                     <div className="flex items-center mr-2">
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); setFolderToRename(folderName); setRenameFolderInput(folderName); }}
-                                                            className="p-1.5 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white"
+                                                            className="p-2 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white"
                                                         >
-                                                            <Edit2 className="w-3 h-3" />
+                                                            <Edit2 className="w-4 h-4" />
                                                         </button>
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); setFolderToDelete(folderName); }}
-                                                            className="p-1.5 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500"
+                                                            className="p-2 hover:bg-red-500/10 rounded-md text-muted-foreground hover:text-red-500"
                                                         >
-                                                            <Trash2 className="w-3 h-3" />
+                                                            <Trash2 className="w-4 h-4" />
                                                         </button>
                                                     </div>
                                                 )}
@@ -370,7 +367,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                     )}
                                                     
                                                     {folderTasks.map((t: any, i: number) => (
-                                                        <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors group/task">
+                                                        <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
                                                             {/* Checkbox */}
                                                             <div 
                                                                 onClick={() => {
@@ -389,7 +386,6 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
 
                                                             <div className="flex-1 min-w-0">
                                                                 <span className={cn("text-sm block", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
-                                                                {/* Mostrar Empleado Asignado */}
                                                                 {t.assignedTo && (
                                                                     <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground/80">
                                                                         <UserCircle className="w-3 h-3" />
@@ -398,7 +394,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                                 )}
                                                             </div>
 
-                                                            {/* Botones de Acción Tarea */}
+                                                            {/* BOTONES DE TAREA (Siempre visibles) */}
                                                             <div className="flex items-center gap-1">
                                                                 <Button 
                                                                     size="icon" 
@@ -409,8 +405,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                                     <Camera className="w-4 h-4" />
                                                                 </Button>
 
-                                                                {/* Editar y Borrar (Solo manuales) */}
-                                                                {t.type === 'task' && canEdit && (
+                                                                {canEdit && (
                                                                     <>
                                                                         <Button 
                                                                             size="icon" 
@@ -420,14 +415,17 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                                         >
                                                                             <Edit2 className="w-4 h-4" />
                                                                         </Button>
-                                                                        <Button 
-                                                                            size="icon" 
-                                                                            variant="ghost" 
-                                                                            onClick={(e) => handleDeleteTask(t.id, e)} 
-                                                                            className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full"
-                                                                        >
-                                                                            <Trash2 className="w-4 h-4" />
-                                                                        </Button>
+                                                                        {/* Solo permitimos borrar tareas manuales para no romper checklists del sistema, pero se puede habilitar si se desea */}
+                                                                        {t.type === 'task' && (
+                                                                            <Button 
+                                                                                size="icon" 
+                                                                                variant="ghost" 
+                                                                                onClick={(e) => handleDeleteTask(t.id, e)} 
+                                                                                className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full"
+                                                                            >
+                                                                                <Trash2 className="w-4 h-4" />
+                                                                            </Button>
+                                                                        )}
                                                                     </>
                                                                 )}
                                                             </div>
@@ -459,7 +457,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
         </DialogContent>
       </Dialog>
 
-      {/* --- TODOS LOS MODALES --- */}
+      {/* --- MODALES --- */}
 
       {/* 1. CREAR CARPETA */}
       <Dialog open={isCreatingFolder} onOpenChange={setIsCreatingFolder}>
