@@ -40,24 +40,20 @@ export default function Equipment() {
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
 
-  // --- LÓGICA DE AGRUPACIÓN (CORREGIDA) ---
+  // --- LÓGICA DE AGRUPACIÓN ---
   
-  // 1. Obtener carpetas únicas. EL FIX ESTÁ AQUÍ: "as string[]"
   const folders = useMemo(() => {
     const locations = new Set(equipmentList.map((item: any) => item.location || "General"));
     return Array.from(locations).sort() as string[]; 
   }, [equipmentList]);
 
-  // 2. Filtrar items
   const displayedItems = useMemo(() => {
     let items = equipmentList;
     
-    // Búsqueda global
     if (searchQuery.trim()) {
         return items.filter((i: any) => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
-    // Filtro por carpeta
     if (currentFolder) {
       return items.filter((i: any) => (i.location || "General") === currentFolder);
     }
@@ -128,7 +124,6 @@ export default function Equipment() {
      setIsCreatingFolder(false);
   };
 
-  // Contar alertas (Fix de tipo string)
   const getFolderAlerts = (folderName: string) => {
       return equipmentList.filter((i:any) => (i.location || "General") === folderName && i.status !== 'OPERATIONAL').length;
   };
@@ -180,7 +175,6 @@ export default function Equipment() {
       {/* VISTA 1: CARPETAS (RAÍZ) */}
       {!currentFolder && !searchQuery && (
           <div className="grid grid-cols-2 gap-4 pb-20">
-            {/* EL FIX: Añadimos (folderName: string) explícitamente */}
             {folders.map((folderName: string, idx: number) => {
               const alertCount = getFolderAlerts(folderName);
               const itemCount = equipmentList.filter((i:any) => (i.location || "General") === folderName).length;
@@ -257,7 +251,7 @@ export default function Equipment() {
                         </div>
 
                         <div className="flex-1 min-w-0 pt-0.5">
-                            <h3 className="font-bold text-white text-base truncate pr-14">{item.name}</h3>
+                            <h3 className="font-bold text-white text-base truncate pr-16">{item.name}</h3>
                             <p className={cn("text-[10px] font-bold uppercase mt-0.5", 
                                 item.status === 'BROKEN' ? "text-red-400" : 
                                 item.status === 'MAINTENANCE' ? "text-orange-400" : "text-green-400"
@@ -273,7 +267,8 @@ export default function Equipment() {
                         </div>
 
                         {canEdit && (
-                            <div className="flex flex-col gap-2 absolute right-4 top-4">
+                            // 🛠️ AQUÍ ESTÁ EL CAMBIO: "absolute right-4 top-4 flex gap-2"
+                            <div className="absolute right-4 top-4 flex gap-2">
                                 <button onClick={() => handleOpenEdit(item)} className="p-2 bg-white/5 hover:bg-white/20 rounded-lg text-muted-foreground hover:text-white transition-colors">
                                     <Edit2 className="w-4 h-4" />
                                 </button>
