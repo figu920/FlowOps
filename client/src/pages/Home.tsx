@@ -35,7 +35,7 @@ export default function Home() {
     </div>
   );
 
-  // ✅ RECUPERADO: TIMELINE LOGO (Azul)
+  // Logo de TIMELINE (Azul)
   const TimelineLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
       <CalendarClock className="w-7 h-7 text-white" strokeWidth={2.5} />
@@ -64,7 +64,6 @@ export default function Home() {
       countColor: 'text-flow-yellow',
       glowColor: 'bg-[#4ADE80]' 
     },
-    // ✅ AQUÍ ESTÁ DE VUELTA "TIMELINE"
     { 
       title: 'Timeline', 
       path: '/schedule', 
@@ -115,68 +114,73 @@ export default function Home() {
       bgColor: 'bg-white/10',
       glowColor: 'bg-white'
     }
-    // ❌ ANALYTICS ELIMINADO
   ];
 
   return (
-    <div className="min-h-screen bg-background p-6 pb-24">
-      <div className="flex justify-between items-center mb-8 pt-4">
-        <div>
-           <span className="px-2 py-1 rounded-full bg-flow-red text-white text-[10px] font-bold uppercase tracking-wider">
+    // CAMBIO CLAVE: "flex justify-center" para centrar en PC
+    <div className="min-h-screen bg-background p-6 pb-24 flex justify-center">
+      {/* CAMBIO CLAVE: "max-w-lg w-full" limita el ancho para que parezca móvil */}
+      <div className="w-full max-w-lg space-y-8">
+        
+        <div className="pt-4">
+          <span className="px-2 py-1 rounded-full bg-flow-red text-white text-[10px] font-bold uppercase tracking-wider">
              Manager Mode
            </span>
            <h1 className="text-4xl font-black text-white mt-2 tracking-tight">
              Hello, Super
            </h1>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {menuItems.map((item) => (
-          <motion.div
-            key={item.title}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={() => setLocation(item.path)}
-            className="relative bg-card rounded-[32px] p-5 flex flex-col items-center justify-center gap-4 text-center border border-white/5 shadow-xl cursor-pointer overflow-hidden group aspect-square"
-          >
-            {/* Glow Effect */}
-            <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ${item.glowColor}`} />
-            
-            {/* Icon */}
-            <div className="relative z-10">
-              {item.customIcon ? (
-                item.customIcon
-              ) : (
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${item.bgColor || 'bg-white/5'}`}>
-                   {item.icon && <item.icon className={`w-7 h-7 ${item.iconColor || 'text-white'}`} strokeWidth={2.5} />}
-                </div>
-              )}
+        {/* CAMBIO CLAVE: "grid-cols-2" fijo (sin md:grid-cols-3...) */}
+        <div className="grid grid-cols-2 gap-4">
+          {menuItems.map((item) => (
+            <motion.div
+              key={item.title}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => setLocation(item.path)}
+              // aspect-square asegura que sean cuadrados perfectos
+              className="relative bg-card rounded-[32px] p-5 flex flex-col items-center justify-center gap-4 text-center border border-white/5 shadow-xl cursor-pointer overflow-hidden group aspect-square"
+            >
+              {/* Glow Effect */}
+              <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ${item.glowColor}`} />
               
-              {/* Notification Bubble */}
-              {item.count && (
-                <motion.div 
-                  initial={{ scale: 0 }} 
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 bg-[#1C1C1E] border border-white/10 rounded-full px-2 py-0.5 shadow-lg z-20"
-                >
-                  <span className={`text-[10px] font-bold ${item.countColor || 'text-white'}`}>
-                    {item.count}
-                  </span>
-                </motion.div>
-              )}
-            </div>
+              {/* Icon */}
+              <div className="relative z-10">
+                {item.customIcon ? (
+                  item.customIcon
+                ) : (
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center ${item.bgColor || 'bg-white/5'}`}>
+                     {item.icon && <item.icon className={`w-7 h-7 ${item.iconColor || 'text-white'}`} strokeWidth={2.5} />}
+                  </div>
+                )}
+                
+                {/* Notification Bubble */}
+                {item.count && (
+                  <motion.div 
+                    initial={{ scale: 0 }} 
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 bg-[#1C1C1E] border border-white/10 rounded-full px-2 py-0.5 shadow-lg z-20"
+                  >
+                    <span className={`text-[10px] font-bold ${item.countColor || 'text-white'}`}>
+                      {item.count}
+                    </span>
+                  </motion.div>
+                )}
+              </div>
 
-            {/* Title */}
-            <span className="font-bold text-base text-white relative z-10 leading-tight">
-              {item.title}
-            </span>
-            
-            <span className="text-[10px] text-muted-foreground absolute bottom-4 opacity-50 font-medium">
-              Tap to view
-            </span>
-          </motion.div>
-        ))}
+              {/* Title */}
+              <span className="font-bold text-base text-white relative z-10 leading-tight">
+                {item.title}
+              </span>
+              
+              <span className="text-[10px] text-muted-foreground absolute bottom-4 opacity-50 font-medium">
+                Tap to view
+              </span>
+            </motion.div>
+          ))}
+        </div>
+
       </div>
     </div>
   );
