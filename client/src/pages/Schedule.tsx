@@ -3,17 +3,19 @@ import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { 
   useChecklists, useUpdateChecklist, 
-  useTasks, useCompleteTask, useCreateTask, useDeleteTask 
+  useTasks, useCompleteTask, useCreateTask, useDeleteTask, useUsers 
 } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, Calendar as CalendarIcon, Plus, Trash2, Camera, 
-  ChevronLeft, ChevronRight, X, Search, FolderPlus, Folder, ChevronDown, ChevronUp
+  ChevronLeft, ChevronRight, Search, FolderPlus, Folder, 
+  ChevronDown, ChevronUp, Sun, Moon, Clock, User 
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
   startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, 
@@ -31,6 +33,12 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const { data: shiftList = [] } = useChecklists("shift"); 
   const { data: closingList = [] } = useChecklists("closing");
   const { data: tasks = [] } = useTasks();
+  const { data: allUsers = [] } = useUsers(); // Traemos los usuarios
+
+  // Filtramos solo empleados activos
+  const activeEmployees = useMemo(() => {
+    return allUsers.filter((u: any) => u.status === 'active');
+  }, [allUsers]);
 
   const updateChecklistMutation = useUpdateChecklist();
   const completeTaskMutation = useCompleteTask();
@@ -40,13 +48,12 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   // --- MODALES Y ACCIONES ---
   const [isAddingTask, setIsAddingTask] = useState<{date: Date, category: string} | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("Team"); // Estado para el asignado
   
-  // Estados para Carpetas
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [customFolders, setCustomFolders] = useState<string[]>([]);
   
-  // Control de carpetas abiertas (Accordion)
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   const [viewingDay, setViewingDay] = useState<Date | null>(null);
@@ -68,8 +75,16 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
     return eachDayOfInterval({ start: startDate, end: endDate });
   }, [currentMonth]);
 
-  // --- HANDLERS ---
+  // --- HELPER PARA ICONOS ---
+  const getFolderStyle = (name: string) => {
+      const n = name.toLowerCase();
+      if (n.includes('opening')) return { icon: Sun, color: 'text-blue-400', bg: 'bg-blue-500/10' };
+      if (n.includes('shift')) return { icon: Clock, color: 'text-orange-400', bg: 'bg-orange-500/10' };
+      if (n.includes('closing')) return { icon: Moon, color: 'text-purple-400', bg: 'bg-purple-500/10' };
+      return { icon: Folder, color: 'text-white', bg: 'bg-white/10' };
+  };
 
+  // --- HANDLERS ---
   const handleCreateFolder = () => {
       if (newFolderName.trim()) {
           setCustomFolders([...customFolders, newFolderName.trim()]);
@@ -89,15 +104,14 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       
       createTaskMutation.mutate({
         text: newTaskText,
-        assignedTo: 'Team',
+        assignedTo: newTaskAssignee, // Guardamos el empleado seleccionado
         notes: noteTag, 
         completed: false
       });
       
       setNewTaskText("");
+      setNewTaskAssignee("Team"); // Resetear al default
       setIsAddingTask(null);
-      
-      // Abrir la carpeta automáticamente al añadir tarea
       setOpenFolders(prev => ({ ...prev, [isAddingTask.category]: true }));
     }
   };
@@ -162,12 +176,12 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   return (
     <Layout title="Operations Calendar" showBack>
       
-      {/* CABECERA */}
+      {/* CABECERA (Modificada: Sin botón Today) */}
       <div className="flex items-center justify-between mb-6 px-1">
         <h2 className="text-2xl font-black text-white capitalize">{format(currentMonth, 'MMMM yyyy')}</h2>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronLeft className="w-5 h-5" /></Button>
-          <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="rounded-full border-white/10 hover:bg-white/10 text-xs font-bold">Today</Button>
+          {/* BOTÓN TODAY ELIMINADO AQUÍ */}
           <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronRight className="w-5 h-5" /></Button>
         </div>
       </div>
@@ -226,13 +240,11 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                         <h3 className="text-xl font-bold text-white">{viewingDay && format(viewingDay, 'EEEE, MMM do')}</h3>
                         <p className="text-xs text-muted-foreground">Daily Operations Hub</p>
                     </div>
-                    {/* Botón New Folder con color de categoría */}
                     {canEdit && (
                         <Button 
                             size="sm" 
                             onClick={() => setIsCreatingFolder(true)} 
-                            className="text-xs h-8 text-white font-bold shadow-lg"
-                            style={{ backgroundColor: categoryColor }}
+                            className="text-xs h-8 text-white font-bold shadow-lg bg-blue-600 hover:bg-blue-700"
                         >
                             <FolderPlus className="w-3 h-3 mr-1.5" /> New Folder
                         </Button>
@@ -265,17 +277,17 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                 const folderTasks = filteredTasks.filter(t => t.category === folderName);
                                 if (searchQuery && folderTasks.length === 0) return null;
                                 const isOpen = openFolders[folderName];
+                                const { icon: CategoryIcon, color, bg } = getFolderStyle(folderName);
 
                                 return (
                                     <div key={folderName} className="rounded-2xl overflow-hidden border border-white/5 bg-card">
-                                        {/* CABECERA DE CARPETA (Clickable) */}
                                         <div 
                                             onClick={() => toggleFolder(folderName)}
                                             className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                                                    <Folder className="w-5 h-5" />
+                                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", bg, color)}>
+                                                    <CategoryIcon className="w-5 h-5" />
                                                 </div>
                                                 <div>
                                                     <h4 className="font-bold text-white text-sm">{folderName}</h4>
@@ -287,7 +299,6 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                             </div>
                                         </div>
 
-                                        {/* LISTA DE TAREAS (Colapsable) */}
                                         <AnimatePresence>
                                             {isOpen && (
                                                 <motion.div
@@ -317,7 +328,15 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                                                 <Check className="w-4 h-4 stroke-[3]" />
                                                             </div>
 
-                                                            <span className={cn("flex-1 text-sm", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className={cn("text-sm block truncate", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
+                                                                {t.assignedTo && t.assignedTo !== 'Team' && (
+                                                                    <div className="flex items-center gap-1 mt-0.5">
+                                                                        <User className="w-3 h-3 text-muted-foreground" />
+                                                                        <span className="text-[10px] text-muted-foreground">{t.assignedTo}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
 
                                                             <Button 
                                                                 size="icon" 
@@ -350,10 +369,6 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
                                     </div>
                                 );
                             })}
-                            
-                            {activeFolders.length === 0 && (
-                                <div className="text-center py-10 text-muted-foreground opacity-50">Empty day. Create a folder or add tasks.</div>
-                            )}
                         </>
                     );
                 })()}
@@ -369,20 +384,37 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
             <Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Maintenance, Events..." className="bg-black/20 border-white/10" />
           </div>
           <DialogFooter>
-              <Button onClick={handleCreateFolder} className="w-full text-white font-bold" style={{ backgroundColor: categoryColor }}>
+              <Button onClick={handleCreateFolder} className="w-full text-white font-bold bg-blue-600 hover:bg-blue-700">
                   Create Folder
               </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: AÑADIR TAREA */}
-      <Dialog open={!!isAddingTask} onOpenChange={() => setIsAddingTask(null)}>
+      {/* MODAL: AÑADIR TAREA (Actualizado con Selector de Empleado) */}
+      <Dialog open={!!isAddingTask} onOpenChange={() => { setIsAddingTask(null); setNewTaskAssignee("Team"); }}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Add to {isAddingTask?.category}</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
-            <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Task name..." className="bg-black/20 border-white/10" />
+          <div className="space-y-4 py-4">
+            <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
+                <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Task name..." className="bg-black/20 border-white/10" />
+            </div>
+            
+            <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assignee</label>
+                <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                    <SelectTrigger className="bg-black/20 border-white/10">
+                        <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#1C1C1E] border-white/10 text-white z-[100]">
+                        <SelectItem value="Team">Team (Everyone)</SelectItem>
+                        {activeEmployees.map((emp: any) => (
+                            <SelectItem key={emp.id} value={emp.name}>{emp.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
           <DialogFooter><Button onClick={handleAddTask} className="w-full bg-flow-green text-black font-bold">Add Task</Button></DialogFooter>
         </DialogContent>
