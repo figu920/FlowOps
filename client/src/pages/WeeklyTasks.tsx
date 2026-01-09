@@ -1,268 +1,154 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
-import { useTasks, useCompleteTask, useCreateTask, useDeleteTask, useUpdateTask, useUsers } from '@/lib/hooks';
+import { useChecklists, useUpdateChecklist } from '@/lib/hooks'; // Usamos Checklists ahora
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Plus, Trash2, UserCircle, Camera, RefreshCw } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { motion } from 'framer-motion';
+import { 
+  Check, Sun, Moon, Clock, CalendarDays, 
+  CheckCircle2, Circle 
+} from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function WeeklyTasks() {
   const { currentUser } = useStore();
-  
-  // Hooks de datos
-  const { data: allTasks = [] } = useTasks();
-  const { data: users = [] } = useUsers();
-  
-  // Mutaciones
-  const completeMutation = useCompleteTask();
-  const createMutation = useCreateTask();
-  const deleteMutation = useDeleteTask();
-  const updateMutation = useUpdateTask();
+  const updateChecklistMutation = useUpdateChecklist();
 
-  // Estados locales
-  const [isAdding, setIsAdding] = useState(false);
-  const [taskName, setTaskName] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
-  const [notes, setNotes] = useState("");
+  // Fecha actual
+  const today = new Date();
 
-  // Estado Verificación Foto
-  const [verifyingTaskId, setVerifyingTaskId] = useState<string | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Traemos las listas fijas (igual que en Schedule)
+  const { data: openingList = [] } = useChecklists("opening");
+  const { data: shiftList = [] } = useChecklists("shift");
+  const { data: closingList = [] } = useChecklists("closing");
 
-  // Estado Historial
-  const [viewingHistoryTask, setViewingHistoryTask] = useState<string | null>(null);
-
-  const isAdmin = currentUser?.isSystemAdmin === true;
-  const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || isAdmin;
-  const canDelete = currentUser?.role === 'manager' || isAdmin;
-
-  // Filtramos para NO mostrar las tareas del calendario (las que tienen fecha en notas)
-  // Así esta vista solo muestra las "Weekly Tasks" generales.
-  const weeklyTasks = allTasks.filter((t: any) => !t.notes?.includes('DATE:'));
-
-  const handleAddTask = () => {
-    if (taskName && assignedTo) {
-      createMutation.mutate({
-        text: taskName,
-        assignedTo,
-        notes: notes || undefined,
-        completed: false
-      });
-      setIsAdding(false);
-      setTaskName("");
-      setAssignedTo("");
-      setNotes("");
-    }
+  // Handler para completar/descompletar
+  const toggleItem = (id: string, currentStatus: boolean) => {
+    updateChecklistMutation.mutate({ 
+        id, 
+        updates: { completed: !currentStatus } 
+    });
   };
 
-  const handleTaskClick = (task: any) => {
-    if (task.completed) {
-      setViewingHistoryTask(task.id);
-    } else {
-      setVerifyingTaskId(task.id);
-      setPhotoPreview(null);
-    }
-  };
+  // Componente reutilizable para cada Columna
+  const TaskColumn = ({ title, icon: Icon, color, bg, items }: any) => {
+    const completedCount = items.filter((i:any) => i.completed).length;
+    const totalCount = items.length;
+    const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 800; 
-          const scaleSize = MAX_WIDTH / img.width;
+    return (
+      <div className="bg-card border border-white/5 rounded-3xl overflow-hidden flex flex-col h-full">
+        {/* Cabecera de Columna */}
+        <div className="p-5 border-b border-white/5 bg-white/[0.02]">
+          <div className="flex justify-between items-start mb-4">
+             <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", bg, color)}>
+                <Icon className="w-6 h-6" />
+             </div>
+             <div className="text-right">
+                <span className={cn("text-2xl font-black", color)}>{Math.round(progress)}%</span>
+             </div>
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">{title}</h3>
+            <p className="text-xs text-muted-foreground">{completedCount}/{totalCount} Tasks Completed</p>
+          </div>
           
-          if (scaleSize < 1) {
-              canvas.width = MAX_WIDTH;
-              canvas.height = img.height * scaleSize;
-          } else {
-              canvas.width = img.width;
-              canvas.height = img.height;
-          }
+          {/* Barra de progreso */}
+          <div className="h-1 w-full bg-white/10 rounded-full mt-4 overflow-hidden">
+             <div 
+               className={cn("h-full transition-all duration-500 rounded-full", color.replace('text-', 'bg-'))} 
+               style={{ width: `${progress}%` }}
+             />
+          </div>
+        </div>
 
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          setPhotoPreview(compressedBase64);
-        };
-        img.src = event.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const submitCompletion = () => {
-    if (verifyingTaskId && photoPreview) {
-      completeMutation.mutate({ id: verifyingTaskId, photo: photoPreview });
-      setVerifyingTaskId(null);
-      setPhotoPreview(null);
-    }
+        {/* Lista de Tareas */}
+        <div className="p-3 space-y-2 flex-1 overflow-y-auto">
+           {items.length === 0 && (
+             <div className="text-center py-10 text-muted-foreground opacity-50 text-xs">No fixed tasks.</div>
+           )}
+           {items.map((item: any, idx: number) => (
+             <motion.div
+               key={item.id}
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: idx * 0.05 }}
+               onClick={() => toggleItem(item.id, item.completed)}
+               className={cn(
+                 "p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all active:scale-[0.98]",
+                 item.completed 
+                    ? "bg-flow-green/10 border-flow-green/20" 
+                    : "bg-black/20 border-white/5 hover:bg-white/5"
+               )}
+             >
+               <div className={cn(
+                  "mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors",
+                  item.completed 
+                    ? "bg-flow-green border-flow-green text-black" 
+                    : "border-white/30 text-transparent"
+               )}>
+                  <Check className="w-3.5 h-3.5 stroke-[4]" />
+               </div>
+               <span className={cn(
+                  "text-sm font-medium leading-tight",
+                  item.completed ? "text-white/50 line-through" : "text-white"
+               )}>
+                 {item.text}
+               </span>
+             </motion.div>
+           ))}
+        </div>
+      </div>
+    );
   };
 
   return (
-    <Layout 
-      title="Weekly Tasks"
-      showBack={true}
-      action={
-        canEdit && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setIsAdding(true)}
-            className="w-9 h-9 rounded-full bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/20"
-          >
-            <Plus className="w-5 h-5" strokeWidth={3} />
-          </motion.button>
-        )
-      }
-    >
-      <div className="space-y-3 pb-20">
-        {weeklyTasks.length === 0 && (
-            <div className="text-center py-10 text-muted-foreground opacity-50">No weekly tasks yet.</div>
-        )}
-        
-        {weeklyTasks.map((task: any, idx: number) => (
-          <motion.div
-            key={task.id}
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.05 }}
-            className={cn(
-              "group relative overflow-hidden rounded-2xl border p-0 transition-all active:scale-[0.98]",
-              task.completed 
-                ? "bg-card/30 border-white/5" 
-                : "bg-card border-white/[0.06] hover:border-white/10"
-            )}
-          >
-            <div className={cn(
-               "absolute inset-0 bg-purple-500/10 transition-transform duration-500 origin-left",
-               task.completed ? "scale-x-100" : "scale-x-0"
-            )} />
-
-            {canDelete && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(task.id); }}
-                className="absolute top-2 right-2 p-2 text-muted-foreground hover:text-flow-red opacity-0 group-hover:opacity-100 transition-opacity z-20"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-
-            <div 
-              className="relative p-5 flex items-start gap-4 cursor-pointer"
-              onClick={() => handleTaskClick(task)}
-            >
-              <div className={cn(
-                "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-300 shrink-0",
-                task.completed ? "bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]" : "bg-white/5 text-muted-foreground"
-              )}>
-                {task.completed ? <Check className="w-6 h-6 stroke-[3]" /> : <Camera className="w-6 h-6" />}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h3 className={cn(
-                  "text-[17px] font-semibold transition-colors leading-tight",
-                  task.completed ? "text-muted-foreground line-through" : "text-white"
-                )}>
-                  {task.text}
-                </h3>
-                
-                {task.notes && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {task.notes}
-                  </p>
-                )}
-
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md">
-                     <UserCircle className="w-3 h-3 text-purple-400" />
-                     <span className="text-xs text-white/80 font-medium">{task.assignedTo}</span>
-                  </div>
-                  {task.completed && task.completedAt && (
-                    <span className="text-[10px] text-muted-foreground">
-                       Done {new Date(task.completedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
-                  )}
-                  {task.completed && <div className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-1.5 py-0.5 rounded"><Camera className="w-3 h-3"/> PROOF</div>}
-                </div>
-              </div>
+    <Layout title="Daily Checklists" showBack={true}>
+      
+      {/* CABECERA CON FECHA */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-white/5 rounded-lg text-muted-foreground">
+                <CalendarDays className="w-6 h-6" />
             </div>
-          </motion.div>
-        ))}
+            <div>
+                <h2 className="text-sm font-bold text-flow-green uppercase tracking-wider">Today's Operations</h2>
+                <p className="text-2xl font-black text-white">{format(today, 'EEEE, MMM do')}</p>
+            </div>
+        </div>
       </div>
 
-      {/* MODAL: SUBIR FOTO */}
-      <Dialog open={!!verifyingTaskId} onOpenChange={(open) => !open && setVerifyingTaskId(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Photo Proof Required</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4 flex flex-col items-center">
-            <p className="text-muted-foreground text-center text-sm">Upload a photo to verify.</p>
-            <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-            <div onClick={() => fileInputRef.current?.click()} className="w-full aspect-[4/3] bg-black/40 rounded-xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:bg-black/50 transition-all overflow-hidden relative">
-              {photoPreview ? <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" /> : <div className="flex flex-col items-center"><Camera className="w-10 h-10 text-muted-foreground mb-2" /><span className="text-sm text-muted-foreground font-medium">Tap to take photo</span></div>}
-            </div>
-          </div>
-          <DialogFooter><Button onClick={submitCompletion} disabled={!photoPreview} className="w-full bg-flow-green text-black font-bold">Submit</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* GRID DE 3 COLUMNAS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-20">
+        
+        {/* COLUMNA 1: OPENING */}
+        <TaskColumn 
+            title="Opening" 
+            icon={Sun} 
+            color="text-blue-400" 
+            bg="bg-blue-500/10" 
+            items={openingList} 
+        />
 
-      {/* MODAL: HISTORIAL */}
-      <Dialog open={!!viewingHistoryTask} onOpenChange={(open) => !open && setViewingHistoryTask(null)}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] h-[80vh] rounded-2xl p-0 flex flex-col overflow-hidden">
-           {(() => {
-             const task = weeklyTasks.find((t: any) => t.id === viewingHistoryTask);
-             if (!task) return null;
-             return (
-               <>
-                 <div className="p-6 pb-2 border-b border-white/5">
-                   <DialogTitle>{task.text}</DialogTitle>
-                   <p className="text-sm text-muted-foreground mt-1">History</p>
-                 </div>
-                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                   {task.history?.length > 0 ? task.history.map((entry: any, idx: number) => (
-                       <div key={idx} className="space-y-2">
-                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{new Date(entry.completedAt).toLocaleString()}</span>
-                            <span className="text-white font-bold">{entry.completedBy}</span>
-                         </div>
-                         <div className="rounded-xl overflow-hidden border border-white/10 bg-black/20">
-                           <img src={entry.photo} alt="Proof" className="w-full h-auto" />
-                         </div>
-                       </div>
-                   )) : <div className="text-center text-muted-foreground py-10">No history available.</div>}
-                 </div>
-                 {canEdit && (
-                   <div className="p-4 border-t border-white/5">
-                     <Button onClick={() => { if (viewingHistoryTask) updateMutation.mutate({ id: viewingHistoryTask, updates: { completed: false } }); setViewingHistoryTask(null); }} variant="outline" className="w-full border-flow-red/30 text-flow-red hover:bg-flow-red/10"><RefreshCw className="w-4 h-4 mr-2" /> Reopen Task</Button>
-                   </div>
-                 )}
-               </>
-             );
-           })()}
-        </DialogContent>
-      </Dialog>
+        {/* COLUMNA 2: SHIFT */}
+        <TaskColumn 
+            title="Shift" 
+            icon={Clock} 
+            color="text-orange-400" 
+            bg="bg-orange-500/10" 
+            items={shiftList} 
+        />
 
-      {/* MODAL: AÑADIR TAREA */}
-      <Dialog open={isAdding} onOpenChange={setIsAdding}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>New Weekly Task</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Task Name</label><Input value={taskName} onChange={(e) => setTaskName(e.target.value)} placeholder="e.g. Deep Clean" className="bg-black/20 border-white/10"/></div>
-            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assign To</label><Select value={assignedTo} onValueChange={setAssignedTo}><SelectTrigger className="bg-black/20 border-white/10"><SelectValue placeholder="Select..." /></SelectTrigger><SelectContent className="bg-[#1C1C1E] border-white/10 text-white">{users.map((user: any) => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}</SelectContent></Select></div>
-            <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes</label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Instructions..." className="bg-black/20 border-white/10 resize-none h-20"/></div>
-          </div>
-          <DialogFooter><Button onClick={handleAddTask} className="w-full bg-purple-500 text-white font-bold hover:bg-purple-600">Save Task</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* COLUMNA 3: CLOSING */}
+        <TaskColumn 
+            title="Closing" 
+            icon={Moon} 
+            color="text-purple-400" 
+            bg="bg-purple-500/10" 
+            items={closingList} 
+        />
+
+      </div>
     </Layout>
   );
 }
