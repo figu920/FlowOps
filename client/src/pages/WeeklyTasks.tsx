@@ -5,24 +5,21 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { 
   Check, Sun, Moon, Clock, 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon
+  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info
 } from 'lucide-react';
 import { format, addDays, subDays, isToday } from 'date-fns';
-
-// 👇 ESTA LÍNEA ES LA QUE FALTABA
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export default function WeeklyTasks() {
   // --- ESTADOS ---
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [viewingTask, setViewingTask] = useState<any>(null); // Estado para el modal de lectura
 
   // --- DATOS ---
-  // 1. Traemos las plantillas (Lo que "debería" hacerse)
   const { data: openingTemplates = [] } = useChecklists("opening");
   const { data: shiftTemplates = [] } = useChecklists("shift");
   const { data: closingTemplates = [] } = useChecklists("closing");
-
-  // 2. Traemos el historial real (Lo que "se hizo")
   const { data: allTasks = [] } = useTasks();
   
   const createTaskMutation = useCreateTask();
@@ -67,7 +64,7 @@ export default function WeeklyTasks() {
 
     return (
       <div className="bg-card border border-white/5 rounded-3xl overflow-hidden flex flex-col h-full shadow-lg">
-        {/* Cabecera de Columna */}
+        {/* Cabecera */}
         <div className="p-5 border-b border-white/5 bg-white/[0.02] relative overflow-hidden">
           <div className={cn("absolute bottom-0 left-0 h-1 transition-all duration-700", color.replace('text-', 'bg-'))} style={{ width: `${progress}%`, opacity: 0.3 }} />
           
@@ -83,7 +80,7 @@ export default function WeeklyTasks() {
           </div>
         </div>
 
-        {/* Lista de Tareas */}
+        {/* Lista */}
         <div className="p-3 space-y-2 flex-1 overflow-y-auto bg-black/10">
            {templates.length === 0 && (
              <div className="text-center py-8 text-muted-foreground opacity-40 text-[10px] uppercase font-bold">Empty List</div>
@@ -97,7 +94,8 @@ export default function WeeklyTasks() {
                <motion.div
                  key={tpl.id}
                  layout
-                 onClick={() => toggleItem(tpl, categoryId)}
+                 // 1. CLIC EN LA FILA -> VER DETALLES
+                 onClick={() => setViewingTask(tpl)} 
                  className={cn(
                    "group p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all duration-200 active:scale-[0.98]",
                    isCompleted 
@@ -105,28 +103,36 @@ export default function WeeklyTasks() {
                       : "bg-[#1C1C1E] border-white/5 hover:border-white/10 hover:bg-white/5"
                  )}
                >
-                 <div className={cn(
-                    "w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-300",
-                    isCompleted 
-                      ? "bg-flow-green border-flow-green text-black" 
-                      : "border-white/20 text-transparent group-hover:border-white/40"
-                 )}>
-                    <Check className="w-3.5 h-3.5 stroke-[4]" />
+                 {/* 2. CLIC EN EL CÍRCULO -> COMPLETAR (stopPropagation para no abrir modal) */}
+                 <div 
+                    onClick={(e) => { e.stopPropagation(); toggleItem(tpl, categoryId); }}
+                    className={cn(
+                        "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-300 z-10",
+                        isCompleted 
+                        ? "bg-flow-green border-flow-green text-black" 
+                        : "border-white/20 text-transparent hover:border-white/40 bg-black/20"
+                    )}
+                 >
+                    <Check className="w-4 h-4 stroke-[4]" />
                  </div>
                  
                  <div className="flex-1 min-w-0">
+                    {/* 3. TEXTO TRUNCADO */}
                     <span className={cn(
-    "text-sm font-medium leading-tight transition-colors block break-words whitespace-normal", //  Texto completo visible
-    isCompleted ? "text-white" : "text-white/70"
-)}>
-    {tpl.text}
-</span>
+                        "text-sm font-medium leading-tight transition-colors block truncate",
+                        isCompleted ? "text-white" : "text-white/70"
+                    )}>
+                        {tpl.text}
+                    </span>
                     {isCompleted && (
                         <span className="text-[9px] text-flow-green font-bold flex items-center gap-1 mt-0.5">
                             Done
                         </span>
                     )}
                  </div>
+                 
+                 {/* Icono informativo sutil */}
+                 <Info className="w-3 h-3 text-white/10 group-hover:text-white/30 shrink-0" />
                </motion.div>
              );
            })}
@@ -138,7 +144,7 @@ export default function WeeklyTasks() {
   return (
     <Layout title="Daily Operations" showBack={true}>
       
-      {/* HEADER DE FECHA CON NAVEGACIÓN */}
+      {/* HEADER DE FECHA */}
       <div className="mb-6 flex flex-col gap-4">
         <div className="flex items-center justify-between bg-card p-2 rounded-2xl border border-white/5">
             <Button variant="ghost" size="icon" onClick={handlePrevDay} className="text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl h-12 w-12">
@@ -163,35 +169,30 @@ export default function WeeklyTasks() {
 
       {/* GRID DE COLUMNAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-20">
-        
-        <TaskColumn 
-            title="Opening" 
-            icon={Sun} 
-            color="text-blue-400" 
-            bg="bg-blue-500/10" 
-            templates={openingTemplates} 
-            categoryId="Opening"
-        />
-
-        <TaskColumn 
-            title="Shift" 
-            icon={Clock} 
-            color="text-orange-400" 
-            bg="bg-orange-500/10" 
-            templates={shiftTemplates} 
-            categoryId="Shift"
-        />
-
-        <TaskColumn 
-            title="Closing" 
-            icon={Moon} 
-            color="text-purple-400" 
-            bg="bg-purple-500/10" 
-            templates={closingTemplates} 
-            categoryId="Closing"
-        />
-
+        <TaskColumn title="Opening" icon={Sun} color="text-blue-400" bg="bg-blue-500/10" templates={openingTemplates} categoryId="Opening" />
+        <TaskColumn title="Shift" icon={Clock} color="text-orange-400" bg="bg-orange-500/10" templates={shiftTemplates} categoryId="Shift" />
+        <TaskColumn title="Closing" icon={Moon} color="text-purple-400" bg="bg-purple-500/10" templates={closingTemplates} categoryId="Closing" />
       </div>
+
+      {/* MODAL PARA VER TAREA COMPLETA */}
+      <Dialog open={!!viewingTask} onOpenChange={() => setViewingTask(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+            <DialogHeader>
+                <DialogTitle className="text-xl">Task Details</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+                <p className="text-lg text-white font-medium leading-relaxed">
+                    {viewingTask?.text}
+                </p>
+            </div>
+            <DialogFooter>
+                <Button onClick={() => setViewingTask(null)} className="w-full bg-white text-black font-bold">
+                    Close
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </Layout>
   );
 }
