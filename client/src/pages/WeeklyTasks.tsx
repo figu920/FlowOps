@@ -119,9 +119,9 @@ export default function WeeklyTasks() {
                  </div>
                  
                  <div className="flex-1 min-w-0">
-                    {/* 2. CAMBIO AQUÍ: 'line-clamp-2' permite 2 líneas de texto */}
+                    {/* 2. CAMBIO AQUÍ: 'truncate' para una sola línea limpia */}
                     <span className={cn(
-                        "text-sm font-medium leading-tight transition-colors block line-clamp-2", 
+                        "text-sm font-medium leading-tight transition-colors block truncate", 
                         isCompleted ? "text-white" : "text-white/70"
                     )}>
                         {tpl.text}
