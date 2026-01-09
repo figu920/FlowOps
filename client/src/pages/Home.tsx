@@ -106,7 +106,7 @@ export default function Home() {
       glowColor: 'bg-[#3B82F6]' 
     },
     { 
-      title: 'Weekly Tasks', // 🔥 NUEVA ENTRADA
+      title: 'Tasks', // 🔥 NUEVA ENTRADA
       path: '/tasks', 
       customIcon: <TasksLogo />,
       glowColor: 'bg-purple-500' 
