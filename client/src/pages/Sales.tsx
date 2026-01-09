@@ -4,11 +4,15 @@ import { useMenu, useCreateSale, useSales } from '@/lib/hooks';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Save, TrendingUp, Download, History, Calendar, BarChart3, Folder, ChevronLeft } from 'lucide-react';
+import { Minus, Plus, Save, TrendingUp, Download, Calendar, BarChart3, Folder, ChevronLeft, Search, X, ChefHat, LineChart } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast"; 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, 
+  ComposedChart, Line, Legend 
+} from 'recharts';
+import { format, subDays, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 
 export default function Sales() {
   const { data: menu = [] } = useMenu();
@@ -18,35 +22,36 @@ export default function Sales() {
 
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   
-  // --- LÓGICA DE CARPETAS ---
+  // --- LÓGICA DE CARPETAS (INPUT) ---
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
 
-  // 1. Obtener carpetas (categorías del menú) - ✅ CORREGIDO TIPO
+  // --- LÓGICA DE ANÁLISIS INDEPENDIENTE (NUEVO) ---
+  const [analysisSearch, setAnalysisSearch] = useState("");
+  const [selectedDishId, setSelectedDishId] = useState<string | null>(null);
+
+  // 1. Obtener carpetas
   const folders = useMemo(() => {
     const categories = new Set(menu.map((item: any) => item.category).filter(Boolean));
     return Array.from(categories).sort() as string[]; 
   }, [menu]);
 
-  // 2. Items a mostrar
+  // 2. Items a mostrar en Input
   const displayedItems = useMemo(() => {
-    if (currentFolder) {
-      return menu.filter((item: any) => item.category === currentFolder);
-    }
-    // Mostramos items huérfanos en la raíz
+    if (currentFolder) return menu.filter((item: any) => item.category === currentFolder);
     return menu.filter((item: any) => !item.category);
   }, [menu, currentFolder]);
 
-  // --- RESTO DE LÓGICA DE VENTAS ---
+  // 3. Ventas del Mes (General)
   const currentMonthSales = useMemo(() => {
+    const now = new Date();
     return salesHistory.filter((sale: any) => {
       const saleDate = new Date(sale.date);
-      const now = new Date();
-      return saleDate.getMonth() === now.getMonth() && 
-             saleDate.getFullYear() === now.getFullYear();
+      return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
     });
   }, [salesHistory]);
 
-  const chartData = useMemo(() => {
+  // 4. Datos para el Gráfico General
+  const generalChartData = useMemo(() => {
     const daysMap: Record<number, number> = {};
     currentMonthSales.forEach((sale: any) => {
       const day = new Date(sale.date).getDate();
@@ -58,6 +63,52 @@ export default function Sales() {
     })).sort((a, b) => parseInt(a.day.split(' ')[1]) - parseInt(b.day.split(' ')[1]));
   }, [currentMonthSales]);
 
+  // --- LÓGICA DEL GRÁFICO INDEPENDIENTE ---
+  const selectedDish = useMemo(() => menu.find((m: any) => m.id === selectedDishId), [menu, selectedDishId]);
+
+  const itemAnalysisData = useMemo(() => {
+    if (!selectedDish) return [];
+
+    // Últimos 30 días para análisis
+    const end = new Date();
+    const start = subDays(end, 30);
+    const interval = eachDayOfInterval({ start, end });
+
+    // Ventas de este plato específico
+    const dishSales = salesHistory.filter((s: any) => 
+        s.menuItemId === selectedDishId && 
+        new Date(s.date) >= start
+    );
+
+    return interval.map(date => {
+        const dayStr = format(date, 'MMM dd');
+        // Sumar ventas de ese día
+        const dailySales = dishSales
+            .filter((s: any) => isSameDay(new Date(s.date), date))
+            .reduce((acc: number, curr: any) => acc + curr.quantitySold, 0);
+
+        // Objeto base del día
+        const dataPoint: any = {
+            date: dayStr,
+            Sales: dailySales
+        };
+
+        // Calcular consumo de ingredientes (Líneas)
+        if (selectedDish.ingredients) {
+            selectedDish.ingredients.forEach((ing: any) => {
+                // Cantidad vendida * Cantidad que usa la receta
+                dataPoint[ing.name] = dailySales * ing.quantity; 
+            });
+        }
+
+        return dataPoint;
+    });
+  }, [selectedDish, salesHistory, selectedDishId]);
+
+  // Colores para las líneas de ingredientes
+  const LINE_COLORS = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#A855F7", "#FF9F43"];
+
+  // --- HANDLERS ---
   const updateQty = (id: string, delta: number) => {
     setQuantities(prev => ({ ...prev, [id]: Math.max(0, (prev[id] || 0) + delta) }));
   };
@@ -107,37 +158,118 @@ export default function Sales() {
   };
 
   return (
-    <Layout 
-      title="Daily Sales Register" 
-      // ✅ CORREGIDO: Mostramos 'Back' del sistema solo si NO estamos dentro de una carpeta
-      showBack={!currentFolder}
-    >
+    <Layout title="Sales & Analytics" showBack={!currentFolder}>
       <div className="space-y-8 pb-24">
         
-        {/* === SECTION 1: INPUT SALES === */}
-        <section className="space-y-4">
-          <div className="bg-flow-green/10 p-4 rounded-xl border border-flow-green/20 flex items-start gap-3">
-            <TrendingUp className="w-6 h-6 text-flow-green mt-1" />
-            <div>
-              <h3 className="font-bold text-white text-sm">Automated Stock Deduction</h3>
-              <p className="text-xs text-muted-foreground mt-1">Select items to record sales.</p>
+        {/* === SECTION 1: ITEM ANALYSIS (NUEVO) === */}
+        <section className="bg-black/20 rounded-[24px] border border-white/5 overflow-hidden">
+            <div className="p-5 border-b border-white/5 flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400">
+                        <LineChart className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-white">Dish Performance</h3>
+                        <p className="text-xs text-muted-foreground">Select a dish to track sales & ingredient usage.</p>
+                    </div>
+                </div>
+
+                {/* BUSCADOR DE PLATOS */}
+                <div className="relative z-20">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                        value={analysisSearch}
+                        onChange={(e) => { setAnalysisSearch(e.target.value); setSelectedDishId(null); }}
+                        onFocus={() => setSelectedDishId(null)}
+                        placeholder="Search menu item to analyze..." 
+                        className="pl-9 bg-black/40 border-white/10 h-11 rounded-xl"
+                    />
+                    
+                    {/* Lista desplegable de resultados */}
+                    {analysisSearch && !selectedDishId && (
+                        <div className="absolute top-12 left-0 right-0 bg-[#1C1C1E] border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-50">
+                            {menu.filter((m: any) => m.name.toLowerCase().includes(analysisSearch.toLowerCase())).map((dish: any) => (
+                                <button 
+                                    key={dish.id}
+                                    onClick={() => { setSelectedDishId(dish.id); setAnalysisSearch(dish.name); }}
+                                    className="w-full text-left px-4 py-3 hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-white/5 last:border-0"
+                                >
+                                    <ChefHat className="w-4 h-4 text-muted-foreground" />
+                                    <span className="text-sm font-bold text-white">{dish.name}</span>
+                                </button>
+                            ))}
+                            {menu.filter((m: any) => m.name.toLowerCase().includes(analysisSearch.toLowerCase())).length === 0 && (
+                                <div className="p-4 text-center text-xs text-muted-foreground">No dishes found.</div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* GRÁFICO DEL PLATO SELECCIONADO */}
+            {selectedDishId && itemAnalysisData.length > 0 && (
+                <div className="p-4 h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={itemAnalysisData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis dataKey="date" stroke="#666" fontSize={10} tickLine={false} axisLine={false} minTickGap={30} />
+                            
+                            {/* Eje Izquierdo: Ventas */}
+                            <YAxis yAxisId="left" stroke="#888" fontSize={10} tickLine={false} axisLine={false} label={{ value: 'Sales', angle: -90, position: 'insideLeft', fill: '#666', fontSize: 10 }} />
+                            
+                            {/* Eje Derecho: Ingredientes (Oculto valores para limpiar, pero escala automática) */}
+                            <YAxis yAxisId="right" orientation="right" hide />
+
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '12px' }} 
+                                itemStyle={{ fontSize: '12px', padding: 0 }}
+                            />
+                            <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '10px' }} />
+
+                            {/* Barras de Ventas */}
+                            <Bar yAxisId="left" dataKey="Sales" fill="#4ADE80" radius={[4, 4, 0, 0]} barSize={20} />
+
+                            {/* Líneas de Ingredientes */}
+                            {selectedDish?.ingredients?.map((ing: any, idx: number) => (
+                                <Line 
+                                    key={ing.id}
+                                    yAxisId="right"
+                                    type="monotone" 
+                                    dataKey={ing.name} 
+                                    stroke={LINE_COLORS[idx % LINE_COLORS.length]} 
+                                    strokeWidth={2} 
+                                    dot={false}
+                                />
+                            ))}
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+            
+            {/* Estado vacío del gráfico */}
+            {!selectedDishId && (
+                <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground opacity-30 gap-2">
+                    <BarChart3 className="w-10 h-10" />
+                    <p className="text-xs">Select a dish to see detailed metrics</p>
+                </div>
+            )}
+        </section>
+
+        {/* === SECTION 2: INPUT SALES === */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+             <h3 className="font-bold text-white text-lg">Quick Sales Entry</h3>
           </div>
 
           {/* NAVEGACIÓN DE CARPETAS */}
           <div>
             {currentFolder ? (
-               <button 
-                 onClick={() => setCurrentFolder(null)}
-                 className="flex items-center text-muted-foreground hover:text-white text-sm font-medium transition-colors mb-4"
-               >
-                 <ChevronLeft className="w-4 h-4 mr-1" />
-                 Back to Categories
+               <button onClick={() => setCurrentFolder(null)} className="flex items-center text-muted-foreground hover:text-white text-sm font-medium transition-colors mb-4">
+                 <ChevronLeft className="w-4 h-4 mr-1" /> Back to Categories
                </button>
             ) : (
                 <div className="flex items-center gap-2 mb-4 text-muted-foreground text-sm">
-                   <Folder className="w-4 h-4" />
-                   <span>Select category</span>
+                   <Folder className="w-4 h-4" /> <span>Browse Menu</span>
                 </div>
             )}
 
@@ -153,19 +285,14 @@ export default function Sales() {
                     onClick={() => setCurrentFolder(folderName)}
                     className="bg-card hover:bg-white/5 cursor-pointer rounded-[20px] p-4 border border-white/[0.04] flex flex-col items-center gap-3"
                   >
-                    <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center">
-                      <Folder className="w-6 h-6" />
-                    </div>
+                    <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center"><Folder className="w-6 h-6" /></div>
                     <span className="font-bold text-white truncate w-full text-center">{folderName}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase bg-white/5 px-2 py-0.5 rounded-full">
-                       Tap to open
-                    </span>
                   </motion.div>
                 ))}
               </div>
             )}
 
-            {/* VISTA DE PLATOS (DENTRO DE CARPETA) */}
+            {/* VISTA DE PLATOS */}
             {displayedItems.length > 0 && (
                 <div className="space-y-3">
                     {displayedItems.map((dish: any) => (
@@ -183,13 +310,6 @@ export default function Sales() {
                     ))}
                 </div>
             )}
-            
-            {/* Mensaje vacío */}
-            {currentFolder && displayedItems.length === 0 && (
-                <div className="text-center py-10 text-muted-foreground">
-                    <p>No items in this folder yet.</p>
-                </div>
-            )}
           </div>
 
           <Button onClick={handleSubmit} className="w-full bg-white text-black font-bold h-14 rounded-2xl shadow-xl text-lg hover:bg-gray-200 active:scale-95 flex items-center justify-center gap-2" disabled={createSaleMutation.isPending || Object.values(quantities).every(q => q === 0)}>
@@ -197,33 +317,25 @@ export default function Sales() {
           </Button>
         </section>
 
-        {/* === ANALYTICS & HISTORY SECTION === */}
+        {/* === SECTION 3: MONTHLY OVERVIEW === */}
         <section className="pt-6 border-t border-white/10 space-y-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-flow-green" />
-              <h3 className="font-bold text-xl text-white">Monthly Analytics</h3>
-            </div>
+            <h3 className="font-bold text-xl text-white">Monthly Overview</h3>
             <Button variant="outline" size="sm" onClick={downloadPDF} className="border-white/10 bg-white/5 hover:bg-white/10 text-white gap-2" disabled={currentMonthSales.length === 0}>
-              <Download className="w-4 h-4" /> Export PDF
+              <Download className="w-4 h-4" /> PDF
             </Button>
           </div>
 
-          {chartData.length > 0 ? (
-            <div className="bg-black/20 p-4 rounded-2xl border border-white/5 h-[250px]">
+          {generalChartData.length > 0 && (
+            <div className="bg-black/20 p-4 rounded-2xl border border-white/5 h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
+                <BarChart data={generalChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="day" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                  <XAxis dataKey="day" stroke="#888" fontSize={10} tickLine={false} axisLine={false} />
                   <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }} />
                   <Bar dataKey="sales" fill="#00E676" radius={[4, 4, 0, 0]} barSize={30} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-[150px] bg-black/20 rounded-2xl border border-dashed border-white/10 flex items-center justify-center text-muted-foreground text-sm">
-              Register sales to see the chart...
             </div>
           )}
 
