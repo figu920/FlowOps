@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
-import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventory } from '@/lib/hooks';
+import { useInventory, useUpdateInventory, useCreateInventory, useDeleteInventory, useCreateInventoryLog } from '@/lib/hooks';
 import type { Inventory as InventoryType } from '@shared/schema';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';

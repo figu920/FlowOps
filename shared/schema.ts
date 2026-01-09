@@ -264,3 +264,22 @@ export const insertSaleSchema = createInsertSchema(sales).omit({
 
 export type InsertSale = z.infer<typeof insertSaleSchema>;
 export type Sale = typeof sales.$inferSelect;
+
+// ============ INVENTORY LOGS (NUEVA TABLA) ============
+export const inventoryLogs = pgTable("inventory_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemName: text("item_name").notNull(),
+  change: real("change").notNull(),    // Puede ser decimal (ej: 1.5 kg)
+  reason: text("reason").notNull(),    // "Restock", "Waste", etc.
+  user: text("user").notNull(),        // Quién hizo el cambio
+  date: timestamp("date").defaultNow().notNull(),
+  establishment: text("establishment").notNull(),
+});
+
+export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({
+  id: true,
+  date: true,
+});
+
+export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
+export type InventoryLog = typeof inventoryLogs.$inferSelect;

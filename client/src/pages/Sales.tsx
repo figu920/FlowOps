@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
-import { useMenu, useCreateSale, useSales } from '@/lib/hooks';
+import { useMenu, useCreateSale, useSales, useInventoryLogs } from '@/lib/hooks';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   Minus, Plus, Save, Download, Calendar, BarChart3, 
   Folder, ChevronLeft, Search, ChefHat, LineChart, 
-  History, ArrowRightLeft, AlertCircle, PackageCheck
+  History, Package, ArrowRightLeft
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast"; 
 import jsPDF from 'jspdf';
@@ -19,23 +19,11 @@ import {
 import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-// --- MOCK HOOK PARA LOGS DE INVENTARIO ---
-// (En el futuro, esto debería venir de tu base de datos real 'useInventoryLogs')
-const useInventoryLogs = () => {
-  return {
-    data: [
-      { id: 1, date: new Date().toISOString(), itemName: 'Bison Wing Basket', change: -2, reason: 'Waste (Burnt)', user: 'Chef Mike' },
-      { id: 2, date: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), itemName: 'Frozen Fries', change: +20, reason: 'Delivery', user: 'Manager' },
-      { id: 3, date: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), itemName: 'Tomato Sauce', change: -1, reason: 'Broken Jar', user: 'Staff' },
-      { id: 4, date: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), itemName: 'Burger Buns', change: +50, reason: 'Restock', user: 'Manager' },
-    ]
-  };
-};
 
 export default function Sales() {
   const { data: menu = [] } = useMenu();
   const { data: salesHistory = [] } = useSales();
-  const { data: inventoryLogs = [] } = useInventoryLogs(); // Usamos los logs
+  const { data: inventoryLogs = [] } = useInventoryLogs(); 
   const createSaleMutation = useCreateSale();
   const { toast } = useToast();
 
@@ -43,7 +31,7 @@ export default function Sales() {
   
   // --- ESTADOS DE VISTA ---
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
-  const [historyTab, setHistoryTab] = useState<'sales' | 'inventory'>('sales'); // Nuevo Tab
+  const [historyTab, setHistoryTab] = useState<'sales' | 'inventory'>('sales');
 
   // --- ANÁLISIS ---
   const [analysisSearch, setAnalysisSearch] = useState("");
@@ -129,13 +117,15 @@ export default function Sales() {
     const doc = new jsPDF();
     doc.setFontSize(18); doc.text("Transaction Report", 14, 22);
     
-    // Si estamos en ventas, exportamos ventas. Si no, logs.
     if(historyTab === 'sales') {
+        doc.text("Type: Menu Sales", 14, 30);
         const tableData = currentMonthSalesList.map((sale: any) => [formatTime(sale.date), getDishName(sale.menuItemId), sale.quantitySold]);
-        autoTable(doc, { head: [['Date', 'Item', 'Qty']], body: tableData, startY: 30 });
+        autoTable(doc, { head: [['Date', 'Menu Item', 'Qty Sold']], body: tableData, startY: 40 });
     } else {
+        doc.text("Type: Inventory Log", 14, 30);
+        // Aquí ajustamos las cabeceras para que sean sobre INVENTARIO
         const tableData = inventoryLogs.map((log: any) => [formatTime(log.date), log.itemName, log.change > 0 ? `+${log.change}` : log.change, log.reason, log.user]);
-        autoTable(doc, { head: [['Date', 'Item', 'Change', 'Reason', 'User']], body: tableData, startY: 30 });
+        autoTable(doc, { head: [['Date', 'Stock Item', 'Adjustment', 'Reason', 'User']], body: tableData, startY: 40 });
     }
     doc.save(`Report_${format(new Date(), 'yyyy-MM')}.pdf`);
   };
@@ -237,7 +227,7 @@ export default function Sales() {
           </Button>
         </section>
 
-        {/* === SECTION 3: TRANSACTION HISTORY (NUEVO DISEÑO) === */}
+        {/* === SECTION 3: TRANSACTION HISTORY === */}
         <section className="pt-6 border-t border-white/10 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-xl text-white">Transaction History</h3>
@@ -246,7 +236,7 @@ export default function Sales() {
             </Button>
           </div>
 
-          {/* Gráfico General (Solo visible en modo ventas) */}
+          {/* Gráfico General (Solo ventas) */}
           {historyTab === 'sales' && (
              <div className="bg-black/20 p-4 rounded-2xl border border-white/5 h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -262,36 +252,35 @@ export default function Sales() {
 
           {/* PESTAÑAS Y TABLA */}
           <div className="space-y-4">
-             {/* Switcher */}
              <div className="flex p-1 bg-black/40 rounded-xl border border-white/10 w-fit">
                 <button 
                   onClick={() => setHistoryTab('sales')}
                   className={cn("px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2", historyTab === 'sales' ? "bg-flow-green text-black shadow-lg" : "text-muted-foreground hover:text-white")}
                 >
-                    <BarChart3 className="w-4 h-4" /> Sales
+                    <BarChart3 className="w-4 h-4" /> Sales (Menu)
                 </button>
                 <button 
                   onClick={() => setHistoryTab('inventory')}
                   className={cn("px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2", historyTab === 'inventory' ? "bg-blue-500 text-white shadow-lg" : "text-muted-foreground hover:text-white")}
                 >
-                    <History className="w-4 h-4" /> Inventory Logs
+                    <Package className="w-4 h-4" /> Inventory Logs (Stock)
                 </button>
              </div>
 
-             {/* Tabla */}
              <div className="bg-black/20 rounded-xl border border-white/5 overflow-hidden min-h-[300px]">
                 <div className="max-h-[400px] overflow-y-auto">
                     <table className="w-full text-sm text-left">
                     <thead className="text-xs uppercase bg-white/5 text-muted-foreground sticky top-0 backdrop-blur-md z-10">
                         {historyTab === 'sales' ? (
-                            <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Item</th><th className="px-4 py-3 text-right">Qty</th></tr>
+                            <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Menu Item</th><th className="px-4 py-3 text-right">Sold</th></tr>
                         ) : (
-                            <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Log Info</th><th className="px-4 py-3 text-right">Change</th></tr>
+                            // CABECERA CORREGIDA PARA INVENTARIO
+                            <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Stock Item / Reason</th><th className="px-4 py-3 text-right">Adj.</th></tr>
                         )}
                     </thead>
                     <tbody className="divide-y divide-white/5">
                         {historyTab === 'sales' ? (
-                            // LISTA DE VENTAS
+                            // LISTA DE VENTAS (MENU ITEMS)
                             currentMonthSalesList.length > 0 ? currentMonthSalesList.map((sale: any) => (
                                 <tr key={sale.id} className="hover:bg-white/5 transition-colors">
                                     <td className="px-4 py-3 text-white/60 font-mono text-xs">{formatTime(sale.date)}</td>
@@ -300,7 +289,7 @@ export default function Sales() {
                                 </tr>
                             )) : <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No sales yet</td></tr>
                         ) : (
-                            // LISTA DE LOGS DE INVENTARIO
+                            // LISTA DE LOGS DE INVENTARIO (INGREDIENTES)
                             inventoryLogs.length > 0 ? inventoryLogs.map((log: any) => (
                                 <tr key={log.id} className="hover:bg-white/5 transition-colors">
                                     <td className="px-4 py-3 text-white/60 font-mono text-xs w-32">{formatTime(log.date)}</td>

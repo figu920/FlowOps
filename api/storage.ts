@@ -11,7 +11,9 @@ import {
   type Ingredient, type InsertIngredient,
   type Notification, type InsertNotification,
   users, inventory, equipment, checklistItems, weeklyTasks, taskCompletions,
-  chatMessages, timelineEvents, menuItems, ingredients, notifications
+  chatMessages, timelineEvents, menuItems, ingredients, notifications,
+  type InventoryLog, type InsertInventoryLog, 
+  inventoryLogs,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -90,6 +92,10 @@ export interface IStorage {
   markNotificationAsRead(id: string): Promise<Notification | undefined>;
   markAllNotificationsAsRead(recipientId: string): Promise<void>;
   getSystemAdmins(): Promise<User[]>;
+
+  // Inventory Logs
+  getInventoryLogsByEstablishment(establishment: string): Promise<InventoryLog[]>;
+  createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -360,6 +366,18 @@ export class DatabaseStorage implements IStorage {
 
   async getSystemAdmins(): Promise<User[]> {
     return await db.select().from(users).where(eq(users.isSystemAdmin, true));
+  }
+
+  // ===== INVENTORY LOGS =====
+  async getInventoryLogsByEstablishment(establishment: string): Promise<InventoryLog[]> {
+    return await db.select().from(inventoryLogs)
+      .where(eq(inventoryLogs.establishment, establishment))
+      .orderBy(desc(inventoryLogs.date)); // Los más recientes primero
+  }
+
+  async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
+    const [created] = await db.insert(inventoryLogs).values(log).returning();
+    return created;
   }
 }
 

@@ -13,7 +13,8 @@ import {
   insertMenuItemSchema,
   insertIngredientSchema,
   sales,              
-  insertSaleSchema
+  insertSaleSchema,
+  insertInventoryLogSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -259,6 +260,33 @@ export async function registerRoutes(app: Express): Promise<void> {
     if (!req.session.user) return res.sendStatus(401);
     await storage.deleteInventoryItem(req.params.id);
     res.json({ message: "Inventory item deleted" });
+  });
+
+  // ==================== INVENTORY LOGS ====================
+  app.get("/api/inventory-logs", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    
+    // Solo mostramos los logs del establecimiento del usuario
+    const logs = await storage.getInventoryLogsByEstablishment(req.session.user.establishment);
+    res.json(logs);
+  });
+
+  app.post("/api/inventory-logs", async (req: Request, res: Response) => {
+    if (!req.session.user) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      // Forzamos el establishment del usuario logueado por seguridad
+      const logData = insertInventoryLogSchema.parse({
+        ...req.body,
+        establishment: req.session.user.establishment
+      });
+      
+      const log = await storage.createInventoryLog(logData);
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("Error creating inventory log:", error);
+      res.status(500).json({ message: "Failed to create log" });
+    }
   });
 
   // ==================== EQUIPMENT ====================

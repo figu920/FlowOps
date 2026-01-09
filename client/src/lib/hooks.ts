@@ -1,3 +1,4 @@
+import type { InventoryLog, InsertInventoryLog } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 
@@ -447,6 +448,35 @@ export function useCreateSale() {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       // ¡Importante! Refrescamos el inventario para ver que bajó el stock
       queryClient.invalidateQueries({ queryKey: ['inventory'] }); 
+    },
+  });
+}
+
+export function useInventoryLogs() {
+  return useQuery<InventoryLog[]>({
+    queryKey: ['inventory-logs'],
+    queryFn: async () => {
+      const res = await fetch('/api/inventory-logs');
+      if (!res.ok) throw new Error('Failed to fetch inventory logs');
+      return res.json();
+    }
+  });
+}
+
+export function useCreateInventoryLog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (logData: any) => { // Usamos any o InsertInventoryLog parcial
+      const res = await fetch('/api/inventory-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logData)
+      });
+      if (!res.ok) throw new Error('Failed to create log');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-logs'] });
     },
   });
 }
