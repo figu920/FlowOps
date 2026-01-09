@@ -9,17 +9,17 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, Plus, Trash2, Camera, 
-  ChevronLeft, ChevronRight, Search, FolderPlus, Folder, 
-  ChevronDown, ChevronUp, Sun, Moon, Clock, User 
+  ChevronLeft, ChevronRight, Search, 
+  Calendar as CalendarIcon, MapPin, 
+  Sun, Moon, Clock, User, PartyPopper
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  format, addMonths, subMonths, startOfMonth, endOfMonth, 
-  startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, 
-  isToday 
+  format, addWeeks, subWeeks, startOfWeek, endOfWeek, 
+  eachDayOfInterval, isSameDay, isToday, parseISO
 } from 'date-fns';
 
 // --- COMPONENTE MINI PROGRESO CIRCULAR ---
@@ -31,31 +31,9 @@ const CircularProgress = ({ percentage, size = 32, strokeWidth = 3, color = "tex
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
-        {/* Fondo del anillo */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          fill="transparent"
-          className="text-white/10"
-        />
-        {/* Progreso */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          fill="transparent"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className={cn("transition-all duration-500 ease-out", color)}
-        />
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="transparent" className="text-white/10" />
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className={cn("transition-all duration-500 ease-out", color)} />
       </svg>
-      {/* Texto Porcentaje (Opcional, pequeño en el centro) */}
       <span className="absolute text-[8px] font-bold text-white">{Math.round(percentage)}%</span>
     </div>
   );
@@ -65,12 +43,10 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const { currentUser } = useStore();
   
   // --- ESTADOS ---
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Ahora controlamos la "Fecha Actual" para calcular la semana
+  const [currentDate, setCurrentDate] = useState(new Date());
   
   // --- DATA ---
-  const { data: openingList = [] } = useChecklists("opening");
-  const { data: shiftList = [] } = useChecklists("shift"); 
-  const { data: closingList = [] } = useChecklists("closing");
   const { data: tasks = [] } = useTasks();
   const { data: allUsers = [] } = useUsers();
 
@@ -87,11 +63,7 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
   const [isAddingTask, setIsAddingTask] = useState<{date: Date, category: string} | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("Team"); 
-  
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [customFolders, setCustomFolders] = useState<string[]>([]);
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
+  const [newTaskCategory, setNewTaskCategory] = useState("General"); // Para distinguir Eventos de Tareas
 
   const [viewingDay, setViewingDay] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,41 +75,44 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
 
-  // --- GENERAR CALENDARIO ---
+  // --- LÓGICA DE SEMANA (NUEVO) ---
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Empieza Lunes
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+  
   const calendarDays = useMemo(() => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(monthStart);
-    const startDate = startOfWeek(monthStart);
-    const endDate = endOfWeek(monthEnd);
-    return eachDayOfInterval({ start: startDate, end: endDate });
-  }, [currentMonth]);
+    return eachDayOfInterval({ start: weekStart, end: weekEnd });
+  }, [weekStart, weekEnd]);
 
-  // --- HELPER PARA ICONOS ---
-  const getFolderStyle = (name: string) => {
-      const n = name.toLowerCase();
-      if (n.includes('opening')) return { icon: Sun, color: 'text-blue-400', bg: 'bg-blue-500/10' };
-      if (n.includes('shift')) return { icon: Clock, color: 'text-orange-400', bg: 'bg-orange-500/10' };
-      if (n.includes('closing')) return { icon: Moon, color: 'text-purple-400', bg: 'bg-purple-500/10' };
-      return { icon: Folder, color: 'text-white', bg: 'bg-white/10' };
+  // --- HELPERS ---
+  const getTaskCategoryIcon = (cat: string) => {
+      const n = cat.toLowerCase();
+      if (n === 'event') return { icon: PartyPopper, color: 'text-pink-400', bg: 'bg-pink-500/10' };
+      if (n === 'opening') return { icon: Sun, color: 'text-blue-400', bg: 'bg-blue-500/10' };
+      if (n === 'closing') return { icon: Moon, color: 'text-purple-400', bg: 'bg-purple-500/10' };
+      return { icon: Clock, color: 'text-white', bg: 'bg-white/10' };
+  };
+
+  const getTaskCategory = (notes: string) => {
+    const match = notes?.match(/CAT:([^|]+)/);
+    return match ? match[1] : 'General';
+  };
+
+  // Filtrar tareas por día
+  const getTasksForDay = (day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    // Filtramos tareas manuales guardadas en la DB
+    return tasks.filter((t: any) => t.notes?.includes(`DATE:${dateStr}`)).map((t:any) => ({
+        ...t, 
+        type: 'task',
+        category: getTaskCategory(t.notes)
+    }));
   };
 
   // --- HANDLERS ---
-  const handleCreateFolder = () => {
-      if (newFolderName.trim()) {
-          setCustomFolders([...customFolders, newFolderName.trim()]);
-          setNewFolderName("");
-          setIsCreatingFolder(false);
-      }
-  };
-
-  const toggleFolder = (folderName: string) => {
-      setOpenFolders(prev => ({ ...prev, [folderName]: !prev[folderName] }));
-  };
-
   const handleAddTask = () => {
     if (newTaskText && isAddingTask) {
       const dateTag = format(isAddingTask.date, 'yyyy-MM-dd');
-      const noteTag = `DATE:${dateTag}|CAT:${isAddingTask.category}`; 
+      const noteTag = `DATE:${dateTag}|CAT:${newTaskCategory}`; // Guardamos la categoría (Event/Task)
       
       createTaskMutation.mutate({
         text: newTaskText,
@@ -148,18 +123,14 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
       
       setNewTaskText("");
       setNewTaskAssignee("Team");
+      setNewTaskCategory("General");
       setIsAddingTask(null);
-      setOpenFolders(prev => ({ ...prev, [isAddingTask.category]: true }));
     }
   };
 
   const handleDeleteTask = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     deleteTaskMutation.mutate(id);
-  };
-
-  const handleToggleChecklist = (id: string, currentStatus: boolean) => {
-      updateChecklistMutation.mutate({ id, updates: { completed: !currentStatus } });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,295 +144,222 @@ export default function Schedule({ categoryColor = '#3B82F6' }: { categoryColor?
 
   const submitPhotoCompletion = () => {
     if (verifyingTask && photoPreview) {
-      if (verifyingTask.type === 'task') {
-          completeTaskMutation.mutate({ id: verifyingTask.id, photo: photoPreview });
-      } else {
-          handleToggleChecklist(verifyingTask.id, false); 
-      }
+      completeTaskMutation.mutate({ id: verifyingTask.id, photo: photoPreview });
       setVerifyingTask(null);
       setPhotoPreview(null);
     }
   };
 
-  const getTaskCategory = (notes: string) => {
-    const match = notes?.match(/CAT:([^|]+)/);
-    return match ? match[1] : 'General';
-  };
-
-  const getTasksForDay = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    const dailyManualTasks = tasks.filter((t: any) => t.notes?.includes(`DATE:${dateStr}`)).map((t:any) => ({
-        ...t, 
-        type: 'task',
-        category: getTaskCategory(t.notes)
-    }));
-    
-    const isDayToday = isToday(day);
-    let checklistItems: any[] = [];
-    
-    if (isDayToday) {
-        checklistItems = [
-            ...openingList.map((i:any) => ({...i, type: 'checklist', category: 'Opening'})),
-            ...shiftList.map((i:any) => ({...i, type: 'checklist', category: 'Shift'})),
-            ...closingList.map((i:any) => ({...i, type: 'checklist', category: 'Closing'}))
-        ];
-    }
-
-    return [...checklistItems, ...dailyManualTasks];
-  };
-
   return (
-    <Layout title="Operations Calendar" showBack>
+    <Layout title="Weekly Schedule" showBack>
       
-      {/* CABECERA */}
-      <div className="flex items-center justify-between mb-6 px-1">
-        <h2 className="text-2xl font-black text-white capitalize">{format(currentMonth, 'MMMM yyyy')}</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronLeft className="w-5 h-5" /></Button>
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="rounded-full border-white/10 hover:bg-white/10"><ChevronRight className="w-5 h-5" /></Button>
+      {/* CABECERA DE SEMANA */}
+      <div className="flex items-center justify-between mb-6 px-1 bg-white/5 p-3 rounded-2xl border border-white/5">
+        <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subWeeks(currentDate, 1))} className="text-muted-foreground hover:text-white">
+            <ChevronLeft className="w-6 h-6" />
+        </Button>
+        
+        <div className="text-center">
+            <p className="text-[10px] uppercase font-bold text-flow-green tracking-widest mb-1">Current Week</p>
+            <h2 className="text-lg font-bold text-white">
+                {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
+            </h2>
         </div>
+
+        <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addWeeks(currentDate, 1))} className="text-muted-foreground hover:text-white">
+            <ChevronRight className="w-6 h-6" />
+        </Button>
       </div>
 
-      {/* GRID CALENDARIO */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} className="text-center text-[10px] uppercase font-bold text-muted-foreground py-2">{d}</div>)}
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 auto-rows-fr bg-white/5 p-1 rounded-2xl border border-white/5">
+      {/* GRID VERTICAL DE LA SEMANA */}
+      <div className="space-y-3 pb-20">
         {calendarDays.map((day) => {
-          const isSelectedMonth = isSameMonth(day, currentMonth);
           const isDayToday = isToday(day);
-          const allTasks = getTasksForDay(day);
+          const dailyTasks = getTasksForDay(day);
           
-          const completedCount = allTasks.filter(t => t.completed).length;
-          const totalCount = allTasks.length;
+          const events = dailyTasks.filter((t: any) => t.category === 'Event');
+          const operationalTasks = dailyTasks.filter((t: any) => t.category !== 'Event');
+          
+          const completedCount = operationalTasks.filter((t: any) => t.completed).length;
+          const totalCount = operationalTasks.length;
           const percentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-          // Color dinámico según el progreso
-          let progressColor = "text-flow-green"; // Verde por defecto
-          if (percentage < 50) progressColor = "text-red-400";
-          else if (percentage < 100) progressColor = "text-orange-400";
-
           return (
-            <div
+            <motion.div
               key={day.toString()}
               onClick={() => { setViewingDay(day); setSearchQuery(""); }}
+              whileTap={{ scale: 0.98 }}
               className={cn(
-                "min-h-[100px] p-2 rounded-xl border flex flex-col justify-between transition-all cursor-pointer relative group overflow-hidden",
-                isSelectedMonth ? "bg-black/40 border-white/5 hover:border-white/20" : "bg-black/20 border-transparent opacity-50",
-                isDayToday && "ring-1 ring-flow-green bg-flow-green/5"
+                "p-4 rounded-2xl border flex items-center justify-between transition-all cursor-pointer relative overflow-hidden",
+                isDayToday ? "bg-white/10 border-flow-green/30" : "bg-card border-white/5 hover:bg-white/5"
               )}
             >
-              <div className="flex justify-between items-start">
-                <span className={cn("text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full", isDayToday ? "bg-flow-green text-black" : "text-muted-foreground")}>{format(day, 'd')}</span>
-                {canEdit && <button onClick={(e) => { e.stopPropagation(); setIsAddingTask({date: day, category: 'Shift'}); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-muted-foreground hover:text-white"><Plus className="w-3 h-3" /></button>}
+              {/* Barra lateral de color para eventos */}
+              {events.length > 0 && <div className="absolute left-0 top-0 bottom-0 w-1 bg-pink-500" />}
+
+              <div className="flex items-center gap-4">
+                  {/* Fecha */}
+                  <div className={cn("flex flex-col items-center justify-center w-12 h-12 rounded-xl border", isDayToday ? "bg-flow-green text-black border-flow-green" : "bg-black/20 border-white/10 text-muted-foreground")}>
+                      <span className="text-[10px] font-bold uppercase">{format(day, 'EEE')}</span>
+                      <span className="text-lg font-black leading-none">{format(day, 'd')}</span>
+                  </div>
+
+                  {/* Resumen */}
+                  <div>
+                      {events.length > 0 && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                              <PartyPopper className="w-3 h-3 text-pink-400" />
+                              <span className="text-xs font-bold text-pink-200">{events[0].text} {events.length > 1 && `+${events.length - 1}`}</span>
+                          </div>
+                      )}
+                      
+                      {totalCount > 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                              <span className="text-white font-bold">{completedCount}/{totalCount}</span> Tasks Done
+                          </p>
+                      ) : (
+                          <p className="text-xs text-muted-foreground/50 italic">No tasks scheduled</p>
+                      )}
+                  </div>
               </div>
 
-              {/* AQUI ESTA EL CAMBIO: CIRCULAR PROGRESS */}
-              <div className="flex items-center justify-center mt-2 mb-1">
-                 {totalCount > 0 ? (
-                     <div className="flex flex-col items-center">
-                        <CircularProgress percentage={percentage} size={36} strokeWidth={4} color={progressColor} />
-                        <span className="text-[9px] text-muted-foreground font-medium mt-1">{completedCount}/{totalCount} Done</span>
-                     </div>
-                 ) : (
-                    <div className="h-9 flex items-center justify-center">
-                        <span className="text-[10px] text-muted-foreground/30 font-medium">No tasks</span>
-                    </div>
-                 )}
+              {/* Indicador o Acción */}
+              <div className="flex items-center gap-3">
+                  {totalCount > 0 && (
+                      <CircularProgress percentage={percentage} size={36} strokeWidth={4} color={percentage === 100 ? "text-flow-green" : "text-blue-400"} />
+                  )}
+                  {canEdit && (
+                      <Button 
+                        size="icon" 
+                        variant="ghost"
+                        onClick={(e) => { e.stopPropagation(); setIsAddingTask({date: day, category: 'General'}); }} 
+                        className="h-8 w-8 rounded-full bg-white/5 hover:bg-white/20 text-muted-foreground hover:text-white"
+                      >
+                          <Plus className="w-4 h-4" />
+                      </Button>
+                  )}
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
 
       {/* MODAL: DETALLES DEL DÍA */}
-      <Dialog open={!!viewingDay && !isAddingTask && !verifyingTask && !isCreatingFolder} onOpenChange={(open) => !open && setViewingDay(null)}>
+      <Dialog open={!!viewingDay && !isAddingTask && !verifyingTask} onOpenChange={(open) => !open && setViewingDay(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
             
             <div className="p-6 pb-4 border-b border-white/5 bg-black/20">
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <h3 className="text-xl font-bold text-white">{viewingDay && format(viewingDay, 'EEEE, MMM do')}</h3>
-                        <p className="text-xs text-muted-foreground">Daily Operations Hub</p>
+                        <p className="text-xs text-muted-foreground">Events & Tasks</p>
                     </div>
                     {canEdit && (
                         <Button 
                             size="sm" 
-                            onClick={() => setIsCreatingFolder(true)} 
-                            className="text-xs h-8 text-white font-bold shadow-lg bg-blue-600 hover:bg-blue-700"
+                            onClick={() => { if(viewingDay) setIsAddingTask({ date: viewingDay, category: 'General' }); }} 
+                            className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg"
                         >
-                            <FolderPlus className="w-3 h-3 mr-1.5" /> New Folder
+                            <Plus className="w-3 h-3 mr-1.5" /> New Entry
                         </Button>
                     )}
                 </div>
-
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search tasks..." 
-                        className="bg-black/40 border-white/10 pl-9 h-10 text-sm rounded-xl focus-visible:ring-flow-green"
-                    />
-                </div>
             </div>
             
-            <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-black/10">
+            <div className="p-4 overflow-y-auto space-y-3 flex-1 bg-black/10">
                 {viewingDay && (() => {
                     const allTasks = getTasksForDay(viewingDay);
-                    const dynamicFoldersFromTasks = Array.from(new Set(allTasks.map(t => t.category)));
-                    const activeFolders = Array.from(new Set([...dynamicFoldersFromTasks, "Opening", "Shift", "Closing", ...customFolders]));
-                    const filteredTasks = searchQuery 
-                        ? allTasks.filter(t => t.text.toLowerCase().includes(searchQuery.toLowerCase()))
-                        : allTasks;
+                    
+                    if (allTasks.length === 0) {
+                        return <div className="text-center py-10 text-muted-foreground opacity-50">Nothing scheduled for this day.</div>;
+                    }
 
-                    return (
-                        <>
-                            {activeFolders.map((folderName) => {
-                                const folderTasks = filteredTasks.filter(t => t.category === folderName);
-                                if (searchQuery && folderTasks.length === 0) return null;
-                                const isOpen = openFolders[folderName];
-                                const { icon: CategoryIcon, color, bg } = getFolderStyle(folderName);
+                    return allTasks.map((t: any) => {
+                        const { icon: CategoryIcon, color, bg } = getTaskCategoryIcon(t.category);
+                        const isEvent = t.category === 'Event';
 
-                                return (
-                                    <div key={folderName} className="rounded-2xl overflow-hidden border border-white/5 bg-card">
-                                        <div 
-                                            onClick={() => toggleFolder(folderName)}
-                                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", bg, color)}>
-                                                    <CategoryIcon className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-white text-sm">{folderName}</h4>
-                                                    <span className="text-[10px] text-muted-foreground">{folderTasks.length} tasks</span>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white/5 p-1 rounded-full">
-                                                {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                                            </div>
+                        return (
+                            <div key={t.id} className={cn("flex items-center gap-3 p-3 rounded-xl border transition-all", isEvent ? "bg-pink-500/5 border-pink-500/20" : "bg-card border-white/5")}>
+                                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", bg, color)}>
+                                    <CategoryIcon className="w-5 h-5" />
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                    <span className={cn("text-sm font-medium block truncate", t.completed && !isEvent && "line-through text-muted-foreground")}>{t.text}</span>
+                                    {t.assignedTo && t.assignedTo !== 'Team' && (
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <User className="w-3 h-3 text-muted-foreground" />
+                                            <span className="text-[10px] text-muted-foreground">{t.assignedTo}</span>
                                         </div>
+                                    )}
+                                </div>
 
-                                        <AnimatePresence>
-                                            {isOpen && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    className="border-t border-white/5 bg-black/20"
-                                                >
-                                                    {folderTasks.length === 0 && (
-                                                        <div className="p-4 text-center text-[10px] text-muted-foreground">Empty folder</div>
-                                                    )}
-                                                    
-                                                    {folderTasks.map((t: any, i: number) => (
-                                                        <div key={i} className="flex items-center gap-3 p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                                                            <div 
-                                                                onClick={() => {
-                                                                    if (t.type === 'checklist') handleToggleChecklist(t.id, t.completed);
-                                                                    else if (!t.completed) setVerifyingTask({ id: t.id, type: 'task' });
-                                                                }}
-                                                                className={cn(
-                                                                    "w-6 h-6 rounded-lg flex items-center justify-center shrink-0 cursor-pointer border transition-all",
-                                                                    t.completed 
-                                                                        ? "bg-flow-green border-flow-green text-black" 
-                                                                        : "bg-white/5 border-white/20 text-transparent hover:border-white/40"
-                                                                )}
-                                                            >
-                                                                <Check className="w-4 h-4 stroke-[3]" />
-                                                            </div>
+                                {!isEvent && (
+                                    <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        onClick={() => {
+                                            if (!t.completed) setVerifyingTask({ id: t.id, type: 'task' });
+                                        }}
+                                        className={cn("h-8 w-8 rounded-full", t.completed ? "text-flow-green bg-flow-green/10" : "text-muted-foreground hover:bg-white/10 hover:text-white")}
+                                    >
+                                        {t.completed ? <Check className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+                                    </Button>
+                                )}
 
-                                                            <div className="flex-1 min-w-0">
-                                                                <span className={cn("text-sm block truncate", t.completed && "line-through text-muted-foreground")}>{t.text}</span>
-                                                                {t.assignedTo && t.assignedTo !== 'Team' && (
-                                                                    <div className="flex items-center gap-1 mt-0.5">
-                                                                        <User className="w-3 h-3 text-muted-foreground" />
-                                                                        <span className="text-[10px] text-muted-foreground">{t.assignedTo}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            <Button 
-                                                                size="icon" 
-                                                                variant="ghost" 
-                                                                onClick={() => setVerifyingTask({ id: t.id, type: t.type })}
-                                                                className={cn("h-8 w-8 rounded-full", t.completed ? "text-flow-green bg-flow-green/10" : "text-muted-foreground hover:bg-white/10 hover:text-white")}
-                                                            >
-                                                                <Camera className="w-4 h-4" />
-                                                            </Button>
-
-                                                            {t.type === 'task' && canEdit && (
-                                                                <Button size="icon" variant="ghost" onClick={(e) => handleDeleteTask(t.id, e)} className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full">
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    ))}
-
-                                                    {canEdit && !searchQuery && (
-                                                        <button 
-                                                            onClick={() => setIsAddingTask({ date: viewingDay!, category: folderName })}
-                                                            className="w-full py-3 text-xs font-bold text-muted-foreground hover:text-flow-green hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
-                                                        >
-                                                            <Plus className="w-3 h-3" /> Add Task to {folderName}
-                                                        </button>
-                                                    )}
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                );
-                            })}
-                        </>
-                    );
+                                {canEdit && (
+                                    <Button size="icon" variant="ghost" onClick={(e) => handleDeleteTask(t.id, e)} className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full">
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        );
+                    });
                 })()}
             </div>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: CREAR CARPETA NUEVA */}
-      <Dialog open={isCreatingFolder} onOpenChange={setIsCreatingFolder}>
-        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Create New Folder</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <Input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Maintenance, Events..." className="bg-black/20 border-white/10" />
-          </div>
-          <DialogFooter>
-              <Button onClick={handleCreateFolder} className="w-full text-white font-bold bg-blue-600 hover:bg-blue-700">
-                  Create Folder
-              </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* MODAL: AÑADIR TAREA (Actualizado con Selector de Empleado) */}
+      {/* MODAL: AÑADIR TAREA / EVENTO */}
       <Dialog open={!!isAddingTask} onOpenChange={() => { setIsAddingTask(null); setNewTaskAssignee("Team"); }}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>Add to {isAddingTask?.category}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add to {isAddingTask && format(isAddingTask.date, 'EEEE')}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
-                <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Task name..." className="bg-black/20 border-white/10" />
-            </div>
-            
-            <div>
-                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assignee</label>
-                <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
-                    <SelectTrigger className="bg-black/20 border-white/10">
-                        <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Type</label>
+                <Select value={newTaskCategory} onValueChange={setNewTaskCategory}>
+                    <SelectTrigger className="bg-black/20 border-white/10"><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-[#1C1C1E] border-white/10 text-white z-[100]">
-                        <SelectItem value="Team">Team (Everyone)</SelectItem>
-                        {activeEmployees.map((emp: any) => (
-                            <SelectItem key={emp.id} value={emp.name}>{emp.name}</SelectItem>
-                        ))}
+                        <SelectItem value="General">Regular Task 📋</SelectItem>
+                        <SelectItem value="Event">Event / Note 🎉</SelectItem>
+                        <SelectItem value="Maintenance">Maintenance 🔧</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
+
+            <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Description</label>
+                <Input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder={newTaskCategory === 'Event' ? "e.g. Health Inspection" : "Task name..."} className="bg-black/20 border-white/10" />
+            </div>
+            
+            {newTaskCategory !== 'Event' && (
+                <div>
+                    <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Assignee</label>
+                    <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                        <SelectTrigger className="bg-black/20 border-white/10">
+                            <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1C1C1E] border-white/10 text-white z-[100]">
+                            <SelectItem value="Team">Team (Everyone)</SelectItem>
+                            {activeEmployees.map((emp: any) => (
+                                <SelectItem key={emp.id} value={emp.name}>{emp.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
           </div>
-          <DialogFooter><Button onClick={handleAddTask} className="w-full bg-flow-green text-black font-bold">Add Task</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleAddTask} className="w-full bg-flow-green text-black font-bold">Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
