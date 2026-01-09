@@ -12,8 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast"; // Importar Toast
+import { useToast } from "@/hooks/use-toast";
 
 export default function Equipment() {
   const { currentUser } = useStore();
@@ -43,7 +42,7 @@ export default function Equipment() {
   // Formulario Item
   const [name, setName] = useState("");
   const [category, setCategory] = useState(""); 
-  const [status, setStatus] = useState<"OPERATIONAL" | "BROKEN" | "MAINTENANCE">("OPERATIONAL");
+  // El estado inicial para el formulario siempre será Operational por defecto
   const [notes, setNotes] = useState("");
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
@@ -65,19 +64,20 @@ export default function Equipment() {
     return []; 
   }, [equipmentList, currentFolder, searchQuery]);
 
-  // --- HANDLERS CARPETAS (NUEVO) ---
+  // --- HANDLERS ---
+
+  // 🔥 NUEVO: Cambio de estado directo
+  const handleStatusChange = (id: string, newStatus: "OPERATIONAL" | "BROKEN" | "MAINTENANCE") => {
+      updateMutation.mutate({ id, updates: { status: newStatus } });
+  };
 
   const performRenameFolder = async () => {
     if (!editingFolder || !folderNewName.trim() || folderNewName === editingFolder) {
       setIsRenamingFolder(false); return;
     }
     const itemsToUpdate = equipmentList.filter((i: any) => (i.location || "General") === editingFolder);
-    
     for (const item of itemsToUpdate) {
-        await updateMutation.mutateAsync({ 
-            id: item.id, 
-            updates: { location: folderNewName } 
-        });
+        await updateMutation.mutateAsync({ id: item.id, updates: { location: folderNewName } });
     }
     setIsRenamingFolder(false);
     setEditingFolder(null);
@@ -87,7 +87,6 @@ export default function Equipment() {
   const performDeleteFolder = async () => {
     if (!deletingFolder) return;
     const itemsToDelete = equipmentList.filter((i: any) => (i.location || "General") === deletingFolder);
-    
     for (const item of itemsToDelete) {
         await deleteMutation.mutateAsync(item.id);
     }
@@ -95,12 +94,9 @@ export default function Equipment() {
     toast({ title: "Area Deleted", description: `Removed area and ${itemsToDelete.length} items.` });
   };
 
-  // --- HANDLERS ITEMS ---
-
   const handleOpenAdd = () => {
       setName("");
       setCategory(currentFolder === "General" ? "" : (currentFolder || "")); 
-      setStatus("OPERATIONAL");
       setNotes("");
       setEditingItem(null);
       setIsAdding(true);
@@ -109,7 +105,6 @@ export default function Equipment() {
   const handleOpenEdit = (item: any) => {
       setName(item.name);
       setCategory(item.location || "");
-      setStatus(item.status);
       setNotes(item.notes || "");
       setEditingItem(item);
       setIsAdding(true);
@@ -117,7 +112,14 @@ export default function Equipment() {
 
   const handleSave = () => {
       if (!name.trim()) return;
-      const data = { name, location: category || "General", status, notes };
+      // Si estamos editando, solo actualizamos nombre/notas/ubicación (el estado se gestiona fuera)
+      // Si estamos creando, el estado por defecto es OPERATIONAL
+      const data: any = { name, location: category || "General", notes };
+      
+      if (!editingItem) {
+          data.status = "OPERATIONAL";
+      }
+
       if (editingItem) updateMutation.mutate({ id: editingItem.id, updates: data });
       else createMutation.mutate(data);
       setIsAdding(false);
@@ -125,10 +127,6 @@ export default function Equipment() {
 
   const handleDelete = (id: string) => {
       if (confirm("Delete this equipment?")) deleteMutation.mutate(id);
-  };
-
-  const handleCreateFolderClick = () => {
-      setName(""); setCategory(""); setStatus("OPERATIONAL"); setNotes(""); setEditingItem(null); setIsCreatingFolder(true);
   };
 
   const handleSaveNewFolderItem = () => {
@@ -167,7 +165,6 @@ export default function Equipment() {
               const itemCount = equipmentList.filter((i:any) => (i.location || "General") === folderName).length;
               return (
                 <motion.div key={folderName} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.05 }} onClick={() => setCurrentFolder(folderName)} className="aspect-square bg-card hover:bg-white/5 cursor-pointer rounded-[24px] p-4 border border-white/[0.04] flex flex-col items-center justify-center gap-3 relative group shadow-lg">
-                    {/* ACCIONES DE CARPETA */}
                     {canEdit && (
                         <div className="absolute top-2 right-2 flex gap-1 z-10">
                              <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folderName); setFolderNewName(folderName); setIsRenamingFolder(true); }} className="p-1.5 bg-black/40 rounded-md text-white/70 hover:text-white"><Edit2 className="w-3 h-3"/></button>
@@ -180,7 +177,7 @@ export default function Equipment() {
                 </motion.div>
               );
             })}
-            {canEdit && <motion.button whileTap={{ scale: 0.95 }} onClick={handleCreateFolderClick} className="aspect-square bg-white/5 hover:bg-white/10 border-2 border-dashed border-white/10 rounded-[24px] flex flex-col items-center justify-center gap-3 text-muted-foreground hover:text-white transition-colors"><div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center"><FolderPlus className="w-6 h-6" /></div><span className="text-xs font-bold uppercase tracking-wider">New Area</span></motion.button>}
+            {canEdit && <motion.button whileTap={{ scale: 0.95 }} onClick={() => { setName(""); setCategory(""); setNotes(""); setEditingItem(null); setIsCreatingFolder(true); }} className="aspect-square bg-white/5 hover:bg-white/10 border-2 border-dashed border-white/10 rounded-[24px] flex flex-col items-center justify-center gap-3 text-muted-foreground hover:text-white transition-colors"><div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center"><FolderPlus className="w-6 h-6" /></div><span className="text-xs font-bold uppercase tracking-wider">New Area</span></motion.button>}
           </div>
       )}
 
@@ -188,16 +185,66 @@ export default function Equipment() {
         <div className="space-y-3 pb-20">
             <AnimatePresence mode="popLayout">
                 {displayedItems.map((item: any) => (
-                    <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("p-4 rounded-2xl border flex items-start gap-4 transition-all relative group bg-card", item.status === 'BROKEN' ? "border-red-500/30 bg-red-500/5" : item.status === 'MAINTENANCE' ? "border-orange-500/30 bg-orange-500/5" : "border-white/5")}>
-                        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-xl border", item.status === 'BROKEN' ? "bg-red-500/10 border-red-500/20 text-red-500" : item.status === 'MAINTENANCE' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : "bg-green-500/10 border-green-500/20 text-green-500")}>
-                            {item.status === 'BROKEN' ? <AlertTriangle className="w-6 h-6" /> : item.status === 'MAINTENANCE' ? <Wrench className="w-6 h-6" /> : <CheckCircle2 className="w-6 h-6" />}
+                    <motion.div 
+                        key={item.id} 
+                        initial={{ opacity: 0, y: 10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        className={cn(
+                            "p-4 rounded-2xl border flex flex-col gap-3 transition-all relative group bg-card", 
+                            // Bordes sutiles según estado
+                            item.status === 'BROKEN' ? "border-red-500/30 bg-red-500/5" : 
+                            item.status === 'MAINTENANCE' ? "border-orange-500/30 bg-orange-500/5" : 
+                            "border-white/5"
+                        )}
+                    >
+                        {/* CABECERA ITEM */}
+                        <div className="flex items-start gap-4">
+                            <div className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-xl border", 
+                                item.status === 'BROKEN' ? "bg-red-500/10 border-red-500/20 text-red-500" : 
+                                item.status === 'MAINTENANCE' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : 
+                                "bg-green-500/10 border-green-500/20 text-green-500"
+                            )}>
+                                {item.status === 'BROKEN' ? <AlertTriangle className="w-6 h-6" /> : 
+                                 item.status === 'MAINTENANCE' ? <Wrench className="w-6 h-6" /> : 
+                                 <CheckCircle2 className="w-6 h-6" />}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0 pt-0.5">
+                                <h3 className="font-bold text-white text-base truncate pr-16">{item.name}</h3>
+                                {item.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">"{item.notes}"</p>}
+                            </div>
+
+                            {canEdit && (
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleOpenEdit(item)} className="p-2 bg-white/5 hover:bg-white/20 rounded-lg text-muted-foreground hover:text-white transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                    <button onClick={() => handleDelete(item.id)} className="p-2 bg-white/5 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
-                            <h3 className="font-bold text-white text-base truncate pr-16">{item.name}</h3>
-                            <p className={cn("text-[10px] font-bold uppercase mt-0.5", item.status === 'BROKEN' ? "text-red-400" : item.status === 'MAINTENANCE' ? "text-orange-400" : "text-green-400")}>{item.status}</p>
-                            {item.notes && <p className="text-xs text-muted-foreground mt-2 bg-black/20 p-2 rounded border border-white/5 italic">{item.notes}</p>}
+
+                        {/* BOTONES DE ESTADO (Fuera del modal) */}
+                        <div className="grid grid-cols-3 gap-2 bg-black/20 p-1.5 rounded-xl">
+                            {[
+                                { id: 'OPERATIONAL', label: 'Operational', color: 'bg-green-500 text-black', icon: CheckCircle2 },
+                                { id: 'MAINTENANCE', label: 'Maint.', color: 'bg-orange-500 text-black', icon: Wrench },
+                                { id: 'BROKEN', label: 'Broken', color: 'bg-red-500 text-white', icon: AlertTriangle }
+                            ].map((opt) => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => handleStatusChange(item.id, opt.id as any)}
+                                    className={cn(
+                                        "py-2 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5",
+                                        item.status === opt.id 
+                                            ? opt.color 
+                                            : "text-muted-foreground hover:bg-white/5"
+                                    )}
+                                >
+                                    {opt.id === item.status && <opt.icon className="w-3 h-3" />}
+                                    {opt.label}
+                                </button>
+                            ))}
                         </div>
-                        {canEdit && <div className="absolute right-4 top-4 flex gap-2"><button onClick={() => handleOpenEdit(item)} className="p-2 bg-white/5 hover:bg-white/20 rounded-lg text-muted-foreground hover:text-white transition-colors"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete(item.id)} className="p-2 bg-white/5 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></div>}
                     </motion.div>
                 ))}
             </AnimatePresence>
@@ -208,11 +255,10 @@ export default function Equipment() {
       {/* MODALES */}
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-          <DialogHeader><DialogTitle>{editingItem ? 'Edit Equipment' : `Add to ${currentFolder || 'General'}`}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem ? 'Edit Info' : `Add to ${currentFolder || 'General'}`}</DialogTitle></DialogHeader>
           <div className="py-4 space-y-4">
              <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Rational Oven" className="bg-black/20 border-white/10" /></div>
              {editingItem && <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Area (Folder)</label><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Area Name" className="bg-black/20 border-white/10" /></div>}
-             <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label><Select value={status} onValueChange={(v:any) => setStatus(v)}><SelectTrigger className="bg-black/20 border-white/10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1C1C1E] border-white/10 text-white"><SelectItem value="OPERATIONAL">Operational ✅</SelectItem><SelectItem value="MAINTENANCE">Maintenance 🔧</SelectItem><SelectItem value="BROKEN">Broken 🚨</SelectItem></SelectContent></Select></div>
              <div><label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Notes / Issues</label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="bg-black/20 border-white/10 h-20 resize-none" /></div>
           </div>
           <DialogFooter><Button onClick={handleSave} className="w-full bg-flow-yellow text-black font-bold">Save Changes</Button></DialogFooter>
