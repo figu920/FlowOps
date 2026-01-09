@@ -42,7 +42,6 @@ export default function Equipment() {
   // Formulario Item
   const [name, setName] = useState("");
   const [category, setCategory] = useState(""); 
-  // El estado inicial para el formulario siempre será Operational por defecto
   const [notes, setNotes] = useState("");
 
   const canEdit = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
@@ -53,20 +52,26 @@ export default function Equipment() {
     return Array.from(locations).sort() as string[]; 
   }, [equipmentList]);
 
+  // 🔥 AQUÍ ESTÁ EL CAMBIO: Forzar orden alfabético siempre
   const displayedItems = useMemo(() => {
-    let items = equipmentList;
+    let items = [];
+
+    // 1. Filtrar
     if (searchQuery.trim()) {
-        return items.filter((i: any) => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        items = equipmentList.filter((i: any) => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    } else if (currentFolder) {
+        items = equipmentList.filter((i: any) => (i.location || "General") === currentFolder);
+    } else {
+        return []; // Si no hay búsqueda ni carpeta, no mostramos items sueltos (solo carpetas)
     }
-    if (currentFolder) {
-      return items.filter((i: any) => (i.location || "General") === currentFolder);
-    }
-    return []; 
+
+    // 2. Ordenar Alfabéticamente (A-Z) para evitar saltos
+    return items.sort((a: any, b: any) => a.name.localeCompare(b.name));
+    
   }, [equipmentList, currentFolder, searchQuery]);
 
   // --- HANDLERS ---
 
-  // 🔥 NUEVO: Cambio de estado directo
   const handleStatusChange = (id: string, newStatus: "OPERATIONAL" | "BROKEN" | "MAINTENANCE") => {
       updateMutation.mutate({ id, updates: { status: newStatus } });
   };
@@ -112,8 +117,6 @@ export default function Equipment() {
 
   const handleSave = () => {
       if (!name.trim()) return;
-      // Si estamos editando, solo actualizamos nombre/notas/ubicación (el estado se gestiona fuera)
-      // Si estamos creando, el estado por defecto es OPERATIONAL
       const data: any = { name, location: category || "General", notes };
       
       if (!editingItem) {
@@ -183,71 +186,67 @@ export default function Equipment() {
 
       {(currentFolder || searchQuery) && (
         <div className="space-y-3 pb-20">
-            <AnimatePresence mode="popLayout">
-                {displayedItems.map((item: any) => (
-                    <motion.div 
-                        key={item.id} 
-                        initial={{ opacity: 0, y: 10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
-                        className={cn(
-                            "p-4 rounded-2xl border flex flex-col gap-3 transition-all relative group bg-card", 
-                            // Bordes sutiles según estado
-                            item.status === 'BROKEN' ? "border-red-500/30 bg-red-500/5" : 
-                            item.status === 'MAINTENANCE' ? "border-orange-500/30 bg-orange-500/5" : 
-                            "border-white/5"
+            {/* Nota: He quitado AnimatePresence para evitar saltos raros al reordenar */}
+            {displayedItems.map((item: any) => (
+                <motion.div 
+                    key={item.id} 
+                    // Eliminamos layout animations para que sea sólido como una roca al cambiar estado
+                    className={cn(
+                        "p-4 rounded-2xl border flex flex-col gap-3 transition-colors relative group bg-card", 
+                        item.status === 'BROKEN' ? "border-red-500/30 bg-red-500/5" : 
+                        item.status === 'MAINTENANCE' ? "border-orange-500/30 bg-orange-500/5" : 
+                        "border-white/5"
+                    )}
+                >
+                    <div className="flex items-start gap-4">
+                        <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-xl border", 
+                            item.status === 'BROKEN' ? "bg-red-500/10 border-red-500/20 text-red-500" : 
+                            item.status === 'MAINTENANCE' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : 
+                            "bg-green-500/10 border-green-500/20 text-green-500"
+                        )}>
+                            {item.status === 'BROKEN' ? <AlertTriangle className="w-6 h-6" /> : 
+                                item.status === 'MAINTENANCE' ? <Wrench className="w-6 h-6" /> : 
+                                <CheckCircle2 className="w-6 h-6" />}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0 pt-0.5">
+                            <h3 className="font-bold text-white text-base truncate pr-16">{item.name}</h3>
+                            {item.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">"{item.notes}"</p>}
+                        </div>
+
+                        {canEdit && (
+                            <div className="flex gap-2">
+                                <button onClick={() => handleOpenEdit(item)} className="p-2 bg-white/5 hover:bg-white/20 rounded-lg text-muted-foreground hover:text-white transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                <button onClick={() => handleDelete(item.id)} className="p-2 bg-white/5 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                         )}
-                    >
-                        {/* CABECERA ITEM */}
-                        <div className="flex items-start gap-4">
-                            <div className={cn(
-                                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-xl border", 
-                                item.status === 'BROKEN' ? "bg-red-500/10 border-red-500/20 text-red-500" : 
-                                item.status === 'MAINTENANCE' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : 
-                                "bg-green-500/10 border-green-500/20 text-green-500"
-                            )}>
-                                {item.status === 'BROKEN' ? <AlertTriangle className="w-6 h-6" /> : 
-                                 item.status === 'MAINTENANCE' ? <Wrench className="w-6 h-6" /> : 
-                                 <CheckCircle2 className="w-6 h-6" />}
-                            </div>
-                            
-                            <div className="flex-1 min-w-0 pt-0.5">
-                                <h3 className="font-bold text-white text-base truncate pr-16">{item.name}</h3>
-                                {item.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">"{item.notes}"</p>}
-                            </div>
+                    </div>
 
-                            {canEdit && (
-                                <div className="flex gap-2">
-                                    <button onClick={() => handleOpenEdit(item)} className="p-2 bg-white/5 hover:bg-white/20 rounded-lg text-muted-foreground hover:text-white transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                    <button onClick={() => handleDelete(item.id)} className="p-2 bg-white/5 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* BOTONES DE ESTADO (Fuera del modal) */}
-                        <div className="grid grid-cols-3 gap-2 bg-black/20 p-1.5 rounded-xl">
-                            {[
-                                { id: 'OPERATIONAL', label: 'Operational', color: 'bg-green-500 text-black', icon: CheckCircle2 },
-                                { id: 'MAINTENANCE', label: 'Maint.', color: 'bg-orange-500 text-black', icon: Wrench },
-                                { id: 'BROKEN', label: 'Broken', color: 'bg-red-500 text-white', icon: AlertTriangle }
-                            ].map((opt) => (
-                                <button
-                                    key={opt.id}
-                                    onClick={() => handleStatusChange(item.id, opt.id as any)}
-                                    className={cn(
-                                        "py-2 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5",
-                                        item.status === opt.id 
-                                            ? opt.color 
-                                            : "text-muted-foreground hover:bg-white/5"
-                                    )}
-                                >
-                                    {opt.id === item.status && <opt.icon className="w-3 h-3" />}
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
-                    </motion.div>
-                ))}
-            </AnimatePresence>
+                    <div className="grid grid-cols-3 gap-2 bg-black/20 p-1.5 rounded-xl">
+                        {[
+                            { id: 'OPERATIONAL', label: 'Operational', color: 'bg-green-500 text-black', icon: CheckCircle2 },
+                            { id: 'MAINTENANCE', label: 'Maint.', color: 'bg-orange-500 text-black', icon: Wrench },
+                            { id: 'BROKEN', label: 'Broken', color: 'bg-red-500 text-white', icon: AlertTriangle }
+                        ].map((opt) => (
+                            <button
+                                key={opt.id}
+                                onClick={() => handleStatusChange(item.id, opt.id as any)}
+                                className={cn(
+                                    "py-2 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5",
+                                    item.status === opt.id 
+                                        ? opt.color 
+                                        : "text-muted-foreground hover:bg-white/5"
+                                )}
+                            >
+                                {opt.id === item.status && <opt.icon className="w-3 h-3" />}
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </motion.div>
+            ))}
+            
             {displayedItems.length === 0 && <div className="text-center py-12 text-muted-foreground opacity-50"><p>No equipment here yet.</p></div>}
         </div>
       )}
@@ -276,7 +275,6 @@ export default function Equipment() {
         </DialogContent>
       </Dialog>
 
-      {/* MODALES EDICIÓN CARPETAS */}
       <Dialog open={isRenamingFolder} onOpenChange={setIsRenamingFolder}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
           <DialogHeader><DialogTitle>Rename Area</DialogTitle></DialogHeader>
