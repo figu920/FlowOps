@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useChecklists, useTasks, useCreateTask, useDeleteTask } from '@/lib/hooks'; 
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, Sun, Moon, Clock, 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info
@@ -14,7 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 export default function WeeklyTasks() {
   // --- ESTADOS ---
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [viewingTask, setViewingTask] = useState<any>(null); // Estado para el modal de lectura
+  
+  // Guardamos la tarea Y su categoría para poder completarla desde el modal
+  const [viewingTask, setViewingTask] = useState<{ template: any, categoryId: string } | null>(null);
 
   // --- DATOS ---
   const { data: openingTemplates = [] } = useChecklists("opening");
@@ -94,8 +96,8 @@ export default function WeeklyTasks() {
                <motion.div
                  key={tpl.id}
                  layout
-                 // 1. CLIC EN LA FILA -> VER DETALLES
-                 onClick={() => setViewingTask(tpl)} 
+                 // 1. AL PINCHAR, GUARDAMOS TAREA + CATEGORÍA
+                 onClick={() => setViewingTask({ template: tpl, categoryId })} 
                  className={cn(
                    "group p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all duration-200 active:scale-[0.98]",
                    isCompleted 
@@ -103,7 +105,7 @@ export default function WeeklyTasks() {
                       : "bg-[#1C1C1E] border-white/5 hover:border-white/10 hover:bg-white/5"
                  )}
                >
-                 {/* 2. CLIC EN EL CÍRCULO -> COMPLETAR (stopPropagation para no abrir modal) */}
+                 {/* Círculo para marcar rápido */}
                  <div 
                     onClick={(e) => { e.stopPropagation(); toggleItem(tpl, categoryId); }}
                     className={cn(
@@ -117,21 +119,15 @@ export default function WeeklyTasks() {
                  </div>
                  
                  <div className="flex-1 min-w-0">
-                    {/* 3. TEXTO TRUNCADO */}
+                    {/* 2. CAMBIO AQUÍ: 'line-clamp-2' permite 2 líneas de texto */}
                     <span className={cn(
-                        "text-sm font-medium leading-tight transition-colors block truncate",
+                        "text-sm font-medium leading-tight transition-colors block line-clamp-2", 
                         isCompleted ? "text-white" : "text-white/70"
                     )}>
                         {tpl.text}
                     </span>
-                    {isCompleted && (
-                        <span className="text-[9px] text-flow-green font-bold flex items-center gap-1 mt-0.5">
-                            Done
-                        </span>
-                    )}
                  </div>
                  
-                 {/* Icono informativo sutil */}
                  <Info className="w-3 h-3 text-white/10 group-hover:text-white/30 shrink-0" />
                </motion.div>
              );
@@ -140,6 +136,11 @@ export default function WeeklyTasks() {
       </div>
     );
   };
+
+  // Helper para el modal
+  const isViewingTaskCompleted = viewingTask 
+    ? !!getCompletionStatus(viewingTask.template.text, viewingTask.categoryId) 
+    : false;
 
   return (
     <Layout title="Daily Operations" showBack={true}>
@@ -174,19 +175,49 @@ export default function WeeklyTasks() {
         <TaskColumn title="Closing" icon={Moon} color="text-purple-400" bg="bg-purple-500/10" templates={closingTemplates} categoryId="Closing" />
       </div>
 
-      {/* MODAL PARA VER TAREA COMPLETA */}
+      {/* MODAL DETALLES Y ACCIÓN */}
       <Dialog open={!!viewingTask} onOpenChange={() => setViewingTask(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
             <DialogHeader>
                 <DialogTitle className="text-xl">Task Details</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
+            
+            <div className="py-6">
                 <p className="text-lg text-white font-medium leading-relaxed">
-                    {viewingTask?.text}
+                    {viewingTask?.template.text}
                 </p>
+                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground bg-white/5 p-2 rounded-lg">
+                    <span className="uppercase font-bold text-[10px] tracking-wider bg-white/10 px-1.5 py-0.5 rounded">
+                        {viewingTask?.categoryId}
+                    </span>
+                    <span>Task for {format(selectedDate, 'MMM do')}</span>
+                </div>
             </div>
-            <DialogFooter>
-                <Button onClick={() => setViewingTask(null)} className="w-full bg-white text-black font-bold">
+
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
+                {/* 3. BOTÓN PARA COMPLETAR DENTRO DEL MODAL */}
+                <Button 
+                    onClick={() => {
+                        if (viewingTask) {
+                            toggleItem(viewingTask.template, viewingTask.categoryId);
+                            setViewingTask(null); // Cerramos tras accionar
+                        }
+                    }} 
+                    className={cn(
+                        "w-full font-bold h-12 text-base",
+                        isViewingTaskCompleted 
+                            ? "bg-white/10 text-white hover:bg-white/20" 
+                            : "bg-flow-green text-black hover:bg-flow-green/90"
+                    )}
+                >
+                    {isViewingTaskCompleted ? (
+                        <>Mark as Incomplete</>
+                    ) : (
+                        <><Check className="w-5 h-5 mr-2" /> Mark as Done</>
+                    )}
+                </Button>
+                
+                <Button variant="ghost" onClick={() => setViewingTask(null)} className="w-full text-muted-foreground hover:text-white">
                     Close
                 </Button>
             </DialogFooter>
