@@ -12,7 +12,8 @@ import {
   LogOut,
   Users,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  ClipboardList // <--- IMPORTANTE: Nuevo Icono
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
@@ -21,19 +22,17 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { logout, currentUser } = useStore();
 
-  // --- DATOS EN TIEMPO REAL ---
   const { data: inventory = [] } = useInventory();
   const { data: tasks = [] } = useTasks();
   
-  // Calcular alertas
   const lowStockCount = inventory.filter((i: any) => i.status === 'LOW').length;
-  const pendingTasksCount = tasks.filter((t: any) => !t.completed).length;
+  // Solo contamos las tareas del calendario en el contador de arriba
+  const pendingTasksCount = tasks.filter((t: any) => !t.completed && t.notes?.includes('DATE:')).length;
 
-  // --- RELOJ EN VIVO ---
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Actualizar cada minuto
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -44,7 +43,7 @@ export default function Home() {
     return "Good Evening";
   };
 
-  // --- COMPONENTES DE LOGOS (Tus iconos originales) ---
+  // --- LOGOS ---
   const InventoryLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#4ADE80] flex items-center justify-center shadow-[0_0_20px_rgba(74,222,128,0.3)]">
       <Box className="w-7 h-7 text-black" strokeWidth={2.5} />
@@ -60,6 +59,13 @@ export default function Home() {
   const TimelineLogo = () => (
     <div className="w-14 h-14 rounded-full bg-[#3B82F6] flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
       <CalendarClock className="w-7 h-7 text-white" strokeWidth={2.5} />
+    </div>
+  );
+
+  // 🔥 NUEVO LOGO PARA WEEKLY TASKS
+  const TasksLogo = () => (
+    <div className="w-14 h-14 rounded-full bg-purple-500 flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.3)]">
+      <ClipboardList className="w-7 h-7 text-white" strokeWidth={2.5} />
     </div>
   );
   
@@ -81,7 +87,7 @@ export default function Home() {
     </div>
   );
 
-  // --- MENU CONFIG ---
+  // --- MENU ---
   const menuItems = [
     { 
       title: 'Inventory', 
@@ -98,6 +104,12 @@ export default function Home() {
       count: pendingTasksCount > 0 ? `${pendingTasksCount} Tasks` : undefined,
       countColor: 'text-blue-200',
       glowColor: 'bg-[#3B82F6]' 
+    },
+    { 
+      title: 'Weekly Tasks', // 🔥 NUEVA ENTRADA
+      path: '/tasks', 
+      customIcon: <TasksLogo />,
+      glowColor: 'bg-purple-500' 
     },
     { 
       title: 'Equipment', 
@@ -137,31 +149,26 @@ export default function Home() {
     <div className="min-h-screen bg-background p-6 pb-24 flex justify-center">
       <div className="w-full max-w-lg space-y-6">
         
-        {/* --- NUEVA CABECERA DINÁMICA --- */}
+        {/* HEADER */}
         <div className="pt-2 flex flex-col gap-1">
            <div className="flex justify-between items-start">
                <div>
-                   {/* Fecha elegante */}
                    <p className="text-flow-green font-bold text-xs uppercase tracking-wider mb-1">
                        {format(currentTime, 'EEEE, MMM do')}
                    </p>
-                   {/* Saludo dinámico */}
                    <h1 className="text-3xl font-black text-white tracking-tight leading-none">
                      {getGreeting()}, <br/>
                      <span className="opacity-80">{currentUser?.name.split(' ')[0] || 'Team'}</span>
                    </h1>
                </div>
                
-               <button 
-                  onClick={() => logout()}
-                  className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5"
-               >
+               <button onClick={() => logout()} className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5">
                   <LogOut className="w-3 h-3" />
                </button>
            </div>
         </div>
 
-        {/* --- NUEVO: RESUMEN DE ESTADO (Mini Dashboard) --- */}
+        {/* ALERTS */}
         {(lowStockCount > 0 || pendingTasksCount > 0) && (
             <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                 {lowStockCount > 0 && (
@@ -190,7 +197,7 @@ export default function Home() {
             </div>
         )}
 
-        {/* --- GRID DE BOTONES (Sin Cambios Visuales Mayores, solo Schedule actualizado) --- */}
+        {/* GRID */}
         <div className="grid grid-cols-2 gap-4">
           {menuItems.map((item) => (
             <motion.div
@@ -200,10 +207,8 @@ export default function Home() {
               onClick={() => setLocation(item.path)}
               className="relative bg-card rounded-[32px] p-5 flex flex-col items-center justify-center gap-4 text-center border border-white/5 shadow-xl cursor-pointer overflow-hidden group aspect-square"
             >
-              {/* Glow Effect */}
               <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ${item.glowColor}`} />
               
-              {/* Icon */}
               <div className="relative z-10">
                 {item.customIcon ? (
                   item.customIcon
@@ -213,28 +218,19 @@ export default function Home() {
                   </div>
                 )}
                 
-                {/* Notification Bubble (Solo si hay conteo) */}
                 {item.count && (
                   <motion.div 
                     initial={{ scale: 0 }} 
                     animate={{ scale: 1 }}
                     className="absolute -top-1 -right-1 bg-[#1C1C1E] border border-white/10 rounded-full px-2 py-0.5 shadow-lg z-20"
                   >
-                    <span className={`text-[10px] font-bold ${item.countColor || 'text-white'}`}>
-                      {item.count}
-                    </span>
+                    <span className={`text-[10px] font-bold ${item.countColor || 'text-white'}`}>{item.count}</span>
                   </motion.div>
                 )}
               </div>
 
-              {/* Title */}
-              <span className="font-bold text-base text-white relative z-10 leading-tight">
-                {item.title}
-              </span>
-              
-              <span className="text-[10px] text-muted-foreground absolute bottom-4 opacity-50 font-medium">
-                Tap to view
-              </span>
+              <span className="font-bold text-base text-white relative z-10 leading-tight">{item.title}</span>
+              <span className="text-[10px] text-muted-foreground absolute bottom-4 opacity-50 font-medium">Tap to view</span>
             </motion.div>
           ))}
         </div>
