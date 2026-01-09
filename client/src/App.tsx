@@ -16,6 +16,8 @@ import Menu from "@/pages/Menu";
 import NotFound from "@/pages/not-found";
 import Sales from "@/pages/Sales";
 import Schedule from "@/pages/Schedule";
+// 👇 1. IMPORTAMOS LA NUEVA PÁGINA
+import WeeklyTasks from "@/pages/WeeklyTasks";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
   const { currentUser } = useStore();
@@ -69,12 +71,11 @@ function Router() {
          {() => <PrivateRoute component={Timeline} categoryColor="#FF9800" />}
       </Route>
 
-      {/* 8. EMPLOYEES (Rosa) - Nota: Aquí también se añade el color dentro de la lógica de roles */}
+      {/* 8. EMPLOYEES (Rosa) */}
      <Route path="/employees">
          {() => (currentUser?.role === 'manager' ||
-
- currentUser?.role === 'lead' ||
- currentUser?.isSystemAdmin)
+                 currentUser?.role === 'lead' ||
+                 currentUser?.isSystemAdmin)
           ? <PrivateRoute component={Employees} categoryColor="#E91E63" /> 
            : <NotFound />
          }
@@ -86,9 +87,15 @@ function Router() {
       </Route>
 
       {/* 10. OPERATIONS HUB (Calendario unificado) */}
-<Route path="/schedule">
-  {() => <PrivateRoute component={Schedule} categoryColor="#3B82F6" />}
-</Route>
+      <Route path="/schedule">
+        {() => <PrivateRoute component={Schedule} categoryColor="#3B82F6" />}
+      </Route>
+
+      {/* 👇 11. NUEVA RUTA: WEEKLY TASKS (Morado) */}
+      {/* Esta es la parte que faltaba para que funcione el botón */}
+      <Route path="/tasks">
+        {() => <PrivateRoute component={WeeklyTasks} categoryColor="#A855F7" />}
+      </Route>
       
       <Route component={NotFound} />
     </Switch>
