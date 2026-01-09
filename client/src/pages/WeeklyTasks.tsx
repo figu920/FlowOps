@@ -116,11 +116,11 @@ export default function WeeklyTasks() {
                  
                  <div className="flex-1 min-w-0">
                     <span className={cn(
-                        "text-sm font-medium leading-tight transition-colors block truncate",
-                        isCompleted ? "text-white" : "text-white/70"
-                    )}>
-                        {tpl.text}
-                    </span>
+    "text-sm font-medium leading-tight transition-colors block break-words whitespace-normal", //  Texto completo visible
+    isCompleted ? "text-white" : "text-white/70"
+)}>
+    {tpl.text}
+</span>
                     {isCompleted && (
                         <span className="text-[9px] text-flow-green font-bold flex items-center gap-1 mt-0.5">
                             Done
