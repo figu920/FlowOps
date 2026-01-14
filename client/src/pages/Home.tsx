@@ -9,7 +9,7 @@ import {
   Box, 
   Refrigerator,
   CalendarClock,
-  LogOut,
+  Settings,
   Users,
   AlertTriangle,
   CheckCircle2,
@@ -162,9 +162,13 @@ export default function Home() {
                    </h1>
                </div>
                
-               <button onClick={() => logout()} className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5">
-                  <LogOut className="w-3 h-3" />
-               </button>
+               <button 
+    onClick={() => setLocation('/settings')} 
+    className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5"
+>
+    <Settings className="w-4 h-4" />
+    <span>Profile</span>
+</button>
            </div>
         </div>
 
