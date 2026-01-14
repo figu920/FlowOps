@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
+import { useChat, useSendMessage } from '@/lib/hooks'; 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,22 +24,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
-// --- TIPOS ---
-type Message = {
-  id: string;
-  text: string;
-  sender: string;
-  timestamp: Date;
-  isCurrentUser: boolean;
-  attachment?: {
-    type: 'image' | 'file';
-    name: string;
-    url?: string;
-  };
-};
-
 // --- OPCIONES RÁPIDAS (CHIPS) ---
 const QUICK_REPLIES = [
+  "Who can cover my shift? 🔄", // <--- AÑADIDO AQUÍ PRIMERO
   "Inventory arrived 📦",
   "Need help front 🆘",
   "Backup needed 🏃",
@@ -52,6 +40,11 @@ const QUICK_REPLIES = [
 export default function Chat() {
   const { currentUser } = useStore();
   const { toast } = useToast();
+  
+  // 1. CONEXIÓN CON BASE DE DATOS
+  const { data: messages = [], isLoading } = useChat(); 
+  const sendMessageMutation = useSendMessage();
+
   const [newMessage, setNewMessage] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
@@ -59,44 +52,44 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // --- ESTADO INICIAL VACÍO (SIN EJEMPLOS) ---
-  const [messages, setMessages] = useState<Message[]>([]);
-
-  // Auto-scroll al recibir mensajes
+  // Auto-scroll al recibir mensajes nuevos desde la DB
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages.length]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
+    // Evitar enviar si está vacío
     if ((!newMessage.trim() && !selectedFile) || !currentUser) return;
 
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      text: newMessage,
-      sender: 'You',
-      timestamp: new Date(),
-      isCurrentUser: true,
-    };
+    try {
+        // Preparar el texto. Si hay archivo, añadimos una nota
+        let textToSend = newMessage;
+        if (selectedFile) {
+            textToSend = newMessage ? `${newMessage} [File: ${selectedFile.name}]` : `[Sent a file: ${selectedFile.name}]`;
+        }
 
-    if (selectedFile) {
-        const isImage = selectedFile.type.startsWith('image/');
-        newMsg.attachment = {
-            type: isImage ? 'image' : 'file',
-            name: selectedFile.name,
-            url: isImage ? URL.createObjectURL(selectedFile) : undefined
-        };
+        // 2. ENVIAR A LA BASE DE DATOS
+        await sendMessageMutation.mutateAsync({
+            text: textToSend,
+            type: 'text' 
+        });
+
+        // Limpiar inputs
+        setNewMessage('');
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+
+    } catch (error) {
+        console.error("Error sending message:", error);
+        toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
     }
-
-    setMessages([...messages, newMsg]);
-    setNewMessage('');
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
   const handleQuickReply = (text: string) => {
+    // Al pulsar una respuesta rápida, la ponemos en el input
     setNewMessage(text);
   };
 
@@ -118,25 +111,15 @@ export default function Chat() {
     }
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (dateString: string | Date) => {
+    const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderAttachment = (msg: Message) => {
-    if (!msg.attachment) return null;
-    if (msg.attachment.type === 'image' && msg.attachment.url) {
-        return (
-            <div className="mt-2 mb-1 rounded-lg overflow-hidden border border-white/10 max-w-[250px]">
-                <img src={msg.attachment.url} alt="attachment" className="w-full h-auto object-cover" />
-            </div>
-        );
-    }
-    return (
-        <div className="flex items-center gap-2 mt-2 mb-1 bg-black/20 p-2 rounded-lg border border-white/10 max-w-[250px]">
-            <FileText className="w-5 h-5 text-flow-green" />
-            <span className="text-xs text-white truncate flex-1">{msg.attachment.name}</span>
-        </div>
-    );
+  const renderAttachment = (msg: any) => {
+      // Nota: Como la DB actual solo guarda texto, esto es visual por si en el futuro expandes la DB.
+      // Por ahora el archivo se envía como texto "[File: nombre]".
+      return null; 
   };
 
   return (
@@ -145,49 +128,56 @@ export default function Chat() {
         
         {/* === MESSAGES AREA === */}
         <ScrollArea className="flex-1 pr-4 -mr-4 pb-2">
-          {messages.length === 0 ? (
+          {isLoading ? (
+             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading history...</div>
+          ) : messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30">
                 <Send className="w-12 h-12 mb-2" />
                 <p>No messages yet.</p>
             </div>
           ) : (
             <div className="space-y-6 py-4">
-                {messages.map((msg) => (
-                <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex items-end gap-3 ${msg.isCurrentUser ? 'flex-row-reverse' : ''}`}
-                >
-                    {!msg.isCurrentUser && (
-                    <Avatar className="w-8 h-8 border border-white/10">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender}`} />
-                        <AvatarFallback>{msg.sender[0]}</AvatarFallback>
-                    </Avatar>
-                    )}
+                {messages.map((msg: any) => {
+                    const isCurrentUser = msg.sender === currentUser?.name;
+                    
+                    return (
+                        <motion.div
+                            key={msg.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`flex items-end gap-3 ${isCurrentUser ? 'flex-row-reverse' : ''}`}
+                        >
+                            {!isCurrentUser && (
+                            <Avatar className="w-8 h-8 border border-white/10">
+                                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender}`} />
+                                <AvatarFallback>{msg.sender[0]}</AvatarFallback>
+                            </Avatar>
+                            )}
 
-                    <div className={`max-w-[75%] group ${msg.isCurrentUser ? 'items-end' : 'items-start'} flex flex-col`}>
-                    {!msg.isCurrentUser && (
-                        <span className="text-[10px] text-muted-foreground ml-1 mb-1 block">{msg.sender}</span>
-                    )}
-                    
-                    <div
-                        className={`p-3 rounded-2xl text-sm border ${
-                        msg.isCurrentUser
-                            ? 'bg-flow-green text-black border-flow-green rounded-br-sm'
-                            : 'bg-[#1C1C1E] text-white border-white/10 rounded-bl-sm'
-                        }`}
-                    >
-                        {msg.text && <p>{msg.text}</p>}
-                        {renderAttachment(msg)}
-                    </div>
-                    
-                    <span className="text-[9px] text-muted-foreground mx-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity block">
-                        {formatTime(msg.timestamp)}
-                    </span>
-                    </div>
-                </motion.div>
-                ))}
+                            <div className={`max-w-[75%] group ${isCurrentUser ? 'items-end' : 'items-start'} flex flex-col`}>
+                            {!isCurrentUser && (
+                                <span className="text-[10px] text-muted-foreground ml-1 mb-1 block">
+                                    {msg.sender} <span className="opacity-50 text-[9px]">({msg.senderRole})</span>
+                                </span>
+                            )}
+                            
+                            <div
+                                className={`p-3 rounded-2xl text-sm border ${
+                                isCurrentUser
+                                    ? 'bg-flow-green text-black border-flow-green rounded-br-sm'
+                                    : 'bg-[#1C1C1E] text-white border-white/10 rounded-bl-sm'
+                                }`}
+                            >
+                                <p>{msg.text}</p>
+                            </div>
+                            
+                            <span className="text-[9px] text-muted-foreground mx-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity block">
+                                {formatTime(msg.timestamp)}
+                            </span>
+                            </div>
+                        </motion.div>
+                    );
+                })}
                 <div ref={scrollRef} />
             </div>
           )}
@@ -196,7 +186,7 @@ export default function Chat() {
         {/* === BOTTOM AREA === */}
         <div className="mt-auto">
             
-            {/* 1. VISTA PREVIA DE ARCHIVO (Si hay uno seleccionado) */}
+            {/* 1. VISTA PREVIA DE ARCHIVO */}
             <AnimatePresence>
                 {selectedFile && (
                     <motion.div 
@@ -214,7 +204,7 @@ export default function Chat() {
                 )}
             </AnimatePresence>
 
-            {/* 2. OPCIONES RÁPIDAS (SCROLL ARREGLADO) */}
+            {/* 2. OPCIONES RÁPIDAS */}
             {!selectedFile && (
                 <div className="w-full overflow-x-auto pb-3 pt-1 no-scrollbar">
                     <div className="flex gap-2 px-1 w-max">
@@ -231,10 +221,10 @@ export default function Chat() {
                 </div>
             )}
 
-            {/* 3. INPUT BAR (Con el estilo original + funcionalidad nueva) */}
+            {/* 3. INPUT BAR */}
             <div className="bg-black/40 p-2 pl-2 rounded-[32px] border border-white/10 flex items-center gap-2">
                 
-                {/* BOTÓN + (Desplegable) */}
+                {/* BOTÓN + */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button 
@@ -270,7 +260,7 @@ export default function Chat() {
                     className="bg-transparent border-none focus-visible:ring-0 text-white h-10 px-2 flex-1 placeholder:text-muted-foreground"
                 />
                 
-                {/* BOTÓN ENVIAR (Estilo Flecha Original) */}
+                {/* BOTÓN ENVIAR */}
                 <Button 
                     onClick={handleSend} 
                     size="icon" 
