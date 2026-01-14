@@ -53,6 +53,7 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
   const updateMutation = useUpdateInventory();
   const createMutation = useCreateInventory();
   const deleteMutation = useDeleteInventory();
+  const createLogMutation = useCreateInventoryLog();
 
   // Estados UI
   const [lowCommentItem, setLowCommentItem] = useState<string | null>(null);
@@ -151,14 +152,46 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
 
   const handleSaveItem = () => {
     if (newItemName.trim()) {
+      const newQty = parseFloat(newItemQty) || 0;
+      
+      // 1. LÓGICA DE REGISTRO (LOGS) 📝
+      if (editingItem) {
+          const oldQty = editingItem.quantity || 0;
+          const diff = newQty - oldQty;
+
+          // Solo registramos si la cantidad cambió
+          if (diff !== 0) {
+              createLogMutation.mutate({
+                  itemName: newItemName,
+                  change: diff, // Ej: +10 o -5
+                  reason: diff > 0 ? 'Restock' : 'Adjustment', // Razón automática
+                  user: currentUser?.name || 'Unknown User',
+                  date: new Date().toISOString()
+              });
+              
+              if (diff > 0) toast({ title: "Restock Logged", description: `Added +${diff} to logs.` });
+          }
+      } else {
+          // Si es un ítem nuevo
+           createLogMutation.mutate({
+              itemName: newItemName,
+              change: newQty,
+              reason: 'New Item',
+              user: currentUser?.name || 'Unknown User',
+              date: new Date().toISOString()
+          });
+      }
+
+      // 2. GUARDADO NORMAL 💾
       const data = {
         name: newItemName,
         emoji: newItemIcon, 
         category: currentPath || undefined,
-        quantity: parseFloat(newItemQty) || 0,
+        quantity: newQty,
         unit: newItemUnit,
         costPerUnit: parseFloat(newItemCost) || 0,
       };
+
       if (editingItem) updateMutation.mutate({ id: editingItem.id, updates: data });
       else createMutation.mutate({ ...data, status: 'OK' });
       
