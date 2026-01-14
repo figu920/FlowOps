@@ -1,3 +1,4 @@
+import Settings from "@/pages/Settings";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
@@ -16,7 +17,6 @@ import Menu from "@/pages/Menu";
 import NotFound from "@/pages/not-found";
 import Sales from "@/pages/Sales";
 import Schedule from "@/pages/Schedule";
-// 👇 1. IMPORTAMOS LA NUEVA PÁGINA
 import WeeklyTasks from "@/pages/WeeklyTasks";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -91,8 +91,9 @@ function Router() {
         {() => <PrivateRoute component={Schedule} categoryColor="#3B82F6" />}
       </Route>
 
+      <Route path="/settings" component={Settings} />
+
       {/* 👇 11. NUEVA RUTA: WEEKLY TASKS (Morado) */}
-      {/* Esta es la parte que faltaba para que funcione el botón */}
       <Route path="/tasks">
         {() => <PrivateRoute component={WeeklyTasks} categoryColor="#A855F7" />}
       </Route>

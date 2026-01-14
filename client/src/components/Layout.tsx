@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronLeft, LogOut } from 'lucide-react';
+import { ChevronLeft, Settings as SettingsIcon } from 'lucide-react'; // Importamos el icono de ajustes
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore } from '@/lib/store';
+// import { useStore } from '@/lib/store'; // Ya no necesitamos useStore aquí para el logout
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,15 +16,10 @@ interface LayoutProps {
 export default function Layout({ children, title, showBack = true, className, action }: LayoutProps) {
   const [_, setLocation] = useLocation();
   const [scrolled, setScrolled] = useState(false);
-  const { currentUser, logout } = useStore();
+  // const { currentUser, logout } = useStore(); // Ya no gestionamos logout aquí
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setScrolled(e.currentTarget.scrollTop > 20);
-  };
-
-  const handleLogout = () => {
-    logout();
-    setLocation('/login');
   };
 
   return (
@@ -37,33 +32,31 @@ export default function Layout({ children, title, showBack = true, className, ac
         )}
       >
         <div className="flex items-center justify-between h-11 max-w-md mx-auto w-full relative">
+          
+          {/* ZONA IZQUIERDA: ATRÁS O AJUSTES */}
           <div className="flex items-center w-1/3">
             {showBack ? (
               <motion.button 
                 whileTap={{ opacity: 0.5 }}
-                onClick={() => setLocation('/')}
+                onClick={() => setLocation('/')} // O history.back() si prefieres
                 className="flex items-center text-flow-green -ml-2 p-2"
               >
                 <ChevronLeft className="w-7 h-7" strokeWidth={2.5} />
                 <span className="text-[17px] font-medium leading-none pb-0.5">Back</span>
               </motion.button>
             ) : (
-              // User Avatar/Logout on Home
+              // 👇 AQUÍ ESTÁ EL CAMBIO: BOTÓN DE AJUSTES EN VEZ DE LOGOUT
               <motion.button
                 whileTap={{ scale: 0.95 }}
-                onClick={handleLogout}
-                className="flex items-center gap-2 bg-white/5 pr-3 pl-1 py-1 rounded-full border border-white/5 group hover:bg-red-500/10 hover:border-red-500/20 transition-all"
+                onClick={() => setLocation('/settings')}
+                className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white transition-colors border border-white/5"
               >
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] font-bold group-hover:from-red-500 group-hover:to-red-600">
-                  {currentUser?.name.charAt(0)}
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-[10px] font-bold leading-none uppercase text-muted-foreground group-hover:text-red-400">Log Out</span>
-                </div>
+                <SettingsIcon className="w-5 h-5" />
               </motion.button>
             )}
           </div>
           
+          {/* TÍTULO CENTRAL (Se muestra al hacer scroll) */}
           <div className="w-1/3 flex justify-center">
              <AnimatePresence>
                {scrolled && title && (
@@ -79,6 +72,7 @@ export default function Layout({ children, title, showBack = true, className, ac
              </AnimatePresence>
           </div>
 
+          {/* ZONA DERECHA: ACCIONES ESPECÍFICAS (Botón +) */}
           <div className="w-1/3 flex justify-end">
             {action}
           </div>
@@ -94,7 +88,7 @@ export default function Layout({ children, title, showBack = true, className, ac
         )}
       >
         <div className={cn("px-5 pt-20 pb-10", !showBack && "pt-16")}>
-          {/* Large Title Area */}
+          {/* Título Grande (Se oculta al hacer scroll) */}
           {!scrolled && title && (
             <motion.h1 
               initial={{ opacity: 0, scale: 0.98 }}
