@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   phoneNumber: text("phone_number"),
   isSystemAdmin: boolean("is_system_admin").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  avatarUrl: text("avatar_url"),
 });
 
 

@@ -1,3 +1,6 @@
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
@@ -206,6 +209,61 @@ export async function registerRoutes(app: Express): Promise<void> {
     res.json({ message: "User rejected" });
   });
 
+  // --- CONFIGURACIÓN DE SUBIDA DE IMÁGENES (MULTER) ---
+  // Aseguramos que la carpeta uploads existe
+  const uploadDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  const storageConfig = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadDir)
+    },
+    filename: function (req, file, cb) {
+      // Nombre único: timestamp + extensión original
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  });
+
+  const upload = multer({ 
+    storage: storageConfig,
+    limits: { fileSize: 5 * 1024 * 1024 }, // Límite de 5MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only images are allowed'));
+        }
+    }
+  });
+
+  // --- RUTA PARA SUBIR AVATAR ---
+  app.post('/api/user/avatar', upload.single('avatar'), async (req: any, res: Response) => {
+    if (!req.session.user) return res.status(401).send("Unauthorized");
+    if (!req.file) return res.status(400).send("No file uploaded");
+
+    try {
+        // La URL será relativa al servidor
+        const fileUrl = `/uploads/${req.file.filename}`;
+
+        // Actualizamos el usuario en la DB
+        const [updatedUser] = await db.update(users)
+            .set({ avatarUrl: fileUrl })
+            .where(eq(users.id, req.session.user.id))
+            .returning();
+        
+        // Actualizamos la sesión
+        req.session.user = updatedUser;
+            
+        res.json({ success: true, avatarUrl: fileUrl, user: updatedUser });
+    } catch (error) {
+        console.error("Avatar upload error:", error);
+        res.status(500).send("Error uploading avatar");
+    }
+  });
+  
   // ==================== INVENTORY ====================
   app.get("/api/inventory", async (req, res) => {
     if (!req.session.user) return res.sendStatus(401);

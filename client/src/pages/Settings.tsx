@@ -1,23 +1,71 @@
+import { useRef, useState } from 'react';
 import Layout from '@/components/Layout';
 import { useStore } from '@/lib/store';
 import { useLocation } from 'wouter';
 import { Button } from "@/components/ui/button";
-import { LogOut, Shield, MapPin, Mail } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LogOut, Shield, MapPin, Mail, Camera } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+// Importamos el nuevo componente
+import ProfileAvatar from '@/components/ProfileAvatar';
 
 export default function Settings() {
-  // ✅ CORRECCIÓN: Usamos 'logout' en lugar de 'setUser'
-  const { currentUser, logout } = useStore();
+  const { currentUser, logout,  } = useStore();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleLogout = async () => {
     try {
-      // Al llamar a logout(), el store se encarga de limpiar el usuario y cerrar sesión
-      await logout(); 
-      setLocation('/auth'); // O '/login', según tu ruta de entrada
+      await logout();
+      setLocation('/auth');
     } catch (error) {
       console.error("Logout failed", error);
     }
+  };
+
+  // Función que se ejecuta al seleccionar un archivo de la galería
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    // Validar tamaño (ej: 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "Error", description: "Image too large (Max 5MB)", variant: "destructive" });
+        return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+        const res = await fetch('/api/user/avatar', {
+            method: 'POST',
+            body: formData // No hacen falta headers, el navegador los pone automáticamente para FormData
+        });
+
+        if (!res.ok) throw new Error("Upload failed");
+        
+        const data = await res.json();
+        
+        toast({ title: "Success", description: "Profile photo updated. Reloading..." });
+// Recargamos la página para que se vea la foto nueva en todas partes
+setTimeout(() => window.location.reload(), 1000);
+
+    } catch (error) {
+        console.error("Error uploading avatar:", error);
+        toast({ title: "Error", description: "Failed to upload photo.", variant: "destructive" });
+    } finally {
+        setIsUploading(false);
+        // Limpiamos el input para poder volver a subir el mismo archivo si se quiere
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Función para simular el clic en el input oculto
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   if (!currentUser) return null;
@@ -26,14 +74,37 @@ export default function Settings() {
     <Layout title="My Profile" showBack>
       <div className="space-y-6 pb-10">
         
-        {/* 1. TARJETA DE PERFIL */}
-        <div className="bg-[#1C1C1E] rounded-3xl p-6 border border-white/5 flex flex-col items-center text-center">
-            <div className="w-24 h-24 rounded-full border-4 border-black/40 mb-4 relative">
-                <Avatar className="w-full h-full">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`} />
-                    <AvatarFallback>{currentUser.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className={`absolute bottom-0 right-0 w-6 h-6 rounded-full border-2 border-[#1C1C1E] ${currentUser.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
+        {/* 1. TARJETA DE PERFIL CON SUBIDA DE FOTO */}
+        <div className="bg-[#1C1C1E] rounded-3xl p-6 border border-white/5 flex flex-col items-center text-center relative overflow-hidden">
+            
+            {/* Input oculto para la galería */}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileSelect} 
+                accept="image/png, image/jpeg, image/jpg" 
+                className="hidden"
+            />
+            
+            {/* Área del Avatar Clicable */}
+            <div 
+                onClick={triggerFileInput}
+                className={`w-28 h-28 relative mb-4 group cursor-pointer rounded-full ${isUploading ? 'opacity-50' : ''}`}
+            >
+                {/* Usamos el nuevo componente */}
+                <ProfileAvatar 
+                    user={currentUser} 
+                    className="w-full h-full border-4 border-[#1C1C1E] shadow-xl" 
+                    iconClassName="w-12 h-12"
+                />
+                
+                {/* Overlay de "Cámara" al pasar el ratón */}
+                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="w-8 h-8 text-white/80" />
+                </div>
+
+                {/* Indicador de estado */}
+                <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-[#1C1C1E] z-10 ${currentUser.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
             </div>
             
             <h2 className="text-2xl font-bold text-white mb-1">{currentUser.name}</h2>
@@ -44,13 +115,15 @@ export default function Settings() {
                     {currentUser.role}
                 </span>
             </div>
+            
+             {isUploading && <p className="text-xs text-muted-foreground mt-2 animate-pulse">Uploading...</p>}
         </div>
 
         {/* 2. DATOS DE LA CUENTA */}
         <div className="space-y-4">
             <h3 className="text-lg font-bold text-white px-2">Account Details</h3>
-            
             <div className="bg-[#1C1C1E] rounded-2xl border border-white/5 overflow-hidden">
+                {/* ... (El resto de los datos igual que antes) ... */}
                 <div className="p-4 flex items-center gap-4 border-b border-white/5">
                     <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
                         <Mail className="w-5 h-5" />
@@ -60,7 +133,6 @@ export default function Settings() {
                         <div className="text-white font-medium">{currentUser.email}</div>
                     </div>
                 </div>
-
                 <div className="p-4 flex items-center gap-4 border-b border-white/5">
                     <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
                         <MapPin className="w-5 h-5" />
@@ -70,8 +142,7 @@ export default function Settings() {
                         <div className="text-white font-medium">{currentUser.establishment}</div>
                     </div>
                 </div>
-
-                <div className="p-4 flex items-center gap-4">
+                 <div className="p-4 flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-400">
                         <Shield className="w-5 h-5" />
                     </div>
@@ -93,8 +164,8 @@ export default function Settings() {
                 <LogOut className="w-5 h-5" />
                 Log Out
             </Button>
-            <p className="text-center text-xs text-muted-foreground mt-4 opacity-50">
-                FlowOps v1.0 • Logged in as {currentUser.username}
+             <p className="text-center text-xs text-muted-foreground mt-4 opacity-50">
+                FlowOps v1.1 • {currentUser.username}
             </p>
         </div>
 

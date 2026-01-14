@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Send, 
   Plus, 
@@ -23,10 +22,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+// ✅ IMPORTANTE: Importamos tu nuevo componente de Avatar
+import ProfileAvatar from '@/components/ProfileAvatar';
 
 // --- OPCIONES RÁPIDAS (CHIPS) ---
 const QUICK_REPLIES = [
-  "Who can cover my shift? 🔄", // <--- AÑADIDO AQUÍ PRIMERO
+  "Who can cover my shift? 🔄",
   "Inventory arrived 📦",
   "Need help front 🆘",
   "Backup needed 🏃",
@@ -89,7 +90,6 @@ export default function Chat() {
   };
 
   const handleQuickReply = (text: string) => {
-    // Al pulsar una respuesta rápida, la ponemos en el input
     setNewMessage(text);
   };
 
@@ -114,12 +114,6 @@ export default function Chat() {
   const formatTime = (dateString: string | Date) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const renderAttachment = (msg: any) => {
-      // Nota: Como la DB actual solo guarda texto, esto es visual por si en el futuro expandes la DB.
-      // Por ahora el archivo se envía como texto "[File: nombre]".
-      return null; 
   };
 
   return (
@@ -147,11 +141,20 @@ export default function Chat() {
                             animate={{ opacity: 1, y: 0 }}
                             className={`flex items-end gap-3 ${isCurrentUser ? 'flex-row-reverse' : ''}`}
                         >
+                            {/* 👇 AQUÍ USAMOS TU NUEVO AVATAR */}
                             {!isCurrentUser && (
-                            <Avatar className="w-8 h-8 border border-white/10">
-                                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender}`} />
-                                <AvatarFallback>{msg.sender[0]}</AvatarFallback>
-                            </Avatar>
+                                <div className="shrink-0">
+                                    <ProfileAvatar 
+                                        user={{ 
+                                            name: msg.sender, 
+                                            // Nota: Si en el futuro conectas el chat con la tabla de usuarios completa, 
+                                            // aquí podrás pasar la URL real. Por ahora saldrá el monigote gris.
+                                            avatarUrl: undefined 
+                                        }} 
+                                        className="w-8 h-8 border border-white/10"
+                                        iconClassName="w-4 h-4"
+                                    />
+                                </div>
                             )}
 
                             <div className={`max-w-[75%] group ${isCurrentUser ? 'items-end' : 'items-start'} flex flex-col`}>

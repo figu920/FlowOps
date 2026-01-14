@@ -1,4 +1,4 @@
-// api/index.ts
+import path from 'path';
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import session from "express-session";
@@ -33,6 +33,8 @@ app.use(
     },
   })
 );
+
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // --- Middleware para parsear JSON y URL-encoded ---
 // Aumentamos el limite a 10mb para permitir subida de fotos

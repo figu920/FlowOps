@@ -9,14 +9,15 @@ import {
   Box, 
   Refrigerator,
   CalendarClock,
-  Settings,
+  LogOut,
   Users,
   AlertTriangle,
   CheckCircle2,
-  ClipboardList // <--- IMPORTANTE: Nuevo Icono
+  ClipboardList
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import ProfileAvatar from "@/components/ProfileAvatar"; // ✅ Importamos tu nuevo Avatar
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -26,7 +27,6 @@ export default function Home() {
   const { data: tasks = [] } = useTasks();
   
   const lowStockCount = inventory.filter((i: any) => i.status === 'LOW').length;
-  // Solo contamos las tareas del calendario en el contador de arriba
   const pendingTasksCount = tasks.filter((t: any) => !t.completed && t.notes?.includes('DATE:')).length;
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -62,7 +62,6 @@ export default function Home() {
     </div>
   );
 
-  // 🔥 NUEVO LOGO PARA WEEKLY TASKS
   const TasksLogo = () => (
     <div className="w-14 h-14 rounded-full bg-purple-500 flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.3)]">
       <ClipboardList className="w-7 h-7 text-white" strokeWidth={2.5} />
@@ -106,7 +105,7 @@ export default function Home() {
       glowColor: 'bg-[#3B82F6]' 
     },
     { 
-      title: 'Tasks', // 🔥 NUEVA ENTRADA
+      title: 'Tasks', 
       path: '/tasks', 
       customIcon: <TasksLogo />,
       glowColor: 'bg-purple-500' 
@@ -162,13 +161,17 @@ export default function Home() {
                    </h1>
                </div>
                
-               <button 
-    onClick={() => setLocation('/settings')} 
-    className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors border border-white/5"
->
-    <Settings className="w-4 h-4" />
-    <span>Profile</span>
-</button>
+               {/* ✅ AQUÍ ESTÁ TU FOTO DE PERFIL QUE LLEVA A AJUSTES */}
+               <div 
+                  onClick={() => setLocation('/settings')}
+                  className="cursor-pointer transition-transform active:scale-95"
+               >
+                  <ProfileAvatar 
+                    user={currentUser!} 
+                    className="w-12 h-12 border-2 border-white/10 shadow-lg" 
+                    iconClassName="w-6 h-6"
+                  />
+               </div>
            </div>
         </div>
 
