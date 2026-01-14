@@ -434,9 +434,49 @@ export default function Inventory({ categoryColor = '#4CAF50' }: { categoryColor
               
               <div>
                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Unit</label>
-                <select className="w-full h-10 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" value={newItemUnit} onChange={(e) => setNewItemUnit(e.target.value)}>
-                  <option value="units">Units</option><option value="lb">lb</option><option value="kg">kg</option><option value="L">L</option><option value="box">Box</option>
-                </select>
+                <div className="relative">
+                    <select 
+                        className="w-full h-10 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 appearance-none cursor-pointer" 
+                        value={newItemUnit} 
+                        onChange={(e) => setNewItemUnit(e.target.value)}
+                    >
+                        <optgroup label="Common Containers" className="bg-[#1C1C1E] text-white font-bold">
+                            <option value="units">Units (ea)</option>
+                            <option value="box">Box</option>
+                            <option value="pack">Pack</option>
+                            <option value="jar">Jar</option>
+                            <option value="can">Can</option>
+                            <option value="btl">Bottle</option>
+                            <option value="bag">Bag</option>
+                            <option value="case">Case</option>
+                        </optgroup>
+
+                        <optgroup label="US Volume" className="bg-[#1C1C1E] text-white font-bold">
+                            <option value="gal">Gallon (gal)</option>
+                            <option value="qt">Quart (qt)</option>
+                            <option value="pt">Pint (pt)</option>
+                            <option value="cup">Cup</option>
+                            <option value="fl oz">Fluid Oz (fl oz)</option>
+                        </optgroup>
+
+                        <optgroup label="US Weight" className="bg-[#1C1C1E] text-white font-bold">
+                            <option value="lb">Pound (lb)</option>
+                            <option value="oz">Ounce (oz)</option>
+                        </optgroup>
+
+                        <optgroup label="Metric" className="bg-[#1C1C1E] text-white font-bold">
+                            <option value="kg">Kilogram (kg)</option>
+                            <option value="g">Gram (g)</option>
+                            <option value="L">Liter (L)</option>
+                            <option value="ml">Milliliter (ml)</option>
+                        </optgroup>
+                    </select>
+                    
+                    {/* Flecha personalizada para reemplazar la del navegador */}
+                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-muted-foreground">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
               </div>
 
               <div>
