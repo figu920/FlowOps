@@ -1,22 +1,35 @@
 import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
-import { useChecklists, useTasks, useCreateTask, useDeleteTask } from '@/lib/hooks'; 
+import { useChecklists, useTasks, useCreateTask, useDeleteTask, useCreateChecklist, useUpdateChecklist, useDeleteChecklist } from '@/lib/hooks'; 
+import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, Sun, Moon, Clock, 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info
+  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info,
+  Plus, Trash2, Edit2, X, Save
 } from 'lucide-react';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 
 export default function WeeklyTasks() {
+  const { currentUser } = useStore();
+  const { toast } = useToast();
+
   // --- ESTADOS ---
   const [selectedDate, setSelectedDate] = useState(new Date());
   
-  // Guardamos la tarea Y su categoría para poder completarla desde el modal
+  // Estado para ver/editar tarea existente
   const [viewingTask, setViewingTask] = useState<{ template: any, categoryId: string } | null>(null);
+  const [isEditingMode, setIsEditingMode] = useState(false);
+  const [editedText, setEditedText] = useState("");
+
+  // Estado para añadir nueva tarea
+  const [isAddingTask, setIsAddingTask] = useState<{ category: string } | null>(null);
+  const [newTaskText, setNewTaskText] = useState("");
 
   // --- DATOS ---
   const { data: openingTemplates = [] } = useChecklists("opening");
@@ -24,8 +37,17 @@ export default function WeeklyTasks() {
   const { data: closingTemplates = [] } = useChecklists("closing");
   const { data: allTasks = [] } = useTasks();
   
+  // --- MUTACIONES (Operaciones Diarias) ---
   const createTaskMutation = useCreateTask();
   const deleteTaskMutation = useDeleteTask();
+
+  // --- MUTACIONES (Gestión de Plantillas) ---
+  const createChecklistMutation = useCreateChecklist();
+  const updateChecklistMutation = useUpdateChecklist();
+  const deleteChecklistMutation = useDeleteChecklist();
+
+  // Permisos: Solo managers/admins pueden editar las plantillas
+  const canManageTemplates = currentUser?.role === 'manager' || currentUser?.role === 'lead' || currentUser?.isSystemAdmin;
 
   // --- LOGICA DE FECHAS ---
   const dateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
@@ -34,8 +56,9 @@ export default function WeeklyTasks() {
   const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1));
   const handleToday = () => setSelectedDate(new Date());
 
-  // --- LOGICA DE ESTADO ---
+  // --- LOGICA DE ESTADO (COMPLETADO/PENDIENTE) ---
   const getCompletionStatus = (templateText: string, category: string) => {
+      // Buscamos por texto exacto Y fecha Y categoría
       return allTasks.find((t: any) => 
           t.text === templateText && 
           t.notes?.includes(`DATE:${dateKey}`) && 
@@ -51,10 +74,48 @@ export default function WeeklyTasks() {
       } else {
           createTaskMutation.mutate({
               text: template.text,
-              assignedTo: 'Team',
+              assignedTo: currentUser?.name || 'Team',
               notes: `DATE:${dateKey}|CAT:${category}|REF:${template.id}`,
               completed: true 
           });
+      }
+  };
+
+  // --- HANDLERS DE GESTIÓN (AÑADIR/EDITAR/BORRAR) ---
+  
+  const handleAddNewTemplate = () => {
+      if (!isAddingTask || !newTaskText.trim()) return;
+      
+      createChecklistMutation.mutate({
+          text: newTaskText,
+          listType: isAddingTask.category.toLowerCase(), // 'opening', 'shift', 'closing'
+          establishment: currentUser?.establishment || 'Global'
+      });
+      
+      setIsAddingTask(null);
+      setNewTaskText("");
+      toast({ title: "Task Added", description: "Added to the checklist successfully." });
+  };
+
+  const handleUpdateTemplate = () => {
+      if (!viewingTask || !editedText.trim()) return;
+
+      updateChecklistMutation.mutate({
+          id: viewingTask.template.id,
+          updates: { text: editedText }
+      });
+
+      setIsEditingMode(false);
+      setViewingTask(null); // Cerramos tras editar
+      toast({ title: "Task Updated", description: "Checklist item updated." });
+  };
+
+  const handleDeleteTemplate = () => {
+      if (!viewingTask) return;
+      if (confirm("Are you sure you want to delete this task permanently from the list?")) {
+          deleteChecklistMutation.mutate(viewingTask.template.id);
+          setViewingTask(null);
+          toast({ title: "Task Deleted", description: "Removed from checklist." });
       }
   };
 
@@ -76,9 +137,20 @@ export default function WeeklyTasks() {
              </div>
              <span className={cn("text-xl font-black tabular-nums tracking-tight", color)}>{Math.round(progress)}%</span>
           </div>
-          <div className="relative z-10">
-            <h3 className="text-base font-bold text-white uppercase tracking-wider">{title}</h3>
-            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{completedCount} of {totalCount} Done</p>
+          <div className="relative z-10 flex justify-between items-end">
+            <div>
+                <h3 className="text-base font-bold text-white uppercase tracking-wider">{title}</h3>
+                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{completedCount} of {totalCount} Done</p>
+            </div>
+            {/* BOTÓN AÑADIR (+) */}
+            {canManageTemplates && (
+                <button 
+                    onClick={() => setIsAddingTask({ category: categoryId })}
+                    className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/20 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
+                >
+                    <Plus className="w-4 h-4" />
+                </button>
+            )}
           </div>
         </div>
 
@@ -96,8 +168,11 @@ export default function WeeklyTasks() {
                <motion.div
                  key={tpl.id}
                  layout
-                 // 1. AL PINCHAR, GUARDAMOS TAREA + CATEGORÍA
-                 onClick={() => setViewingTask({ template: tpl, categoryId })} 
+                 onClick={() => {
+                     setViewingTask({ template: tpl, categoryId });
+                     setEditedText(tpl.text);
+                     setIsEditingMode(false);
+                 }} 
                  className={cn(
                    "group p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all duration-200 active:scale-[0.98]",
                    isCompleted 
@@ -105,7 +180,6 @@ export default function WeeklyTasks() {
                       : "bg-[#1C1C1E] border-white/5 hover:border-white/10 hover:bg-white/5"
                  )}
                >
-                 {/* Círculo para marcar rápido */}
                  <div 
                     onClick={(e) => { e.stopPropagation(); toggleItem(tpl, categoryId); }}
                     className={cn(
@@ -119,7 +193,6 @@ export default function WeeklyTasks() {
                  </div>
                  
                  <div className="flex-1 min-w-0">
-                    {/* 2. CAMBIO AQUÍ: 'truncate' para una sola línea limpia */}
                     <span className={cn(
                         "text-sm font-medium leading-tight transition-colors block truncate", 
                         isCompleted ? "text-white" : "text-white/70"
@@ -128,6 +201,7 @@ export default function WeeklyTasks() {
                     </span>
                  </div>
                  
+                 {/* Icono discreto para indicar que se puede abrir */}
                  <Info className="w-3 h-3 text-white/10 group-hover:text-white/30 shrink-0" />
                </motion.div>
              );
@@ -137,7 +211,6 @@ export default function WeeklyTasks() {
     );
   };
 
-  // Helper para el modal
   const isViewingTaskCompleted = viewingTask 
     ? !!getCompletionStatus(viewingTask.template.text, viewingTask.categoryId) 
     : false;
@@ -175,50 +248,110 @@ export default function WeeklyTasks() {
         <TaskColumn title="Closing" icon={Moon} color="text-purple-400" bg="bg-purple-500/10" templates={closingTemplates} categoryId="Closing" />
       </div>
 
-      {/* MODAL DETALLES Y ACCIÓN */}
+      {/* MODAL DETALLES / EDICIÓN / COMPLETADO */}
       <Dialog open={!!viewingTask} onOpenChange={() => setViewingTask(null)}>
         <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
-            <DialogHeader>
-                <DialogTitle className="text-xl">Task Details</DialogTitle>
+            <DialogHeader className="flex flex-row items-center justify-between">
+                <DialogTitle className="text-xl">
+                    {isEditingMode ? 'Edit Task' : 'Task Details'}
+                </DialogTitle>
+                
+                {/* BOTONES DE GESTIÓN (EDITAR / BORRAR) */}
+                {canManageTemplates && !isEditingMode && (
+                    <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => setIsEditingMode(true)} className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10 rounded-full">
+                            <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={handleDeleteTemplate} className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full">
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
+                    </div>
+                )}
             </DialogHeader>
             
             <div className="py-6">
-                <p className="text-lg text-white font-medium leading-relaxed">
-                    {viewingTask?.template.text}
-                </p>
-                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground bg-white/5 p-2 rounded-lg">
-                    <span className="uppercase font-bold text-[10px] tracking-wider bg-white/10 px-1.5 py-0.5 rounded">
-                        {viewingTask?.categoryId}
-                    </span>
-                    <span>Task for {format(selectedDate, 'MMM do')}</span>
-                </div>
+                {isEditingMode ? (
+                    <div className="space-y-3">
+                        <Input 
+                            autoFocus
+                            value={editedText}
+                            onChange={(e) => setEditedText(e.target.value)}
+                            className="bg-black/20 border-white/10 text-lg font-medium"
+                        />
+                        <p className="text-xs text-muted-foreground">This will update the task for everyone.</p>
+                    </div>
+                ) : (
+                    <>
+                        <p className="text-lg text-white font-medium leading-relaxed">
+                            {viewingTask?.template.text}
+                        </p>
+                        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground bg-white/5 p-2 rounded-lg">
+                            <span className="uppercase font-bold text-[10px] tracking-wider bg-white/10 px-1.5 py-0.5 rounded">
+                                {viewingTask?.categoryId}
+                            </span>
+                            <span>Task for {format(selectedDate, 'MMM do')}</span>
+                        </div>
+                    </>
+                )}
             </div>
 
             <DialogFooter className="flex-col gap-2 sm:flex-row">
-                {/* 3. BOTÓN PARA COMPLETAR DENTRO DEL MODAL */}
-                <Button 
-                    onClick={() => {
-                        if (viewingTask) {
-                            toggleItem(viewingTask.template, viewingTask.categoryId);
-                            setViewingTask(null); // Cerramos tras accionar
-                        }
-                    }} 
-                    className={cn(
-                        "w-full font-bold h-12 text-base",
-                        isViewingTaskCompleted 
-                            ? "bg-white/10 text-white hover:bg-white/20" 
-                            : "bg-flow-green text-black hover:bg-flow-green/90"
-                    )}
-                >
-                    {isViewingTaskCompleted ? (
-                        <>Mark as Incomplete</>
-                    ) : (
-                        <><Check className="w-5 h-5 mr-2" /> Mark as Done</>
-                    )}
-                </Button>
-                
-                <Button variant="ghost" onClick={() => setViewingTask(null)} className="w-full text-muted-foreground hover:text-white">
-                    Close
+                {isEditingMode ? (
+                    <div className="flex gap-2 w-full">
+                        <Button variant="outline" onClick={() => setIsEditingMode(false)} className="flex-1 border-white/10 hover:bg-white/5 text-white">Cancel</Button>
+                        <Button onClick={handleUpdateTemplate} className="flex-1 bg-blue-500 text-white font-bold"><Save className="w-4 h-4 mr-2"/> Save</Button>
+                    </div>
+                ) : (
+                    <>
+                        <Button 
+                            onClick={() => {
+                                if (viewingTask) {
+                                    toggleItem(viewingTask.template, viewingTask.categoryId);
+                                    setViewingTask(null);
+                                }
+                            }} 
+                            className={cn(
+                                "w-full font-bold h-12 text-base",
+                                isViewingTaskCompleted 
+                                    ? "bg-white/10 text-white hover:bg-white/20" 
+                                    : "bg-flow-green text-black hover:bg-flow-green/90"
+                            )}
+                        >
+                            {isViewingTaskCompleted ? (
+                                <>Mark as Incomplete</>
+                            ) : (
+                                <><Check className="w-5 h-5 mr-2" /> Mark as Done</>
+                            )}
+                        </Button>
+                        
+                        <Button variant="ghost" onClick={() => setViewingTask(null)} className="w-full text-muted-foreground hover:text-white">
+                            Close
+                        </Button>
+                    </>
+                )}
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL PARA AÑADIR NUEVA TAREA */}
+      <Dialog open={!!isAddingTask} onOpenChange={() => setIsAddingTask(null)}>
+        <DialogContent className="bg-[#1C1C1E] border-white/10 text-white w-[90%] rounded-2xl p-6">
+            <DialogHeader>
+                <DialogTitle>Add to {isAddingTask?.category}</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Task Description</label>
+                <Input 
+                    autoFocus
+                    value={newTaskText} 
+                    onChange={(e) => setNewTaskText(e.target.value)} 
+                    placeholder="e.g. Check temperature log"
+                    className="bg-black/20 border-white/10"
+                />
+            </div>
+            <DialogFooter>
+                <Button onClick={handleAddNewTemplate} className="w-full bg-flow-green text-black font-bold">
+                    Add Task
                 </Button>
             </DialogFooter>
         </DialogContent>
