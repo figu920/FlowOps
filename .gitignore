@@ -1,0 +1,19 @@
+# Dependencias
+node_modules/
+
+# Build/Compilación
+dist/
+.local/
+.config/
+
+# Secretos (MUY IMPORTANTE)
+.env
+.env.local
+crear-admin.ts
+
+# Archivos de usuario y temporales
+uploads/
+attached_assets/
+generated-icon.png
+*.log
+.DS_Store

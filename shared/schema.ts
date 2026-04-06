@@ -1,0 +1,286 @@
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, timestamp, boolean, integer, real, json } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+import { relations } from "drizzle-orm";
+
+// 1. DEFINIR LOS ROLES
+export const ROLES = {
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  SUPERVISOR: 'supervisor',
+  LEAD: 'lead',
+  EMPLOYEE: 'employee',
+} as const;
+// ============ USERS (ACTUALIZADO) ============
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  
+  // AQUI EL CAMBIO: Añadimos 'supervisor' a los roles permitidos
+  role: text("role").notNull().default('employee'), // 'admin' | 'manager' | 'supervisor' | 'lead' | 'employee'
+  
+  status: text("status").notNull().default('pending'), // 'active' | 'pending' | 'removed'
+  establishment: text("establishment").notNull(), // 'Bison Den' | 'Trailblazer Café' | 'Global'
+  phoneNumber: text("phone_number"),
+  isSystemAdmin: boolean("is_system_admin").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  avatarUrl: text("avatar_url"),
+});
+
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+
+// ============ INVENTORY (ACTUALIZADO) ============
+// Cambiamos la 'I' mayúscula por 'i' minúscula
+export const inventory = pgTable("inventory", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emoji: text("emoji").notNull(),
+  name: text("name").notNull(),
+  category: text("category"),
+  
+  // Mantenemos status para compatibilidad visual
+  status: text("status").notNull().default('OK'), 
+  
+  // --- NUEVOS CAMPOS PARA EL CÁLCULO DE MERMAS ---
+  quantity: real("quantity").default(0),      // Ej: 5.5
+  unit: text("unit").default('units'),        // Ej: 'kg', 'L', 'box'
+  costPerUnit: real("cost_per_unit"),         // Ej: 10.50 (Coste por kg/unidad)
+  // ------------------------------------------------
+  
+  establishment: text("establishment").notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+  updatedBy: text("updated_by").notNull(),
+  lowComment: text("low_comment"),
+});
+
+export const insertInventorySchema = createInsertSchema(inventory).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export type InsertInventory = z.infer<typeof insertInventorySchema>;
+export type Inventory = typeof inventory.$inferSelect;
+
+
+// ============ EQUIPMENT ============
+export const equipment = pgTable("equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category"),
+  status: text("status").notNull().default('Working'), // 'Working' | 'Attention' | 'Broken'
+  establishment: text("establishment").notNull(),
+  lastIssue: text("last_issue"),
+});
+
+export const insertEquipmentSchema = createInsertSchema(equipment).omit({
+  id: true,
+});
+
+export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
+export type Equipment = typeof equipment.$inferSelect;
+
+// ============ CHECKLIST ITEMS ============
+export const checklistItems = pgTable("checklist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  text: text("text").notNull(),
+  listType: text("list_type").notNull(), // 'opening' | 'shift' | 'closing'
+  establishment: text("establishment").notNull(),
+  completed: boolean("completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  completedBy: text("completed_by"),
+  assignedTo: text("assigned_to"),
+  notes: text("notes"),
+});
+
+export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({
+  id: true,
+});
+
+export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
+export type ChecklistItem = typeof checklistItems.$inferSelect;
+
+// ============ WEEKLY TASKS ============
+export const weeklyTasks = pgTable("weekly_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  text: text("text").notNull(),
+  establishment: text("establishment").notNull(),
+  assignedTo: text("assigned_to").notNull(),
+  completed: boolean("completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+});
+
+export const insertWeeklyTaskSchema = createInsertSchema(weeklyTasks).omit({
+  id: true,
+});
+
+export type InsertWeeklyTask = z.infer<typeof insertWeeklyTaskSchema>;
+export type WeeklyTask = typeof weeklyTasks.$inferSelect;
+
+// ============ TASK COMPLETIONS (History) ============
+export const taskCompletions = pgTable("task_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => weeklyTasks.id, { onDelete: 'cascade' }),
+  completedAt: timestamp("completed_at").defaultNow().notNull(),
+  completedBy: text("completed_by").notNull(),
+  photo: text("photo").notNull(),
+});
+
+export const insertTaskCompletionSchema = createInsertSchema(taskCompletions).omit({
+  id: true,
+  completedAt: true,
+});
+
+export type InsertTaskCompletion = z.infer<typeof insertTaskCompletionSchema>;
+export type TaskCompletion = typeof taskCompletions.$inferSelect;
+
+// ============ CHAT MESSAGES ============
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  text: text("text").notNull(),
+  establishment: text("establishment").notNull(),
+  sender: text("sender").notNull(),
+  senderRole: text("sender_role").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  type: text("type").notNull().default('text'), // 'text' | 'action'
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// ============ TIMELINE EVENTS ============
+export const timelineEvents = pgTable("timeline_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  text: text("text").notNull(),
+  establishment: text("establishment").notNull(),
+  author: text("author").notNull(),
+  authorRole: text("author_role").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  type: text("type").notNull(), // 'alert' | 'info' | 'success' | 'warning'
+  comment: text("comment"),
+  photo: text("photo"),
+});
+
+export const insertTimelineEventSchema = createInsertSchema(timelineEvents).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertTimelineEvent = z.infer<typeof insertTimelineEventSchema>;
+export type TimelineEvent = typeof timelineEvents.$inferSelect;
+
+// ============ MENU ITEMS ============
+export const menuItems = pgTable("menu_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  establishment: text("establishment").notNull(),
+});
+
+export const insertMenuItemSchema = createInsertSchema(menuItems).omit({
+  id: true,
+});
+
+export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
+export type MenuItem = typeof menuItems.$inferSelect;
+
+// ============ INGREDIENTS (ACTUALIZADO) ============
+export const ingredients = pgTable("ingredients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  menuItemId: varchar("menu_item_id").notNull().references(() => menuItems.id, { onDelete: 'cascade' }),
+  
+  // --- NUEVO CAMPO: EL LINK AL INVENTARIO ---
+  inventoryItemId: varchar("inventory_item_id").references(() => inventory.id), 
+  // ------------------------------------------
+
+  name: text("name").notNull(),
+  quantity: real("quantity").notNull(),
+  unit: text("unit").notNull(), 
+  notes: text("notes"),
+});
+
+export const insertIngredientSchema = createInsertSchema(ingredients).omit({
+  id: true,
+});
+
+export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
+export type Ingredient = typeof ingredients.$inferSelect;
+
+
+
+// ============ NOTIFICATIONS ============
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  recipientId: varchar("recipient_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: text("type").notNull(), // 'user_registration' | 'system'
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  relatedUserId: varchar("related_user_id"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
+
+// ============ SALES (NUEVA TABLA) ============
+export const sales = pgTable("sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  menuItemId: varchar("menu_item_id").references(() => menuItems.id),
+  quantitySold: integer("quantity_sold").notNull(), // Ej: 3
+  date: timestamp("date").defaultNow().notNull(),
+  establishment: text("establishment").notNull(), // Importante para filtrar por local
+});
+
+export const insertSaleSchema = createInsertSchema(sales).omit({
+  id: true,
+  date: true,
+});
+
+export type InsertSale = z.infer<typeof insertSaleSchema>;
+export type Sale = typeof sales.$inferSelect;
+
+// ============ INVENTORY LOGS (NUEVA TABLA) ============
+export const inventoryLogs = pgTable("inventory_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemName: text("item_name").notNull(),
+  change: real("change").notNull(),    // Puede ser decimal (ej: 1.5 kg)
+  reason: text("reason").notNull(),    // "Restock", "Waste", etc.
+  user: text("user").notNull(),        // Quién hizo el cambio
+  date: timestamp("date").defaultNow().notNull(),
+  establishment: text("establishment").notNull(),
+});
+
+export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({
+  id: true,
+  date: true,
+});
+
+export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
+export type InventoryLog = typeof inventoryLogs.$inferSelect;
